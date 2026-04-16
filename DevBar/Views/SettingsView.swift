@@ -49,7 +49,7 @@ struct SettingsView: View {
                             )
                             .onTapGesture {
                                 selectedIcon = iconName
-                                UserDefaults.standard.set(iconName, forKey: Constants.Defaults.menuBarIconKey)
+                                appViewModel.menuBarIcon = iconName
                             }
                     }
                 }

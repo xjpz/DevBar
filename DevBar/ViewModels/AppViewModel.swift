@@ -22,9 +22,10 @@ final class AppViewModel: ObservableObject {
     /// Prevents duplicate handleLoginSuccess calls
     private var isHandlingLogin = false
 
-    var menuBarIcon: String {
-        UserDefaults.standard.string(forKey: Constants.Defaults.menuBarIconKey)
-            ?? Constants.Defaults.defaultMenuBarIcon
+    @Published var menuBarIcon: String {
+        didSet {
+            UserDefaults.standard.set(menuBarIcon, forKey: Constants.Defaults.menuBarIconKey)
+        }
     }
 
     // NOTE: statusText is a stored property, NOT computed.
@@ -64,6 +65,8 @@ final class AppViewModel: ObservableObject {
     }
 
     init() {
+        menuBarIcon = UserDefaults.standard.string(forKey: Constants.Defaults.menuBarIconKey)
+            ?? Constants.Defaults.defaultMenuBarIcon
         if let saved = authService.credentials {
             credentials = saved
             authState = .loggedIn
@@ -120,6 +123,19 @@ final class AppViewModel: ObservableObject {
         authService.logout()
         authState = .notLoggedIn
         updateStatusText()
+    }
+
+    /// Refresh data when the popover opens, but only if the auto-refresh
+    /// interval is long enough (>= 5 min) and the last refresh wasn't too recent.
+    func refreshOnPopoverOpenIfNeeded() {
+        guard authState == .loggedIn, credentials != nil else { return }
+        guard refreshInterval >= 300 else { return }
+        let minimumInterval: TimeInterval = 30
+        if let last = quotaViewModel.lastUpdated,
+           Date().timeIntervalSince(last) < minimumInterval {
+            return
+        }
+        Task { await refreshQuota() }
     }
 
     func refreshQuota() async {

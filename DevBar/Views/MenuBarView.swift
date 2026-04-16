@@ -27,6 +27,7 @@ struct MenuBarView: View {
         .frame(width: Constants.UI.popoverWidth)
         .onAppear {
             appViewModel.appDidFinishLaunching()
+            appViewModel.refreshOnPopoverOpenIfNeeded()
         }
         .onChange(of: appViewModel.authState) { _, newState in
             if newState != .loggedIn {
