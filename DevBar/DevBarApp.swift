@@ -21,6 +21,7 @@ struct DevBarApp: App {
             MenuBarView()
                 .environmentObject(appViewModel)
                 .environmentObject(appViewModel.quotaViewModel)
+                .environmentObject(appViewModel.updateViewModel)
         } label: {
             MenuBarIconView(text: appViewModel.statusText, iconName: appViewModel.menuBarIcon)
         }

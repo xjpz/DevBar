@@ -3,6 +3,8 @@
 
 import SwiftUI
 import Combine
+import ServiceManagement
+import AppKit
 
 @MainActor
 final class AppViewModel: ObservableObject {
@@ -18,9 +20,11 @@ final class AppViewModel: ObservableObject {
 
     private let authService = AuthService()
     let quotaViewModel = QuotaViewModel()
+    let updateViewModel = UpdateViewModel()
     private var statusTextUpdateTask: Task<Void, Never>?
     /// Prevents duplicate handleLoginSuccess calls
     private var isHandlingLogin = false
+    private var settingsWindow: NSWindow?
 
     @Published var menuBarIcon: String {
         didSet {
@@ -82,6 +86,11 @@ final class AppViewModel: ObservableObject {
         Task { @MainActor [weak self] in
             await Task.yield()
             self?.startRefreshIfNeeded()
+        }
+        // Delayed update check (independent of auth state)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(Constants.Update.launchCheckDelay))
+            self?.updateViewModel.checkForUpdates(silent: true)
         }
     }
 
@@ -170,6 +179,63 @@ final class AppViewModel: ObservableObject {
     func setHiddenFromDock(_ hide: Bool) {
         UserDefaults.standard.set(hide, forKey: Constants.Defaults.hideFromDockKey)
         NSApplication.shared.setActivationPolicy(hide ? .accessory : .regular)
+    }
+
+    // MARK: - Launch at Login
+
+    var launchAtLogin: Bool {
+        get { UserDefaults.standard.bool(forKey: Constants.Defaults.launchAtLoginKey) }
+        set {
+            UserDefaults.standard.set(newValue, forKey: Constants.Defaults.launchAtLoginKey)
+            do {
+                if newValue {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                print("[DevBar] Launch at login error: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: - Settings Window
+
+    func showSettings() {
+        // If window exists and is visible, just bring to front
+        if let window = settingsWindow, window.isVisible {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        // Clean up previous window
+        settingsWindow = nil
+
+        let settingsView = SettingsView()
+            .environmentObject(self)
+            .environmentObject(quotaViewModel)
+            .environmentObject(updateViewModel)
+
+        let hostingView = NSHostingView(rootView: settingsView)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: 480),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = hostingView
+        window.title = "DevBar 设置"
+        window.center()
+        window.level = .floating
+        window.isReleasedWhenClosed = false
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow = window
+    }
+
+    func hideSettings() {
+        settingsWindow?.orderOut(nil)
+        settingsWindow = nil
     }
 }
 

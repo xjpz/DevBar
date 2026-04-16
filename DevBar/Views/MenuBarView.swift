@@ -6,15 +6,12 @@ import SwiftUI
 struct MenuBarView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @EnvironmentObject private var quotaViewModel: QuotaViewModel
-    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 0) {
-            LoggedInContentView(
-                showSettings: $showSettings
-            )
-            .opacity(appViewModel.authState == .loggedIn ? 1 : 0)
-            .allowsHitTesting(appViewModel.authState == .loggedIn)
+            LoggedInContentView()
+                .opacity(appViewModel.authState == .loggedIn ? 1 : 0)
+                .allowsHitTesting(appViewModel.authState == .loggedIn)
 
             if appViewModel.authState != .loggedIn {
                 if appViewModel.authState == .loading {
@@ -61,7 +58,6 @@ struct MenuBarView: View {
 private struct LoggedInContentView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @EnvironmentObject private var quotaViewModel: QuotaViewModel
-    @Binding var showSettings: Bool
 
     var body: some View {
         VStack(spacing: 0) {
@@ -125,16 +121,13 @@ private struct LoggedInContentView: View {
             .buttonStyle(.borderless)
             .help("刷新")
 
-            Button(action: { showSettings.toggle() }) {
+            Button(action: {
+                appViewModel.showSettings()
+            }) {
                 Image(systemName: "gearshape")
             }
             .buttonStyle(.borderless)
             .help("设置")
-            .popover(isPresented: $showSettings) {
-                SettingsView()
-                    .environmentObject(appViewModel)
-                    .environmentObject(quotaViewModel)
-            }
         }
     }
 
@@ -155,20 +148,25 @@ private struct LoggedInContentView: View {
 
     private func quotaListView(limits: [QuotaLimit], level: String?) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Subscription level badge
             if let lvl = level {
                 levelBadge(lvl)
             }
 
-            // Quota limits
             let sorted = limits.sorted { a, b in
-                a.type == "TOKENS_LIMIT" && b.type != "TOKENS_LIMIT"
+                // Day (unit=3) → Week (unit=6) → Month (TIME_LIMIT)
+                let order = { (l: QuotaLimit) -> Int in
+                    switch l.type {
+                    case "TOKENS_LIMIT": return l.unit == 3 ? 0 : 1
+                    case "TIME_LIMIT": return 2
+                    default: return 3
+                    }
+                }
+                return order(a) < order(b)
             }
             ForEach(sorted) { limit in
                 QuotaRowView(limit: limit)
             }
 
-            // Subscription renewal info (below quota)
             if let sub = quotaViewModel.subscription {
                 renewalInfo(sub: sub)
             }
@@ -231,7 +229,7 @@ private struct LoggedInContentView: View {
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderless)
-            .foregroundStyle(.red)
+            .foregroundStyle(.secondary)
 
             Divider()
                 .frame(height: 20)
@@ -241,7 +239,7 @@ private struct LoggedInContentView: View {
             }) {
                 HStack {
                     Image(systemName: "power")
-                    Text("退出 DevBar")
+                    Text("退出")
                 }
                 .frame(maxWidth: .infinity)
             }

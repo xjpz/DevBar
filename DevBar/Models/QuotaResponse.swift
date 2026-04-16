@@ -61,10 +61,12 @@ extension QuotaLimit {
         case "TIME_LIMIT":
             return "每月"
         case "TOKENS_LIMIT":
-            if let number, number != 1 {
-                return "每\(number)小时"
+            guard let unit else { return "每小时" }
+            switch unit {
+            case 3: return "每\(number ?? 1)小时"
+            case 6: return "每周"
+            default: return "每\(number ?? 1)小时"
             }
-            return "每小时"
         default:
             return nil
         }

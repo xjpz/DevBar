@@ -23,6 +23,18 @@ enum Constants {
         static let menuBarIconKey = "menu_bar_icon"
         static let defaultMenuBarIcon = "AppIcon"
         static let hideFromDockKey = "hide_from_dock"
+        static let launchAtLoginKey = "launch_at_login"
+        static let lastUpdateCheckKey = "last_update_check"
+        static let skippedVersionKey = "skipped_version"
+    }
+
+    enum Update {
+        static let owner = "xjpz"
+        static let repo = "DevBar"
+        static let releasesURL = "https://api.github.com/repos/\(owner)/\(repo)/releases/latest"
+        static let releasesPageURL = "https://github.com/\(owner)/\(repo)/releases"
+        static let checkInterval: TimeInterval = 86400 // 24 hours
+        static let launchCheckDelay: TimeInterval = 5
     }
 
     enum Icons {
