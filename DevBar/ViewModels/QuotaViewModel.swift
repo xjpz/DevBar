@@ -15,6 +15,7 @@ final class QuotaViewModel: ObservableObject {
     private let apiClient = BigModelAPIClient()
     private var isRefreshing = false
     private var refreshTimer: Timer?
+    private var initialDataLoaded = false
 
     /// Whether the user has a valid active subscription
     var hasValidSubscription: Bool {
@@ -64,11 +65,23 @@ final class QuotaViewModel: ObservableObject {
         }
 
         await fetchQuota(credentials: credentials)
+        initialDataLoaded = true
+    }
+
+    func resetForLogout() {
+        stopAutoRefresh()
+        quotaData = nil
+        subscription = nil
+        isLoading = false
+        errorMessage = nil
+        lastUpdated = nil
+        initialDataLoaded = false
+        isRefreshing = false
     }
 
     // MARK: - Fetch Quota
 
-    func fetchQuota(credentials: AuthCredentials?) async {
+    func fetchQuota(credentials: AuthCredentials?, silent: Bool = false) async {
         guard !isRefreshing else { return }
         guard let credentials else {
             errorMessage = "未登录"
@@ -76,7 +89,7 @@ final class QuotaViewModel: ObservableObject {
         }
 
         isRefreshing = true
-        if isLoading { /* already true from loadInitialData */ } else {
+        if !silent && !isLoading {
             isLoading = true
         }
         errorMessage = nil
@@ -99,10 +112,11 @@ final class QuotaViewModel: ObservableObject {
     func startAutoRefresh(credentials: AuthCredentials?, interval: TimeInterval, onFetchComplete: (@Sendable @MainActor () -> Void)? = nil) {
         guard refreshTimer == nil else { return }
 
-        // Initial load: subscription check + quota
-        Task {
-            await loadInitialData(credentials: credentials)
-            onFetchComplete?()
+        if !initialDataLoaded {
+            Task {
+                await loadInitialData(credentials: credentials)
+                onFetchComplete?()
+            }
         }
 
         // Periodic refresh: quota only (subscription doesn't change often)
@@ -110,7 +124,7 @@ final class QuotaViewModel: ObservableObject {
             guard let self else { return }
             Task {
                 guard self.hasValidSubscription else { return }
-                await self.fetchQuota(credentials: credentials)
+                await self.fetchQuota(credentials: credentials, silent: true)
                 onFetchComplete?()
             }
         }

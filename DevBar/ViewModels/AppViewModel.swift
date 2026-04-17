@@ -21,10 +21,13 @@ final class AppViewModel: ObservableObject {
     private let authService = AuthService()
     let quotaViewModel = QuotaViewModel()
     let updateViewModel = UpdateViewModel()
+    let notificationService = NotificationService()
     private var statusTextUpdateTask: Task<Void, Never>?
     /// Prevents duplicate handleLoginSuccess calls
     private var isHandlingLogin = false
     private var settingsWindow: NSWindow?
+    private var previousQuotaData: QuotaData?
+    private var hasLaunched = false
 
     @Published var menuBarIcon: String {
         didSet {
@@ -73,23 +76,34 @@ final class AppViewModel: ObservableObject {
             ?? Constants.Defaults.defaultMenuBarIcon
         launchAtLogin = UserDefaults.standard.bool(forKey: Constants.Defaults.launchAtLoginKey)
         isHiddenFromDock = UserDefaults.standard.bool(forKey: Constants.Defaults.hideFromDockKey)
+        notificationLowQuotaEnabled = UserDefaults.standard.bool(forKey: Constants.Defaults.notificationLowQuotaEnabledKey)
+        notificationLowQuotaThreshold = UserDefaults.standard.double(forKey: Constants.Defaults.notificationLowQuotaThresholdKey)
+            .nonZero ?? Constants.Defaults.defaultLowQuotaThreshold
+        notificationExhaustedEnabled = UserDefaults.standard.bool(forKey: Constants.Defaults.notificationExhaustedEnabledKey)
+        notificationResetEnabled = UserDefaults.standard.bool(forKey: Constants.Defaults.notificationResetEnabledKey)
         if let saved = authService.credentials {
             credentials = saved
             authState = .loggedIn
+            quotaViewModel.isLoading = true
         } else {
             authState = .notLoggedIn
         }
+        if authState == .loggedIn {
+            Task { @MainActor [weak self] in
+                await Task.yield()
+                guard let self else { return }
+                await self.quotaViewModel.loadInitialData(credentials: self.credentials)
+                self.updateStatusText(after: .milliseconds(200))
+                self.checkAndNotify()
+                self.startRefreshIfNeeded()
+            }
+        }
     }
 
-    /// Called after the view hierarchy is ready (prevents triggering
-    /// network calls before SwiftUI has finished its initial layout).
-    func appDidFinishLaunching() {
-        guard authState == .loggedIn, credentials != nil else { return }
-        Task { @MainActor [weak self] in
-            await Task.yield()
-            self?.startRefreshIfNeeded()
-        }
-        // Delayed update check (independent of auth state)
+    /// Check for updates after a short delay, called once from onAppear.
+    func checkForUpdatesOnFirstAppear() {
+        guard !hasLaunched else { return }
+        hasLaunched = true
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(Constants.Update.launchCheckDelay))
             self?.updateViewModel.checkForUpdates(silent: true)
@@ -128,29 +142,26 @@ final class AppViewModel: ObservableObject {
 
     func logout() {
         statusTextUpdateTask?.cancel()
-        stopAutoRefresh()
-        quotaViewModel.quotaData = nil
+        quotaViewModel.resetForLogout()
         credentials = nil
         authService.logout()
         authState = .notLoggedIn
         updateStatusText()
     }
 
-    /// Refresh data when the popover opens, but only if the auto-refresh
-    /// interval is long enough (>= 5 min) and the last refresh wasn't too recent.
+    /// Refresh data when the popover opens, unless refreshed within 30s.
     func refreshOnPopoverOpenIfNeeded() {
         guard authState == .loggedIn, credentials != nil else { return }
-        guard refreshInterval >= 300 else { return }
         let minimumInterval: TimeInterval = 30
         if let last = quotaViewModel.lastUpdated,
            Date().timeIntervalSince(last) < minimumInterval {
             return
         }
-        Task { await refreshQuota() }
+        Task { await refreshQuota(silent: true) }
     }
 
-    func refreshQuota() async {
-        await quotaViewModel.fetchQuota(credentials: credentials)
+    func refreshQuota(silent: Bool = false) async {
+        await quotaViewModel.fetchQuota(credentials: credentials, silent: silent)
         updateStatusText(after: .milliseconds(200))
         if quotaViewModel.errorMessage == "登录已过期，请重新登录" {
             authState = .expired
@@ -160,14 +171,26 @@ final class AppViewModel: ObservableObject {
 
     /// Start refresh if not already running (prevents duplicate timers)
     func startRefreshIfNeeded() {
+        guard refreshInterval > 0 else { return } // Don't start if "Never"
         print("[DevBar] ⑦ startRefreshIfNeeded, hasCredentials=\(credentials != nil)")
         quotaViewModel.startAutoRefresh(
             credentials: credentials,
             interval: refreshInterval,
             onFetchComplete: { [weak self] in
                 self?.updateStatusText(after: .milliseconds(200))
+                self?.checkAndNotify()
             }
         )
+    }
+
+    private func checkAndNotify() {
+        guard let currentData = quotaViewModel.quotaData else { return }
+        notificationService.checkAndNotify(
+            quotaData: currentData,
+            settings: notificationSettings,
+            previousData: previousQuotaData
+        )
+        previousQuotaData = currentData
     }
 
     func stopAutoRefresh() {
@@ -198,6 +221,41 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Notification Settings
+
+    @Published var notificationLowQuotaEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(notificationLowQuotaEnabled, forKey: Constants.Defaults.notificationLowQuotaEnabledKey)
+        }
+    }
+
+    @Published var notificationLowQuotaThreshold: Double {
+        didSet {
+            UserDefaults.standard.set(notificationLowQuotaThreshold, forKey: Constants.Defaults.notificationLowQuotaThresholdKey)
+        }
+    }
+
+    @Published var notificationExhaustedEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(notificationExhaustedEnabled, forKey: Constants.Defaults.notificationExhaustedEnabledKey)
+        }
+    }
+
+    @Published var notificationResetEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(notificationResetEnabled, forKey: Constants.Defaults.notificationResetEnabledKey)
+        }
+    }
+
+    var notificationSettings: NotificationSettings {
+        NotificationSettings(
+            lowQuotaEnabled: notificationLowQuotaEnabled,
+            lowQuotaThreshold: notificationLowQuotaThreshold,
+            exhaustedEnabled: notificationExhaustedEnabled,
+            resetEnabled: notificationResetEnabled
+        )
+    }
+
     // MARK: - Settings Window
 
     func showSettings() {
@@ -214,22 +272,32 @@ final class AppViewModel: ObservableObject {
             .environmentObject(self)
             .environmentObject(quotaViewModel)
             .environmentObject(updateViewModel)
+            .environmentObject(notificationService)
 
         let hostingView = NSHostingView(rootView: settingsView)
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 340, height: 480),
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: 420),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         window.contentView = hostingView
-        window.title = "DevBar 设置"
+        window.titleVisibility = .hidden
         window.center()
+
+        let titleToolbar = CenterTitleToolbar(title: "设置")
+        window.toolbar = titleToolbar.toolbar
         window.level = .floating
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow = window
+
+        // Background update check (fire-and-forget, failures are ignored)
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
+            self?.updateViewModel.checkForUpdates(silent: true)
+        }
     }
 
     func hideSettings() {
@@ -241,5 +309,44 @@ final class AppViewModel: ObservableObject {
 private extension Double {
     var nonZero: Double? {
         self > 0 ? self : nil
+    }
+}
+
+private final class CenterTitleToolbar: NSObject, NSToolbarDelegate {
+    let toolbar: NSToolbar
+    private let title: String
+    private static let titleId = NSToolbarItem.Identifier("centerTitle")
+
+    init(title: String) {
+        self.title = title
+        self.toolbar = NSToolbar(identifier: "CenterTitleToolbar")
+        super.init()
+        toolbar.delegate = self
+        toolbar.displayMode = .default
+        toolbar.showsBaselineSeparator = true
+        toolbar.centeredItemIdentifier = Self.titleId
+    }
+
+    func toolbar(_ toolbar: NSToolbar,
+                 itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+                 willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        guard itemIdentifier == Self.titleId else { return nil }
+        let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+        let label = NSTextField(labelWithString: title)
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.alignment = .center
+        label.sizeToFit()
+        item.view = label
+        item.minSize = label.frame.size
+        item.maxSize = label.frame.size
+        return item
+    }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [Self.titleId]
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [Self.titleId]
     }
 }

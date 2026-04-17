@@ -19,7 +19,7 @@ struct MenuBarView: View {
         }
         .frame(width: Constants.UI.popoverWidth)
         .onAppear {
-            appViewModel.appDidFinishLaunching()
+            appViewModel.checkForUpdatesOnFirstAppear()
             appViewModel.refreshOnPopoverOpenIfNeeded()
         }
         .onChange(of: appViewModel.authState) { _, newState in
@@ -63,15 +63,15 @@ private struct LoggedInContentView: View {
 
             Divider()
 
-            if !quotaViewModel.hasValidSubscription {
+            if quotaViewModel.isLoading && quotaViewModel.quotaData == nil {
+                ProgressView("获取用量...")
+                    .padding()
+            } else if !quotaViewModel.hasValidSubscription {
                 noSubscriptionView
             } else if let data = quotaViewModel.quotaData,
                       let limits = data.limits,
                       !limits.isEmpty {
                 quotaListView(limits: limits, level: data.level)
-            } else if quotaViewModel.isLoading {
-                ProgressView("获取用量...")
-                    .padding()
             } else if let error = quotaViewModel.errorMessage {
                 errorView(error)
             } else {

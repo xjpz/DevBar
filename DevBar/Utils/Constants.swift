@@ -26,6 +26,19 @@ enum Constants {
         static let launchAtLoginKey = "launch_at_login"
         static let lastUpdateCheckKey = "last_update_check"
         static let skippedVersionKey = "skipped_version"
+
+        // Notification settings
+        static let notificationLowQuotaEnabledKey = "notification_low_quota_enabled"
+        static let notificationLowQuotaThresholdKey = "notification_low_quota_threshold"
+        static let defaultLowQuotaThreshold: Double = 20 // 20%
+        static let notificationExhaustedEnabledKey = "notification_exhausted_enabled"
+        static let notificationResetEnabledKey = "notification_reset_enabled"
+
+        // Notification throttling
+        static let lastLowQuotaNotificationTimeKey = "last_low_quota_notification_time"
+        static let lastExhaustedNotificationTimeKey = "last_exhausted_notification_time"
+        static let lastResetNotificationTimeKey = "last_reset_notification_time"
+        static let lowQuotaNotificationInterval: TimeInterval = 1800 // 30 minutes
     }
 
     enum Update {

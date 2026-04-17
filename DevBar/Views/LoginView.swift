@@ -104,7 +104,7 @@ private extension LoginView {
                     Text("浏览器登录")
                 }
             }
-            .buttonStyle(DevBarButtonStyle(isPrimary: true))
+            .buttonStyle(DevBarButtonStyle(isPrimary: apiKey.trimmingCharacters(in: .whitespaces).isEmpty))
         }
     }
 
@@ -150,7 +150,7 @@ private extension LoginView {
                     Text("API Key登录")
                 }
             }
-            .buttonStyle(DevBarButtonStyle(isPrimary: false))
+            .buttonStyle(DevBarButtonStyle(isPrimary: !apiKey.trimmingCharacters(in: .whitespaces).isEmpty))
 
             if let error = loginError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
