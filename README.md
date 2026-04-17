@@ -6,12 +6,12 @@
 
 <p align="center">
   <strong>macOS 菜单栏工具，实时监控智谱 BigModel API 用量</strong><br>
-  <a href="#features">安装</a> · <a href="#features">功能</a> · <a href="#screenshots">预览</a> · <a href="#development">开发</a>
+  <a href="#安装">安装</a> · <a href="#功能">功能</a> · <a href="#预览">预览</a> · <a href="#开发">开发</a>
 </p>
 
 ---
 
-## 功能特性 {#features}
+## 功能特性
 
 - **菜单栏实时显示** — 在 macOS 菜单栏直接显示最高用量百分比
 - **Token 用量监控** — 实时显示 Token 和时间的使用进度，颜色动态变化
@@ -25,7 +25,7 @@
 - **可自定义图标** — 10 种 SF Symbol 图标可选
 - **自动更新检查** — 打开设置时后台检查更新
 
-## 安装 {#installation}
+## 安装
 
 ### 从 Release 下载
 
@@ -55,11 +55,11 @@ open DevBar.xcodeproj
    - **通知** — 启用低额度/用尽/重置提醒，设置低额度阈值
    - **关于** — 查看版本信息、GitHub 仓库、检查更新
 
-## 预览 {#screenshots}
+## 预览
 
 ![预览](preview.png)
 
-## 开发 {#development}
+## 开发
 
 - **SwiftUI** — 原生 macOS UI 框架
 - **MenuBarExtra** — 菜单栏集成（`.window` 样式）
