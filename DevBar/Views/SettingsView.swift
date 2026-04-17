@@ -77,19 +77,13 @@ struct SettingsView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    Toggle("登录时启动", isOn: Binding(
-                        get: { appViewModel.launchAtLogin },
-                        set: { appViewModel.launchAtLogin = $0 }
-                    ))
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                    Toggle("登录时启动", isOn: $appViewModel.launchAtLogin)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
 
-                    Toggle("不在 Dock 栏显示", isOn: Binding(
-                        get: { appViewModel.isHiddenFromDock },
-                        set: { appViewModel.setHiddenFromDock($0) }
-                    ))
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
+                    Toggle("不在 Dock 栏显示", isOn: $appViewModel.isHiddenFromDock)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
                 }
 
                 // Last updated

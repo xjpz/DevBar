@@ -33,5 +33,12 @@ final class AuthService {
         credentials = nil
         isLoggedIn = false
         keychain.clear()
+        // Clear browser cookies so re-login requires actual authentication
+        if let url = URL(string: "https://bigmodel.cn") {
+            let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
+            for cookie in cookies {
+                HTTPCookieStorage.shared.deleteCookie(cookie)
+            }
+        }
     }
 }

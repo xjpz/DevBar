@@ -21,7 +21,7 @@ enum Constants {
         static let refreshIntervalKey = "refresh_interval"
         static let defaultRefreshInterval: TimeInterval = 300 // 5 minutes
         static let menuBarIconKey = "menu_bar_icon"
-        static let defaultMenuBarIcon = "AppIcon"
+        static let defaultMenuBarIcon = "sparkles"
         static let hideFromDockKey = "hide_from_dock"
         static let launchAtLoginKey = "launch_at_login"
         static let lastUpdateCheckKey = "last_update_check"
@@ -39,11 +39,11 @@ enum Constants {
 
     enum Icons {
         static let availableIcons: [(String, String)] = [
-            ("chart.bar.xaxis", "横轴"),
-            ("fish.fill", "鱼"),
             ("sparkles", "星星"),
+            ("chart.bar.xaxis", "横轴"),
             ("align.vertical.bottom.fill", "竖线"),
             ("chart.bar.fill", "柱状图"),
+            ("fish.fill", "鱼"),
             ("dog.fill", "狗"),
             ("tortoise.fill", "乌龟"),
             ("hare.fill", "兔子"),

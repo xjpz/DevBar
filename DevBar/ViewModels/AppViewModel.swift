@@ -71,6 +71,8 @@ final class AppViewModel: ObservableObject {
     init() {
         menuBarIcon = UserDefaults.standard.string(forKey: Constants.Defaults.menuBarIconKey)
             ?? Constants.Defaults.defaultMenuBarIcon
+        launchAtLogin = UserDefaults.standard.bool(forKey: Constants.Defaults.launchAtLoginKey)
+        isHiddenFromDock = UserDefaults.standard.bool(forKey: Constants.Defaults.hideFromDockKey)
         if let saved = authService.credentials {
             credentials = saved
             authState = .loggedIn
@@ -172,23 +174,20 @@ final class AppViewModel: ObservableObject {
         quotaViewModel.stopAutoRefresh()
     }
 
-    var isHiddenFromDock: Bool {
-        UserDefaults.standard.bool(forKey: Constants.Defaults.hideFromDockKey)
-    }
-
-    func setHiddenFromDock(_ hide: Bool) {
-        UserDefaults.standard.set(hide, forKey: Constants.Defaults.hideFromDockKey)
-        NSApplication.shared.setActivationPolicy(hide ? .accessory : .regular)
+    @Published var isHiddenFromDock: Bool {
+        didSet {
+            UserDefaults.standard.set(isHiddenFromDock, forKey: Constants.Defaults.hideFromDockKey)
+            NSApplication.shared.setActivationPolicy(isHiddenFromDock ? .accessory : .regular)
+        }
     }
 
     // MARK: - Launch at Login
 
-    var launchAtLogin: Bool {
-        get { UserDefaults.standard.bool(forKey: Constants.Defaults.launchAtLoginKey) }
-        set {
-            UserDefaults.standard.set(newValue, forKey: Constants.Defaults.launchAtLoginKey)
+    @Published var launchAtLogin: Bool {
+        didSet {
+            UserDefaults.standard.set(launchAtLogin, forKey: Constants.Defaults.launchAtLoginKey)
             do {
-                if newValue {
+                if launchAtLogin {
                     try SMAppService.mainApp.register()
                 } else {
                     try SMAppService.mainApp.unregister()

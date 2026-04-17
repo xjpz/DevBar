@@ -8,17 +8,13 @@ struct MenuBarView: View {
     @EnvironmentObject private var quotaViewModel: QuotaViewModel
 
     var body: some View {
-        VStack(spacing: 0) {
-            LoggedInContentView()
-                .opacity(appViewModel.authState == .loggedIn ? 1 : 0)
-                .allowsHitTesting(appViewModel.authState == .loggedIn)
-
-            if appViewModel.authState != .loggedIn {
-                if appViewModel.authState == .loading {
-                    loadingView
-                } else {
-                    loginView
-                }
+        Group {
+            if appViewModel.authState == .loggedIn {
+                LoggedInContentView()
+            } else if appViewModel.authState == .loading {
+                loadingView
+            } else {
+                loginView
             }
         }
         .frame(width: Constants.UI.popoverWidth)
