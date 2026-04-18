@@ -2,36 +2,41 @@
   <img src="DevBar/appstore.png" alt="DevBar" width="120" height="120">
 </p>
 
-<h1 align="center">DevBar（开发吧）</h1>
+<h1 align="center">DevBar （开发吧）</h1>
+
+<div align="center">
+**English** · [简体中文](README_zh.md)
+</div>
+
 
 <p align="center">
-  <strong>macOS 菜单栏工具，实时监控智谱 BigModel API 用量</strong><br>
-  <a href="#安装">安装</a> · <a href="#功能">功能</a> · <a href="#预览">预览</a> · <a href="#开发">开发</a>
+  <strong>A macOS menu bar tool for monitoring Zhipu BigModel API usage in real time</strong><br>
+  <a href="#Installation">Installation</a> · <a href="#features">Features</a> · <a href="#preview">Preview</a> · <a href="#development">Development</a>
 </p>
 
 ---
 
-## 功能特性
+## Features
 
-- **菜单栏实时显示** — 在 macOS 菜单栏直接显示最高用量百分比
-- **Token 用量监控** — 实时显示 Token 和时间的使用进度，颜色动态变化
-- **MCP 使用明细** — 按模型分项展示 MCP 调用次数（search-prime、web-reader 等）
-- **订阅状态管理** — 自动检测套餐有效性，显示订阅到期时间与续费价格
-- **多种登录方式** — 支持浏览器登录（扫码/账号）和 API Key 登录
-- **本地通知** — 低额度提醒、用尽提醒、额度重置提醒，智能防抖
-- **自动刷新** — 支持 3/5/10/30 分钟定时刷新或手动刷新，关闭窗口自动暂停
-- **设置页分组** — Tab 标签分组：通用、通知、关于
-- **Dock 栏控制** — 可设置不在 Dock 栏显示
-- **可自定义图标** — 10 种 SF Symbol 图标可选
-- **自动更新检查** — 打开设置时后台检查更新
+- **Menu Bar Display** — Shows the highest usage percentage directly in the macOS menu bar
+- **Token Usage Monitoring** — Real-time progress of Token and time usage with dynamic color indicators
+- **MCP Usage Breakdown** — Per-model MCP call counts (search-prime, web-reader, etc.)
+- **Subscription Management** — Auto-detects plan validity, shows expiry date and renewal price
+- **Multiple Login Methods** — Browser login (QR code / account) and API Key login
+- **Local Notifications** — Low quota alerts, exhaustion alerts, quota reset alerts with smart debouncing
+- **Auto Refresh** — Configurable 3/5/10/30-minute intervals or manual refresh, auto-pause when closed
+- **Tabbed Settings** — Organized into General, Notifications, and About tabs
+- **Dock Visibility Control** — Option to hide from the Dock
+- **Customizable Icon** — Choose from 10 SF Symbol icons
+- **Auto Update Check** — Background update check when settings are opened
 
-## 安装
+## Installation
 
-### 从 Release 下载
+### Download from Release
 
-下载最新的 `.dmg` 或 `.zip` 文件，将 DevBar 拖入 Applications 文件夹即可。
+Download the latest `.dmg` or `.zip` file and drag DevBar into your Applications folder.
 
-### 从源码构建
+### Build from Source
 
 ```bash
 git clone https://github.com/xjpz/DevBar.git
@@ -39,86 +44,86 @@ cd DevBar
 open DevBar.xcodeproj
 ```
 
-在 Xcode 中选择 `My Mac` 作为运行目标，`Cmd + R` 构建运行。
+Select `My Mac` as the run destination in Xcode and press `Cmd + R`.
 
-**系统要求：** macOS 14.0+
+**System Requirements:** macOS 14.0+
 
-## 使用方法
+## Usage
 
-1. **登录**
-   - **浏览器登录** — 点击「浏览器登录」→ 在弹出窗口中扫码或使用账号登录
-   - **API Key 登录** — 点击「API Key 登录」→ 输入 API Key → 点击「登录」
-2. **查看用量** — 点击菜单栏图标展开面板，查看 Token / MCP 用量
-3. **手动刷新** — 点击刷新按钮立即获取最新数据
-4. **设置** — 点击齿轮图标打开设置面板
-   - **通用** — 切换菜单栏图标、调整刷新间隔、登录时启动、Dock 栏显示
-   - **通知** — 启用低额度/用尽/重置提醒，设置低额度阈值
-   - **关于** — 查看版本信息、GitHub 仓库、检查更新
+1. **Login**
+   - **Browser Login** — Click "Browser Login" → Scan QR code or sign in with your account
+   - **API Key Login** — Click "API Key Login" → Enter API Key → Click "Login"
+2. **View Usage** — Click the menu bar icon to expand the panel and view Token / MCP usage
+3. **Manual Refresh** — Click the refresh button to fetch the latest data
+4. **Settings** — Click the gear icon to open the settings panel
+   - **General** — Switch menu bar icon, adjust refresh interval, launch at login, Dock visibility
+   - **Notifications** — Enable low quota / exhaustion / reset alerts, set low quota threshold
+   - **About** — View version info, GitHub repository, check for updates
 
-## 预览
+## Preview
 
-![预览](preview.png)
+![Preview](preview.png)
 
-## 开发
+## Development
 
-- **SwiftUI** — 原生 macOS UI 框架
-- **MenuBarExtra** — 菜单栏集成（`.window` 样式）
-- **MVVM** — Models / Views / ViewModels 清晰分层
-- **Keychain Services** — 安全存储认证凭据
-- **UserNotifications** — 本地通知支持
-- **URLSession** — HTTP API 请求
+- **SwiftUI** — Native macOS UI framework
+- **MenuBarExtra** — Menu bar integration (`.window` style)
+- **MVVM** — Clean separation of Models / Views / ViewModels
+- **Keychain Services** — Secure credential storage
+- **UserNotifications** — Local notification support
+- **URLSession** — HTTP API requests
 
-## 项目结构
+## Project Structure
 
 ```
 DevBar/
-├── DevBarApp.swift                # 应用入口，MenuBarExtra 配置
+├── DevBarApp.swift                # App entry point, MenuBarExtra config
 ├── Models/
-│   ├── AuthCredentials.swift      # 认证凭据（Token + Cookie）
-│   ├── NotificationSettings.swift # 通知设置模型
-│   ├── QuotaResponse.swift       # 用量 API 响应模型
-│   ├── SettingsTab.swift         # 设置页标签枚举
-│   └── SubscriptionResponse.swift # 订阅 API 响应模型
+│   ├── AuthCredentials.swift      # Auth credentials (Token + Cookie)
+│   ├── NotificationSettings.swift # Notification settings model
+│   ├── QuotaResponse.swift       # Usage API response model
+│   ├── SettingsTab.swift         # Settings tab enum
+│   └── SubscriptionResponse.swift # Subscription API response model
 ├── Services/
-│   ├── BigModelAPIClient.swift   # 智谱 BigModel API 客户端
-│   ├── AuthService.swift         # 认证状态管理
-│   ├── KeychainService.swift     # Keychain 存储服务
-│   └── NotificationService.swift # 通知服务（权限、发送、防抖）
+│   ├── BigModelAPIClient.swift   # Zhipu BigModel API client
+│   ├── AuthService.swift         # Authentication state management
+│   ├── KeychainService.swift     # Keychain storage service
+│   └── NotificationService.swift # Notification service (permissions, sending, debounce)
 ├── ViewModels/
-│   ├── AppViewModel.swift        # 全局应用状态
-│   ├── QuotaViewModel.swift     # 用量数据与刷新逻辑
-│   └── UpdateViewModel.swift    # 自动更新检查
+│   ├── AppViewModel.swift        # Global app state
+│   ├── QuotaViewModel.swift     # Usage data & refresh logic
+│   └── UpdateViewModel.swift    # Auto update check
 ├── Views/
-│   ├── MenuBarView.swift        # 主弹出面板
-│   ├── LoginView.swift          # 浏览器登录引导
-│   ├── QuotaRowView.swift       # 单项用量进度条
-│   ├── SettingsView.swift       # 设置面板主容器
-│   ├── SettingsGeneral.swift    # 通用设置页
-│   ├── SettingsNotifications.swift # 通知设置页
-│   └── SettingsAbout.swift      # 关于页面
+│   ├── MenuBarView.swift        # Main popup panel
+│   ├── LoginView.swift          # Browser login flow
+│   ├── QuotaRowView.swift       # Single usage progress bar
+│   ├── SettingsView.swift       # Settings panel container
+│   ├── SettingsGeneral.swift    # General settings
+│   ├── SettingsNotifications.swift # Notification settings
+│   └── SettingsAbout.swift      # About page
 └── Utils/
-    ├── Constants.swift          # API 地址、默认配置
-    └── Extensions.swift         # 日期/字符串扩展
+    ├── Constants.swift          # API URLs, default config
+    └── Extensions.swift         # Date/String extensions
 ```
 
 ## API
 
-| 接口 | 说明 | 频率 |
-|------|------|------|
-| `GET /api/biz/subscription/list` | 获取订阅列表 | 登录后调用一次 |
-| `GET /api/monitor/usage/quota/limit` | 获取用量配额 | 定时刷新 |
+| Endpoint | Description | Frequency |
+|----------|-------------|-----------|
+| `GET /api/biz/subscription/list` | Fetch subscription list | Once after login |
+| `GET /api/monitor/usage/quota/limit` | Fetch usage quota | Periodic refresh |
 
-认证方式：`Authorization` 请求头 + `bigmodel_token_production` Cookie。
+Authentication: `Authorization` header + `bigmodel_token_production` cookie.
 
-## 配置
+## Configuration
 
-| 配置项 | 默认值 | 说明 |
-|--------|--------|------|
-| 自动刷新间隔 | 5 分钟 | 支持 3/5/10/30 分钟/每小时/从不 |
-| 低额度提醒阈值 | 20% | 支持 10/20/30/50% |
-| 低额度通知频率 | 30 分钟 | 同一阈值最多 30 分钟通知一次 |
-| 菜单栏图标 | sparkles | 支持 10 种 SF Symbol |
-| Dock 栏显示 | 显示 | 可切换隐藏 |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Auto refresh interval | 5 minutes | 3/5/10/30 min / hourly / never |
+| Low quota alert threshold | 20% | 10/20/30/50% |
+| Low quota notification cooldown | 30 minutes | Same threshold notified at most once per 30 min |
+| Menu bar icon | sparkles | 10 SF Symbol options |
+| Dock visibility | Visible | Can be hidden |
 
 ## License
 
