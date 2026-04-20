@@ -3,6 +3,7 @@
 
 import Foundation
 import Combine
+import WidgetKit
 
 @MainActor
 final class QuotaViewModel: ObservableObject {
@@ -36,7 +37,7 @@ final class QuotaViewModel: ObservableObject {
 
     func loadInitialData(credentials: AuthCredentials?) async {
         guard let credentials else {
-            errorMessage = "未登录"
+            errorMessage = String(localized: "not_logged_in")
             return
         }
 
@@ -77,6 +78,8 @@ final class QuotaViewModel: ObservableObject {
         lastUpdated = nil
         initialDataLoaded = false
         isRefreshing = false
+        WidgetDataManager.shared.clearSharedData()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     // MARK: - Fetch Quota
@@ -84,7 +87,7 @@ final class QuotaViewModel: ObservableObject {
     func fetchQuota(credentials: AuthCredentials?, silent: Bool = false) async {
         guard !isRefreshing else { return }
         guard let credentials else {
-            errorMessage = "未登录"
+            errorMessage = String(localized: "not_logged_in")
             return
         }
 
@@ -97,6 +100,11 @@ final class QuotaViewModel: ObservableObject {
         do {
             quotaData = try await apiClient.fetchQuotaLimit(credentials: credentials)
             lastUpdated = Date()
+            // 共享数据到 Widget
+            let widgetData = quotaData?.toWidgetData(subscriptionName: subscription?.productName, subscriptionPrice: subscription?.formattedRenewPrice, subscriptionExpireDate: subscription?.formattedNextRenewDate)
+            if let widgetData {
+                WidgetDataManager.shared.saveAndReload(widgetData)
+            }
         } catch let error as APIError {
             errorMessage = error.errorDescription
         } catch {
@@ -122,7 +130,7 @@ final class QuotaViewModel: ObservableObject {
         // Periodic refresh: quota only (subscription doesn't change often)
         refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             guard let self else { return }
-            Task {
+            Task { @MainActor in
                 guard self.hasValidSubscription else { return }
                 await self.fetchQuota(credentials: credentials, silent: true)
                 onFetchComplete?()

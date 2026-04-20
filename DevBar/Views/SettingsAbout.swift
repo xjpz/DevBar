@@ -48,7 +48,7 @@ struct SettingsAbout: View {
                 HStack(spacing: 6) {
                     Image(systemName: updateViewModel.hasUpdateAvailable
                           ? "arrow.up.circle.fill" : "arrow.up.circle")
-                    Text("检查更新")
+                    Text("check_for_updates")
                 }
                 .font(.body)
             }

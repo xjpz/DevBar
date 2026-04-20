@@ -15,7 +15,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             Picker("", selection: $selectedTab) {
                 ForEach(SettingsTab.allCases, id: \.self) { tab in
-                    Label(tab.rawValue, systemImage: tab.icon).tag(tab)
+                    Label(tab.localizedName, systemImage: tab.icon).tag(tab)
                 }
             }
             .pickerStyle(.segmented)

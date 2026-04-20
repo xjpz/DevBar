@@ -98,8 +98,8 @@ final class NotificationService: ObservableObject {
         if !lowTypes.isEmpty {
             let typesStr = lowTypes.joined(separator: "、")
             send(
-                title: "DevBar 额度提醒",
-                body: "您的 \(typesStr) 额度即将用完，还剩 \(Int(threshold))%"
+                title: String(localized: "notif_low_quota_title"),
+                body: String(format: String(localized: "notif_low_quota_body"), typesStr, Int(threshold))
             )
             recordLowQuotaNotificationTime()
         }
@@ -124,8 +124,8 @@ final class NotificationService: ObservableObject {
         if !exhaustedTypes.isEmpty {
             let typesStr = exhaustedTypes.joined(separator: "、")
             send(
-                title: "DevBar 额度用尽",
-                body: "您的 \(typesStr) 额度已用完，请及时充值"
+                title: String(localized: "notif_exhausted_title"),
+                body: String(format: String(localized: "notif_exhausted_body"), typesStr)
             )
             recordExhaustedNotificationTime()
         }
@@ -154,8 +154,8 @@ final class NotificationService: ObservableObject {
         if !resetTypes.isEmpty {
             let typesStr = resetTypes.joined(separator: "、")
             send(
-                title: "DevBar 额度重置",
-                body: "您的 \(typesStr) 额度已重置，可以继续使用"
+                title: String(localized: "notif_reset_title"),
+                body: String(format: String(localized: "notif_reset_body"), typesStr)
             )
             recordResetNotificationTime()
         }

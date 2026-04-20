@@ -28,6 +28,9 @@ final class AppViewModel: ObservableObject {
     private var settingsWindow: NSWindow?
     private var previousQuotaData: QuotaData?
     private var hasLaunched = false
+    weak var languageManager: LanguageManager?
+
+    weak var statusBarButton: NSStatusBarButton?
 
     @Published var menuBarIcon: String {
         didSet {
@@ -163,7 +166,7 @@ final class AppViewModel: ObservableObject {
     func refreshQuota(silent: Bool = false) async {
         await quotaViewModel.fetchQuota(credentials: credentials, silent: silent)
         updateStatusText(after: .milliseconds(200))
-        if quotaViewModel.errorMessage == "登录已过期，请重新登录" {
+        if quotaViewModel.errorMessage == String(localized: "login_expired") {
             authState = .expired
             updateStatusText()
         }
@@ -268,13 +271,22 @@ final class AppViewModel: ObservableObject {
         // Clean up previous window
         settingsWindow = nil
 
-        let settingsView = SettingsView()
+        let baseView = SettingsView()
             .environmentObject(self)
             .environmentObject(quotaViewModel)
             .environmentObject(updateViewModel)
             .environmentObject(notificationService)
 
-        let hostingView = NSHostingView(rootView: settingsView)
+        let hostedView: AnyView
+        if let lm = languageManager {
+            hostedView = AnyView(baseView
+                .environmentObject(lm)
+                .environment(\.locale, lm.currentLocale))
+        } else {
+            hostedView = AnyView(baseView)
+        }
+
+        let hostingView = NSHostingView(rootView: hostedView)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 340, height: 420),
             styleMask: [.titled, .closable],
@@ -285,7 +297,7 @@ final class AppViewModel: ObservableObject {
         window.titleVisibility = .hidden
         window.center()
 
-        let titleToolbar = CenterTitleToolbar(title: "设置")
+        let titleToolbar = CenterTitleToolbar(title: String(localized: "settings"))
         window.toolbar = titleToolbar.toolbar
         window.level = .floating
         window.isReleasedWhenClosed = false
@@ -297,6 +309,11 @@ final class AppViewModel: ObservableObject {
         Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(500))
             self?.updateViewModel.checkForUpdates(silent: true)
+        }
+
+        // Show update window if new version available
+        if updateViewModel.hasUpdateAvailable {
+            updateViewModel.showUpdateWindow()
         }
     }
 
@@ -337,8 +354,10 @@ private final class CenterTitleToolbar: NSObject, NSToolbarDelegate {
         label.alignment = .center
         label.sizeToFit()
         item.view = label
-        item.minSize = label.frame.size
-        item.maxSize = label.frame.size
+        NSLayoutConstraint.activate([
+            label.widthAnchor.constraint(equalToConstant: label.frame.width),
+            label.heightAnchor.constraint(equalToConstant: label.frame.height)
+        ])
         return item
     }
 

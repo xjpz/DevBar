@@ -52,22 +52,27 @@ enum Constants {
 
     enum Icons {
         static let availableIcons: [(String, String)] = [
-            ("sparkles", "星星"),
-            ("chart.bar.xaxis", "横轴"),
-            ("align.vertical.bottom.fill", "竖线"),
-            ("chart.bar.fill", "柱状图"),
-            ("fish.fill", "鱼"),
-            ("dog.fill", "狗"),
-            ("tortoise.fill", "乌龟"),
-            ("hare.fill", "兔子"),
-            ("cat.fill", "猫"),
-            ("bird.fill", "鸟"),
+            ("sparkles", String(localized: "icon_sparkles")),
+            ("chart.bar.xaxis", String(localized: "icon_chart")),
+            ("align.vertical.bottom.fill", String(localized: "icon_bars")),
+            ("chart.bar.fill", String(localized: "icon_bar_fill")),
+            ("fish.fill", String(localized: "icon_fish")),
+            ("dog.fill", String(localized: "icon_dog")),
+            ("tortoise.fill", String(localized: "icon_tortoise")),
+            ("hare.fill", String(localized: "icon_hare")),
+            ("cat.fill", String(localized: "icon_cat")),
+            ("bird.fill", String(localized: "icon_bird")),
         ]
 
         /// Returns true if the icon name refers to a custom asset image (not a system SF Symbol)
         static func isCustomIcon(_ name: String) -> Bool {
             !availableIcons.contains { $0.0 == name }
         }
+    }
+
+    enum AppGroup {
+        static let groupID = "group.cc.xjpz.DevBar"
+        static let sharedDataKey = "widget_shared_data"
     }
 
     enum UI {

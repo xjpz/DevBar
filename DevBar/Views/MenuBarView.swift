@@ -34,7 +34,7 @@ struct MenuBarView: View {
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("加载中...")
+            Text("loading")
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -54,6 +54,7 @@ struct MenuBarView: View {
 private struct LoggedInContentView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @EnvironmentObject private var quotaViewModel: QuotaViewModel
+    @EnvironmentObject private var updateViewModel: UpdateViewModel
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,7 +65,7 @@ private struct LoggedInContentView: View {
             Divider()
 
             if quotaViewModel.isLoading && quotaViewModel.quotaData == nil {
-                ProgressView("获取用量...")
+                ProgressView("fetching_usage")
                     .padding()
             } else if !quotaViewModel.hasValidSubscription {
                 noSubscriptionView
@@ -75,7 +76,7 @@ private struct LoggedInContentView: View {
             } else if let error = quotaViewModel.errorMessage {
                 errorView(error)
             } else {
-                Text("暂无数据")
+                Text("no_data")
                     .foregroundStyle(.secondary)
                     .padding()
             }
@@ -115,15 +116,23 @@ private struct LoggedInContentView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.borderless)
-            .help("刷新")
+            .help("refresh")
 
             Button(action: {
                 appViewModel.showSettings()
             }) {
-                Image(systemName: "gearshape")
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "gearshape")
+                    if updateViewModel.hasUpdateAvailable {
+                        Circle()
+                            .fill(.red)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 4, y: -4)
+                    }
+                }
             }
             .buttonStyle(.borderless)
-            .help("设置")
+            .help("settings")
         }
     }
 
@@ -133,9 +142,9 @@ private struct LoggedInContentView: View {
         VStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
-            Text("没有可用套餐")
+            Text("no_subscription")
                 .font(.headline)
-            Text("请前往 BigModel 官网订阅")
+            Text("go_subscribe")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -174,7 +183,7 @@ private struct LoggedInContentView: View {
 
     private func renewalInfo(sub: Subscription) -> some View {
         HStack {
-            Text("订阅截止")
+            Text("subscription_ends")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(sub.formattedNextRenewDate)
@@ -204,7 +213,7 @@ private struct LoggedInContentView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("重试") {
+            Button("retry") {
                 Task { await appViewModel.refreshQuota() }
             }
             .buttonStyle(.bordered)
@@ -220,7 +229,7 @@ private struct LoggedInContentView: View {
             Button(action: { appViewModel.logout() }) {
                 HStack {
                     Image(systemName: "rectangle.portrait.and.arrow.right")
-                    Text("退出登录")
+                    Text("log_out")
                 }
                 .frame(maxWidth: .infinity)
             }
@@ -235,7 +244,7 @@ private struct LoggedInContentView: View {
             }) {
                 HStack {
                     Image(systemName: "power")
-                    Text("退出")
+                    Text("quit")
                 }
                 .frame(maxWidth: .infinity)
             }

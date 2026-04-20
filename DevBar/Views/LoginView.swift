@@ -74,12 +74,12 @@ private extension LoginView {
             Text("DevBar")
                 .font(.system(size: 18, weight: .semibold))
 
-            Text("开发吧")
+            Text("tagline")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             if isExpired {
-                Label("登录已过期，请重新登录", systemImage: "clock.badge.exclamationmark")
+                Label("login_expired", systemImage: "clock.badge.exclamationmark")
                     .font(.caption2)
                     .foregroundStyle(.orange)
             }
@@ -94,14 +94,14 @@ private extension LoginView {
     var browserLoginSection: some View {
         VStack(spacing: 10) {
 
-            Text("扫码或账号登录")
+            Text("scan_or_account_login")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
             Button(action: openLoginWindow) {
                 HStack {
                     Image(systemName: "safari")
-                    Text("浏览器登录")
+                    Text("browser_login")
                 }
             }
             .buttonStyle(DevBarButtonStyle(isPrimary: apiKey.trimmingCharacters(in: .whitespaces).isEmpty))
@@ -112,7 +112,7 @@ private extension LoginView {
         HStack {
             Rectangle().frame(height: 0.5).opacity(0.2)
 
-            Text("或")
+            Text("or")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
@@ -127,7 +127,7 @@ private extension LoginView {
 //                .font(.caption2)
 //                .foregroundStyle(.secondary)
 
-            SecureField("请输入API Key", text: $apiKey)
+            SecureField("enter_api_key", text: $apiKey)
                 .textFieldStyle(.plain)
                 .padding(10)
                 .background(
@@ -147,7 +147,7 @@ private extension LoginView {
                     if isValidating {
                         ProgressView().controlSize(.small)
                     }
-                    Text("API Key登录")
+                    Text("api_key_login")
                 }
             }
             .buttonStyle(DevBarButtonStyle(isPrimary: !apiKey.trimmingCharacters(in: .whitespaces).isEmpty))
@@ -165,7 +165,7 @@ private extension LoginView {
     }
 
     var footer: some View {
-        Text("凭据仅保存在本地设备")
+        Text("credentials_local_only")
             .font(.caption2)
             .foregroundStyle(.tertiary)
     }
@@ -191,7 +191,7 @@ private extension LoginView {
                     onLoginSuccess(AuthCredentials(token: key, cookieString: ""))
                 }
             } else {
-                loginError = "API Key 无效"
+                loginError = String(localized: "api_key_invalid")
             }
         }
     }
@@ -213,7 +213,7 @@ private extension LoginView {
                             onLoginSuccess(credentials)
                         }
                     } else {
-                        loginError = "Token 无效，请重新登录"
+                        loginError = String(localized: "token_invalid")
                     }
                 }
             }
@@ -336,7 +336,7 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         )
 
         win.contentView = hostingView
-        win.title = "登录 BigModel"
+        win.title = String(localized: "login_bigmodel")
         win.center()
         win.level = .floating
         win.isReleasedWhenClosed = false

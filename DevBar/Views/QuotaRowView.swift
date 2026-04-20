@@ -24,12 +24,12 @@ struct QuotaRowView: View {
             ProgressView(value: Double(limit.percentage), total: 100)
                 .tint(progressColor)
             HStack {
-                Text("已使用 \(limit.percentage)%")
+                Text(String(format: String(localized: "used_percentage"), limit.percentage))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 if let resetTime = limit.formattedResetTime {
-                    Text("重置: \(resetTime)")
+                    Text(String(format: String(localized: "reset_at"), resetTime))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

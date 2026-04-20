@@ -34,7 +34,7 @@ struct UpdateView: View {
     private var checkingView: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("正在检查更新...")
+            Text("checking_update")
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 80)
@@ -45,7 +45,7 @@ struct UpdateView: View {
             HStack {
                 Image(systemName: "arrow.up.circle.fill")
                     .foregroundStyle(.blue)
-                Text("发现新版本")
+                Text("new_version_found")
                     .font(.headline)
             }
 
@@ -62,7 +62,7 @@ struct UpdateView: View {
             }
 
             HStack(spacing: 8) {
-                Button("跳过此版本") {
+                Button("skip_version") {
                     viewModel.skipThisVersion()
                 }
                 .buttonStyle(.bordered)
@@ -71,12 +71,12 @@ struct UpdateView: View {
                 Spacer()
 
                 if let urlStr = release.htmlUrl, let url = URL(string: urlStr) {
-                    Link("查看详情", destination: url)
+                    Link("view_details", destination: url)
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 }
 
-                Button("立即更新") {
+                Button("update_now") {
                     viewModel.downloadUpdate()
                 }
                 .buttonStyle(.borderedProminent)
@@ -87,7 +87,7 @@ struct UpdateView: View {
 
     private func downloadingView(progress: Double) -> some View {
         VStack(spacing: 12) {
-            Text("正在下载更新...")
+            Text("downloading_update")
                 .font(.headline)
 
             ProgressView(value: progress)
@@ -98,7 +98,7 @@ struct UpdateView: View {
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
 
-            Button("取消") {
+            Button("cancel") {
                 viewModel.cancelDownload()
             }
             .buttonStyle(.bordered)
@@ -113,21 +113,21 @@ struct UpdateView: View {
                 .font(.largeTitle)
                 .foregroundStyle(.green)
 
-            Text("下载完成")
+            Text("download_complete")
                 .font(.headline)
 
-            Text("需要重启应用以完成安装")
+            Text("restart_required")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
-                Button("稍后") {
+                Button("later") {
                     viewModel.dismiss()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
-                Button("立即重启") {
+                Button("restart_now") {
                     viewModel.installAndRelaunch()
                 }
                 .buttonStyle(.borderedProminent)
@@ -140,7 +140,7 @@ struct UpdateView: View {
     private var installingView: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("正在安装...")
+            Text("installing")
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, minHeight: 80)
@@ -150,7 +150,7 @@ struct UpdateView: View {
         VStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
                 .foregroundStyle(.green)
-            Text("当前已是最新版本")
+            Text("up_to_date")
         }
         .frame(maxWidth: .infinity, minHeight: 80)
     }
@@ -165,13 +165,13 @@ struct UpdateView: View {
                 .multilineTextAlignment(.center)
 
             HStack(spacing: 8) {
-                Button("关闭") {
+                Button("close") {
                     viewModel.dismiss()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)
 
-                Button("重试") {
+                Button("retry") {
                     viewModel.checkForUpdates(silent: false)
                 }
                 .buttonStyle(.borderedProminent)

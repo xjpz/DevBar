@@ -13,15 +13,15 @@ enum APIError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notLoggedIn:
-            return "未登录"
+            return String(localized: "not_logged_in")
         case .invalidResponse:
-            return "无效的响应"
+            return String(localized: "invalid_response")
         case .httpError(let code):
-            return "请求失败 (\(code))"
+            return String(format: String(localized: "http_error"), code)
         case .unauthorized:
-            return "登录已过期，请重新登录"
+            return String(localized: "login_expired")
         case .decodingError(let error):
-            return "数据解析失败: \(error.localizedDescription)"
+            return String(format: String(localized: "decoding_failed"), error.localizedDescription)
         }
     }
 }
@@ -126,7 +126,7 @@ final class BigModelAPIClient: Sendable {
             }
             let quotaResponse = try JSONDecoder().decode(QuotaResponse.self, from: data)
             guard quotaResponse.success == true, let quotaData = quotaResponse.data else {
-                let message = quotaResponse.msg ?? "未知错误"
+                let message = quotaResponse.msg ?? String(localized: "unknown_error")
                 print("[DevBar] API failure: \(message)")
                 throw APIError.invalidResponse
             }

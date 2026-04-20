@@ -6,7 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		86A450BD2F95172C00748112 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 86A450BC2F95172C00748112 /* WidgetKit.framework */; };
+		86A450BF2F95172C00748112 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 86A450BE2F95172C00748112 /* SwiftUI.framework */; };
+		86A450CE2F95172E00748112 /* DevBarWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		86A450CC2F95172E00748112 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 86C289782F8D19D100A3610C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 86A450B92F95172C00748112;
+			remoteInfo = DevBarWidgetExtension;
+		};
 		86C2898E2F8D19D300A3610C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 86C289782F8D19D100A3610C /* Project object */;
@@ -23,15 +36,69 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		86A450D32F95172E00748112 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				86A450CE2F95172E00748112 /* DevBarWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DevBarWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		86A450BC2F95172C00748112 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		86A450BE2F95172C00748112 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		86A450E12F9518A000748112 /* DevBarWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DevBarWidgetExtension.entitlements; sourceTree = "<group>"; };
 		86C289802F8D19D100A3610C /* DevBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DevBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		86C2898D2F8D19D300A3610C /* DevBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DevBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86C289972F8D19D300A3610C /* DevBarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DevBarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		86A450CF2F95172E00748112 /* Exceptions for "DevBarWidget" folder in "DevBarWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 86A450B92F95172C00748112 /* DevBarWidgetExtension */;
+		};
+		86A450DF2F95177300748112 /* Exceptions for "DevBar" folder in "DevBarWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Resources/Localizable.xcstrings,
+			);
+			target = 86A450B92F95172C00748112 /* DevBarWidgetExtension */;
+		};
+		86A450ED2F951C1900748112 /* Exceptions for "DevBarWidget" folder in "DevBar" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Models/WidgetSharedData .swift",
+			);
+			target = 86C2897F2F8D19D100A3610C /* DevBar */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		86A450C02F95172C00748112 /* DevBarWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				86A450ED2F951C1900748112 /* Exceptions for "DevBarWidget" folder in "DevBar" target */,
+				86A450CF2F95172E00748112 /* Exceptions for "DevBarWidget" folder in "DevBarWidgetExtension" target */,
+			);
+			path = DevBarWidget;
+			sourceTree = "<group>";
+		};
 		86C289822F8D19D100A3610C /* DevBar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				86A450DF2F95177300748112 /* Exceptions for "DevBar" folder in "DevBarWidgetExtension" target */,
+			);
 			path = DevBar;
 			sourceTree = "<group>";
 		};
@@ -48,6 +115,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		86A450B72F95172C00748112 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				86A450BF2F95172C00748112 /* SwiftUI.framework in Frameworks */,
+				86A450BD2F95172C00748112 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		86C2897D2F8D19D100A3610C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -72,12 +148,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		86A450BB2F95172C00748112 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				86A450BC2F95172C00748112 /* WidgetKit.framework */,
+				86A450BE2F95172C00748112 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		86C289772F8D19D100A3610C = {
 			isa = PBXGroup;
 			children = (
+				86A450E12F9518A000748112 /* DevBarWidgetExtension.entitlements */,
 				86C289822F8D19D100A3610C /* DevBar */,
 				86C289902F8D19D300A3610C /* DevBarTests */,
 				86C2899A2F8D19D300A3610C /* DevBarUITests */,
+				86A450C02F95172C00748112 /* DevBarWidget */,
+				86A450BB2F95172C00748112 /* Frameworks */,
 				86C289812F8D19D100A3610C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +176,7 @@
 				86C289802F8D19D100A3610C /* DevBar.app */,
 				86C2898D2F8D19D300A3610C /* DevBarTests.xctest */,
 				86C289972F8D19D300A3610C /* DevBarUITests.xctest */,
+				86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,6 +184,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		86A450B92F95172C00748112 /* DevBarWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 86A450D02F95172E00748112 /* Build configuration list for PBXNativeTarget "DevBarWidgetExtension" */;
+			buildPhases = (
+				86A450B62F95172C00748112 /* Sources */,
+				86A450B72F95172C00748112 /* Frameworks */,
+				86A450B82F95172C00748112 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				86A450C02F95172C00748112 /* DevBarWidget */,
+			);
+			name = DevBarWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = DevBarWidgetExtension;
+			productReference = 86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		86C2897F2F8D19D100A3610C /* DevBar */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 86C289A12F8D19D300A3610C /* Build configuration list for PBXNativeTarget "DevBar" */;
@@ -102,10 +213,12 @@
 				86C2897C2F8D19D100A3610C /* Sources */,
 				86C2897D2F8D19D100A3610C /* Frameworks */,
 				86C2897E2F8D19D100A3610C /* Resources */,
+				86A450D32F95172E00748112 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				86A450CD2F95172E00748112 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				86C289822F8D19D100A3610C /* DevBar */,
@@ -173,6 +286,9 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					86A450B92F95172C00748112 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
 					86C2897F2F8D19D100A3610C = {
 						CreatedOnToolsVersion = 26.4;
 					};
@@ -191,6 +307,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				"zh-Hans",
 				Base,
 			);
 			mainGroup = 86C289772F8D19D100A3610C;
@@ -203,11 +320,19 @@
 				86C2897F2F8D19D100A3610C /* DevBar */,
 				86C2898C2F8D19D300A3610C /* DevBarTests */,
 				86C289962F8D19D300A3610C /* DevBarUITests */,
+				86A450B92F95172C00748112 /* DevBarWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		86A450B82F95172C00748112 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		86C2897E2F8D19D100A3610C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -232,6 +357,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		86A450B62F95172C00748112 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		86C2897C2F8D19D100A3610C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -256,6 +388,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		86A450CD2F95172E00748112 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 86A450B92F95172C00748112 /* DevBarWidgetExtension */;
+			targetProxy = 86A450CC2F95172E00748112 /* PBXContainerItemProxy */;
+		};
 		86C2898F2F8D19D300A3610C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 86C2897F2F8D19D100A3610C /* DevBar */;
@@ -269,6 +406,74 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		86A450D12F95172E00748112 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = DevBarWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevBarWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DevBarWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar.DevBarWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		86A450D22F95172E00748112 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = DevBarWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevBarWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DevBarWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.4;
+				MARKETING_VERSION = 1.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar.DevBarWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		86C2899F2F8D19D300A3610C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -394,6 +599,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DevBar/DevBar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -404,12 +610,13 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DevBar;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -427,6 +634,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DevBar/DevBar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -437,12 +645,13 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = DevBar;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -538,6 +747,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		86A450D02F95172E00748112 /* Build configuration list for PBXNativeTarget "DevBarWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				86A450D12F95172E00748112 /* Debug */,
+				86A450D22F95172E00748112 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		86C2897B2F8D19D100A3610C /* Build configuration list for PBXProject "DevBar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

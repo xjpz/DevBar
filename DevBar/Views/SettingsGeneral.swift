@@ -6,17 +6,19 @@ import SwiftUI
 struct SettingsGeneral: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @EnvironmentObject private var quotaViewModel: QuotaViewModel
+    @EnvironmentObject private var languageManager: LanguageManager
 
     @State private var selectedInterval: TimeInterval
     @State private var selectedIcon: String
+    @State private var showRestartAlert = false
 
     private let intervals: [(String, TimeInterval)] = [
-        ("3 分钟", 180),
-        ("5 分钟", 300),
-        ("10 分钟", 600),
-        ("30 分钟", 1800),
-        ("60 分钟", 3600),
-        ("从不", 0),
+        (String(localized: "minutes_3"), 180),
+        (String(localized: "minutes_5"), 300),
+        (String(localized: "minutes_10"), 600),
+        (String(localized: "minutes_30"), 1800),
+        (String(localized: "minutes_60"), 3600),
+        (String(localized: "never"), 0),
     ]
 
     init() {
@@ -32,7 +34,20 @@ struct SettingsGeneral: View {
 
     var body: some View {
         Form {
-            Section("菜单栏图标") {
+            Section {
+                HStack {
+                    Text("language")
+                    Spacer()
+                    Picker("", selection: $languageManager.selectedLanguage) {
+                        ForEach(AppLanguage.allCases, id: \.rawValue) { lang in
+                            Text(lang.displayName).tag(lang)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                }
+            }
+
+            Section("menu_bar_icon") {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(32), spacing: 8), count: 5), spacing: 8) {
                     ForEach(Constants.Icons.availableIcons, id: \.0) { iconName, _ in
                         iconView(for: iconName)
@@ -53,7 +68,7 @@ struct SettingsGeneral: View {
 
             Section {
                 HStack {
-                    Text("自动刷新间隔")
+                    Text("auto_refresh_interval")
                     Spacer()
                     Picker("", selection: $selectedInterval) {
                         ForEach(intervals, id: \.1) { label, value in
@@ -64,20 +79,33 @@ struct SettingsGeneral: View {
                 }
             }
 
-            Section("通用") {
-                Toggle("登录时启动", isOn: $appViewModel.launchAtLogin)
-                Toggle("不在 Dock 栏显示", isOn: $appViewModel.isHiddenFromDock)
+            Section("general") {
+                Toggle("launch_at_login", isOn: $appViewModel.launchAtLogin)
+                Toggle("hide_from_dock", isOn: $appViewModel.isHiddenFromDock)
             }
 
             if let lastUpdated = quotaViewModel.lastUpdated {
-                Section("状态") {
-                    Text("上次更新: \(lastUpdated.formatted(.dateTime.hour().minute().second()))")
+                Section("status") {
+                    Text("last_updated \(lastUpdated.formatted(.dateTime.hour().minute().second()))")
                         .foregroundStyle(.secondary)
                 }
             }
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)
+        .onChange(of: languageManager.selectedLanguage) { _, _ in
+            showRestartAlert = true
+        }
+        .alert("restart_required", isPresented: $showRestartAlert) {
+            Button("restart_now") {
+                languageManager.restartToApplyLanguage()
+            }
+            Button("later") {
+                showRestartAlert = false
+            }
+        } message: {
+            Text("restart_to_apply_language")
+        }
         .onChange(of: selectedInterval) { _, newValue in
             appViewModel.refreshInterval = newValue
             appViewModel.stopAutoRefresh()

@@ -15,17 +15,17 @@ enum UpdateError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .networkError(let error):
-            "网络错误: \(error.localizedDescription)"
+            String(format: String(localized: "network_error"), error.localizedDescription)
         case .noReleaseFound:
-            "未找到发布版本"
+            String(localized: "no_release_found")
         case .noSuitableAsset:
-            "未找到可用的更新包"
+            String(localized: "no_update_package")
         case .downloadFailed:
-            "下载失败"
+            String(localized: "download_failed")
         case .invalidArchive:
-            "更新包无效"
+            String(localized: "invalid_package")
         case .installationFailed(let reason):
-            "安装失败: \(reason)"
+            String(format: String(localized: "installation_failed"), reason)
         }
     }
 }
@@ -114,12 +114,7 @@ final class UpdateService: Sendable {
         )
         let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
 
-        let task: URLSessionDownloadTask
-        do {
-            task = session.downloadTask(with: url)
-        } catch {
-            throw UpdateError.downloadFailed
-        }
+        let task = session.downloadTask(with: url)
         task.resume()
 
         let resultURL = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in

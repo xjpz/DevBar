@@ -5,7 +5,7 @@
 <h1 align="center">DevBar（开发吧）</h1>
 
 <div align="center">
-**简体中文** · <a href="README.md">English</a>
+<strong>简体中文</strong> · <a href="README.md">English</a>
 </div>
 
 <p align="center">

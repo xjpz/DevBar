@@ -55,7 +55,7 @@ final class UpdateViewModel: ObservableObject {
 
     // MARK: - Window Management
 
-    private func showWindow() {
+    func showUpdateWindow() {
         // If window exists and is visible, just bring to front
         if let window = updateWindow, window.isVisible {
             window.makeKeyAndOrderFront(nil)
@@ -74,7 +74,7 @@ final class UpdateViewModel: ObservableObject {
             defer: false
         )
         window.contentView = hostingView
-        window.title = "DevBar 更新"
+        window.title = String(localized: "devbar_update")
         window.center()
         window.level = .floating
         window.isReleasedWhenClosed = false
@@ -113,7 +113,7 @@ final class UpdateViewModel: ObservableObject {
                     print("[DevBar] Update: already up to date")
                     if !silent {
                         self.state = .upToDate
-                        self.showWindow()
+                        self.showUpdateWindow()
                         try? await Task.sleep(for: .seconds(2))
                         if case .upToDate = self.state {
                             self.hideWindow()
@@ -133,11 +133,11 @@ final class UpdateViewModel: ObservableObject {
 
                 print("[DevBar] Update: new version available: \(release.tagName)")
                 self.state = .available(release)
-                self.showWindow()
+                self.showUpdateWindow()
             } catch {
                 if !silent {
                     self.state = .error(error.localizedDescription)
-                    self.showWindow()
+                    self.showUpdateWindow()
                 } else {
                     print("[DevBar] Update check failed: \(error.localizedDescription)")
                     self.state = .idle
@@ -150,7 +150,7 @@ final class UpdateViewModel: ObservableObject {
         guard case .available(let release) = state else { return }
         guard let asset = release.assets.first(where: { $0.name.hasSuffix(".zip") }) else {
             print("[DevBar] Update: no zip asset found in release \(release.tagName), assets=\(release.assets.map(\.name))")
-            state = .error("未找到可用的更新包")
+            state = .error(String(localized: "no_update_package"))
             return
         }
 
@@ -164,8 +164,9 @@ final class UpdateViewModel: ObservableObject {
                 let localURL = try await service.downloadAsset(
                     from: url,
                     progressHandler: { [weak self] progress in
+                        guard let self else { return }
                         Task { @MainActor in
-                            guard let self, case .downloading = self.state else { return }
+                            guard case .downloading = self.state else { return }
                             self.state = .downloading(progress: progress)
                         }
                     }

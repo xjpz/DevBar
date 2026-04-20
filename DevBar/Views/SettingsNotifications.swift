@@ -14,11 +14,11 @@ struct SettingsNotifications: View {
         Form {
             Section {
                 HStack {
-                    Text("通知权限")
+                    Text("notification_permission")
                     Spacer()
 
                     if notificationService.authorizationStatus == .denied {
-                        Button("已拒绝") {
+                        Button("denied") {
                             notificationService.openSystemNotificationSettings()
                         }
                         .foregroundStyle(.red)
@@ -34,19 +34,19 @@ struct SettingsNotifications: View {
                                 ProgressView()
                                     .controlSize(.small)
                             } else {
-                                Text("请求权限")
+                                Text("request_permission")
                             }
                         }
                         .disabled(isRequestingPermission)
                     } else {
-                        Text("已授权")
+                        Text("authorized")
                             .foregroundStyle(.green)
                     }
                 }
             }
 
-            Section("低额度提醒") {
-                Toggle("启用低额度提醒", isOn: $appViewModel.notificationLowQuotaEnabled)
+            Section {
+                Toggle("enable_low_quota_alert", isOn: $appViewModel.notificationLowQuotaEnabled)
                     .onChange(of: appViewModel.notificationLowQuotaEnabled) { _, newValue in
                         if newValue && notificationService.authorizationStatus == .notDetermined {
                             Task {
@@ -57,7 +57,7 @@ struct SettingsNotifications: View {
 
                 if appViewModel.notificationLowQuotaEnabled {
                     HStack {
-                        Text("阈值")
+                        Text("threshold")
                             .foregroundStyle(.secondary)
                         Spacer()
                         Picker("", selection: $appViewModel.notificationLowQuotaThreshold) {
@@ -71,7 +71,7 @@ struct SettingsNotifications: View {
             }
 
             Section {
-                Toggle("启用用尽提醒", isOn: $appViewModel.notificationExhaustedEnabled)
+                Toggle("enable_exhausted_alert", isOn: $appViewModel.notificationExhaustedEnabled)
                     .onChange(of: appViewModel.notificationExhaustedEnabled) { _, newValue in
                         if newValue && notificationService.authorizationStatus == .notDetermined {
                             Task {
@@ -80,7 +80,7 @@ struct SettingsNotifications: View {
                         }
                     }
 
-                Toggle("启用额度重置提醒", isOn: $appViewModel.notificationResetEnabled)
+                Toggle("enable_reset_alert", isOn: $appViewModel.notificationResetEnabled)
                     .onChange(of: appViewModel.notificationResetEnabled) { _, newValue in
                         if newValue && notificationService.authorizationStatus == .notDetermined {
                             Task {
@@ -88,11 +88,23 @@ struct SettingsNotifications: View {
                             }
                         }
                     }
-            } header: {
-                Text("其他提醒")
             } footer: {
-                Text("用尽提醒在额度耗尽时通知，重置提醒在额度恢复时通知")
+                Text("alerts_footer")
                     .font(.caption)
+            }
+
+            Section {
+                HStack(spacing: 12) {
+                    Image(systemName: "widget.small")
+                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("widget_guide_title")
+                            .font(.subheadline)
+                        Text("widget_guide_description")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
         .formStyle(.grouped)
