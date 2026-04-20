@@ -78,7 +78,7 @@
 		86A450ED2F951C1900748112 /* Exceptions for "DevBarWidget" folder in "DevBar" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				"Models/WidgetSharedData .swift",
+				"Models/WidgetSharedData.swift",
 			);
 			target = 86C2897F2F8D19D100A3610C /* DevBar */;
 		};
