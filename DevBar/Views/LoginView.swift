@@ -6,37 +6,42 @@
 import SwiftUI
 import WebKit
 
-// MARK: - SwiftUI View
-
 struct LoginView: View {
-    var isExpired = false
-    let onLoginSuccess: (AuthCredentials) -> Void
+    @EnvironmentObject private var appViewModel: AppViewModel
 
+    var isExpired = false
+
+    @State private var selectedProvider: QuotaProvider = .glm
     @State private var isValidating = false
     @State private var loginError: String?
-    @State private var apiKey = ""
+    @State private var glmAPIKey = ""
+    @State private var openAIToken = ""
 
     var body: some View {
         VStack(spacing: 16) {
-
             header
 
-            VStack(spacing: 12) {
-                browserLoginSection
-                separatorView
-                apiKeySection
+            providerPicker
+
+            Group {
+                switch selectedProvider {
+                case .glm:
+                    glmLoginCard
+                case .openai:
+                    openAILoginCard
+                }
             }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.ultraThinMaterial)
-                    .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
-            )
 
             footer
         }
         .padding(20)
         .frame(width: 320)
+        .task {
+            if let token = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey),
+               !token.isEmpty {
+                openAIToken = token
+            }
+        }
     }
 }
 
@@ -61,8 +66,6 @@ struct DevBarButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Header
-
 private extension LoginView {
     var header: some View {
         VStack(spacing: 10) {
@@ -70,9 +73,6 @@ private extension LoginView {
                 .resizable()
                 .frame(width: 52, height: 52)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            Text("DevBar")
-                .font(.system(size: 18, weight: .semibold))
 
             Text("tagline")
                 .font(.caption)
@@ -85,49 +85,84 @@ private extension LoginView {
             }
         }
     }
-}
 
-// MARK: - Sections
+    var providerPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(providerOrder, id: \.self) { provider in
+                Button {
+                    loginError = nil
+                    selectedProvider = provider
+                } label: {
+                    HStack(spacing: 6) {
+                        providerLogo(for: provider, size: 14)
+                        Text(provider.localizedName)
+                            .font(.caption.weight(selectedProvider == provider ? .semibold : .regular))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(selectedProvider == provider ? Color.accentColor.opacity(0.14) : Color.primary.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(selectedProvider == provider ? selectedAccentColor.opacity(0.35) : Color.primary.opacity(0.06), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
 
-private extension LoginView {
+    var glmLoginCard: some View {
+        VStack(spacing: 12) {
+            browserLoginSection
+            separatorView
+            glmAPIKeySection
+        }
+        .padding(16)
+        .background(cardBackground)
+    }
+
+    var openAILoginCard: some View {
+        VStack(spacing: 12) {
+            Button(action: loadOpenAITokenFromCodexConfig) {
+                Text("accounts_read_from_config")
+            }
+            .buttonStyle(DevBarButtonStyle(isPrimary: openAIToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+            .disabled(isValidating)
+
+            separatorView
+
+            openAITokenSection
+        }
+        .padding(16)
+        .background(cardBackground)
+    }
 
     var browserLoginSection: some View {
         VStack(spacing: 10) {
-
-            Text("scan_or_account_login")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-
             Button(action: openLoginWindow) {
-                HStack {
-                    Image(systemName: "safari")
-                    Text("browser_login")
-                }
+                Text("browser_login")
             }
-            .buttonStyle(DevBarButtonStyle(isPrimary: apiKey.trimmingCharacters(in: .whitespaces).isEmpty))
+            .buttonStyle(DevBarButtonStyle(isPrimary: glmAPIKey.trimmingCharacters(in: .whitespaces).isEmpty))
+            .disabled(isValidating)
         }
     }
 
     var separatorView: some View {
         HStack {
             Rectangle().frame(height: 0.5).opacity(0.2)
-
             Text("or")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-
             Rectangle().frame(height: 0.5).opacity(0.2)
         }
     }
 
-    var apiKeySection: some View {
+    var glmAPIKeySection: some View {
         VStack(spacing: 10) {
-
-//            Text("使用 API Key")
-//                .font(.caption2)
-//                .foregroundStyle(.secondary)
-
-            SecureField("enter_api_key", text: $apiKey)
+            SecureField("enter_api_key", text: $glmAPIKey)
                 .textFieldStyle(.plain)
                 .padding(10)
                 .background(
@@ -137,12 +172,16 @@ private extension LoginView {
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(Color.gray.opacity(0.2))
-
                 )
                 .font(.system(size: 12, design: .monospaced))
-                .onSubmit { loginWithApiKey() }
+                .onSubmit { loginWithGLMApiKey() }
 
-            Button(action: loginWithApiKey) {
+            Text("accounts_glm_api_key_hint")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: loginWithGLMApiKey) {
                 HStack {
                     if isValidating {
                         ProgressView().controlSize(.small)
@@ -150,17 +189,59 @@ private extension LoginView {
                     Text("api_key_login")
                 }
             }
-            .buttonStyle(DevBarButtonStyle(isPrimary: !apiKey.trimmingCharacters(in: .whitespaces).isEmpty))
+            .buttonStyle(DevBarButtonStyle(isPrimary: !glmAPIKey.trimmingCharacters(in: .whitespaces).isEmpty))
+            .disabled(isValidating)
 
-            if let error = loginError {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-                    .padding(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.red.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            errorMessageView
+        }
+    }
+
+    var openAITokenSection: some View {
+        VStack(spacing: 10) {
+            SecureField(String(localized: "openai_token_placeholder"), text: $openAIToken)
+                .textFieldStyle(.plain)
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color(NSColor.textBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.gray.opacity(0.2))
+                )
+                .font(.system(size: 12, design: .monospaced))
+                .onSubmit { loginWithOpenAIToken() }
+
+            Text("accounts_openai_token_hint")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: loginWithOpenAIToken) {
+                HStack {
+                    if isValidating {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text("openai_token_login")
+                }
             }
+            .buttonStyle(DevBarButtonStyle(isPrimary: !openAIToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+            .disabled(isValidating)
+
+            errorMessageView
+        }
+    }
+
+    @ViewBuilder
+    var errorMessageView: some View {
+        if let loginError {
+            Label(loginError, systemImage: "exclamationmark.triangle.fill")
+                .font(.caption2)
+                .foregroundStyle(.red)
+                .padding(6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.red.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
         }
     }
 
@@ -169,30 +250,99 @@ private extension LoginView {
             .font(.caption2)
             .foregroundStyle(.tertiary)
     }
+
+    var providerOrder: [QuotaProvider] {
+        let ordered = appViewModel.accountConfigs
+            .sorted { $0.order < $1.order }
+            .map(\.provider)
+        return ordered.isEmpty ? QuotaProvider.allCases : ordered
+    }
+
+    var selectedAccentColor: Color {
+        selectedProvider.accentColor
+    }
+
+    var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(selectedAccentColor.opacity(0.12), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.08), radius: 10, y: 4)
+    }
+
+    func providerLogo(for provider: QuotaProvider, size: CGFloat) -> some View {
+        Image(provider.assetName)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+    }
 }
 
-// MARK: - Actions
-
 private extension LoginView {
-
-    func loginWithApiKey() {
-        let key = apiKey.trimmingCharacters(in: .whitespaces)
+    func loginWithGLMApiKey() {
+        let key = glmAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty else { return }
 
         loginError = nil
         isValidating = true
 
         Task { @MainActor in
-            let isValid = await validateApiKey(key)
+            let isValid = await validateGLMAPIKey(key)
             isValidating = false
 
             if isValid {
+                appViewModel.updateAccountConfig(provider: .glm, isEnabled: true)
                 withAnimation(.spring()) {
-                    onLoginSuccess(AuthCredentials(token: key, cookieString: ""))
+                    appViewModel.handleLoginSuccess(AuthCredentials(token: key, cookieString: ""))
                 }
             } else {
                 loginError = String(localized: "api_key_invalid")
             }
+        }
+    }
+
+    func loginWithOpenAIToken() {
+        let token = openAIToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return }
+
+        loginError = nil
+        isValidating = true
+        let accountId = UserDefaults.standard.string(forKey: Constants.OpenAI.accountIdKey)
+
+        Task { @MainActor in
+            defer { isValidating = false }
+
+            do {
+                _ = try await appViewModel.openAIQuotaViewModel.fetchUsage(
+                    accessToken: token,
+                    accountId: accountId,
+                    silent: true
+                )
+                KeychainService.shared.save(key: Constants.Keychain.openAIAccessTokenKey, value: token)
+                appViewModel.updateAccountConfig(provider: .openai, isEnabled: true)
+                appViewModel.refreshAuthenticationState()
+            } catch let error as APIError {
+                loginError = error.errorDescription
+            } catch {
+                loginError = error.localizedDescription
+            }
+        }
+    }
+
+    func loadOpenAITokenFromCodexConfig() {
+        loginError = nil
+
+        do {
+            let token = try CodexAuthFileLoader.loadOpenAIAccessToken()
+            guard !token.isEmpty else {
+                loginError = String(localized: "accounts_openai_config_missing_token")
+                return
+            }
+            openAIToken = token
+        } catch {
+            loginError = String(localized: "accounts_openai_config_read_failed")
         }
     }
 
@@ -205,12 +355,13 @@ private extension LoginView {
                 isValidating = true
 
                 Task { @MainActor in
-                    let isValid = await validateToken(cookieString: credentials.cookieString)
+                    let isValid = await validateGLMCookie(credentials.cookieString)
                     isValidating = false
 
                     if isValid {
+                        appViewModel.updateAccountConfig(provider: .glm, isEnabled: true)
                         withAnimation(.spring()) {
-                            onLoginSuccess(credentials)
+                            appViewModel.handleLoginSuccess(credentials)
                         }
                     } else {
                         loginError = String(localized: "token_invalid")
@@ -222,43 +373,32 @@ private extension LoginView {
         controller.show()
     }
 
-    /// Validate API Key
-    func validateApiKey(_ key: String) async -> Bool {
+    func validateGLMAPIKey(_ key: String) async -> Bool {
         var request = URLRequest(url: URL(string: Constants.API.quotaLimitURL)!)
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 10
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-
             guard let http = response as? HTTPURLResponse,
                   http.statusCode == 200 else {
                 return false
             }
 
-            // 👇 解析 JSON
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 let success = json["success"] as? Bool ?? false
                 let code = json["code"] as? Int ?? -1
-
-                if success == true || code == 0 {
-                    return true
-                } else {
-                    print("[DevBar] API Key invalid: \(json)")
-                    return false
-                }
+                return success || code == 0
             }
 
             return false
-
         } catch {
             print("[DevBar] API Key validation failed: \(error.localizedDescription)")
             return false
         }
     }
 
-    /// Validate Cookie Token
-    func validateToken(cookieString: String) async -> Bool {
+    func validateGLMCookie(_ cookieString: String) async -> Bool {
         var request = URLRequest(url: URL(string: Constants.API.subscriptionListURL)!)
         request.setValue(cookieString, forHTTPHeaderField: "Cookie")
         request.timeoutInterval = 10
@@ -276,12 +416,9 @@ private extension LoginView {
     }
 }
 
-// MARK: - Web Login
-
 private let loginScriptMessageHandler = "loginDetector"
 
 final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-
     private var window: NSWindow?
     private var webView: WKWebView?
     private var pollTimer: Timer?
@@ -300,7 +437,6 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         config.websiteDataStore = .default()
 
         let contentController = WKUserContentController()
-
         let script = WKUserScript(
             source: """
             (function() {
@@ -376,9 +512,7 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         webView = nil
     }
 
-    func userContentController(_ userContentController: WKUserContentController,
-                               didReceive message: WKScriptMessage) {
-
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == loginScriptMessageHandler else { return }
 
         Task { @MainActor [weak self] in
@@ -408,8 +542,6 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         onCookiesExtracted(credentials)
     }
 }
-
-// MARK: - WebView Wrapper
 
 private struct LoginWebViewWrapper: NSViewRepresentable {
     let webView: WKWebView

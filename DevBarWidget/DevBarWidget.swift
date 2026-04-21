@@ -71,6 +71,17 @@ struct DevBarWidgetEntryView: View {
 
     @Environment(\.widgetFamily) var family
 
+    private var providerTitle: String {
+        switch entry.data.provider {
+        case .glm:
+            return "GLM"
+        case .openai:
+            return "OpenAI"
+        case nil:
+            return "DevBar"
+        }
+    }
+
     var body: some View {
         if !entry.isLoggedIn {
             NotLoggedInView()
@@ -79,9 +90,14 @@ struct DevBarWidgetEntryView: View {
         } else {
             switch family {
             case .systemSmall:
-                QuotaSmallView(limits: entry.data.limits, level: entry.data.level)
+                QuotaSmallView(
+                    title: providerTitle,
+                    limits: entry.data.limits,
+                    level: entry.data.level
+                )
             case .systemMedium:
                 QuotaMediumView(
+                    title: providerTitle,
                     limits: entry.data.limits,
                     level: entry.data.level,
                     subscriptionName: entry.data.subscriptionName,
@@ -91,6 +107,7 @@ struct DevBarWidgetEntryView: View {
                 )
             default:
                 QuotaMediumView(
+                    title: providerTitle,
                     limits: entry.data.limits,
                     level: entry.data.level,
                     subscriptionName: entry.data.subscriptionName,

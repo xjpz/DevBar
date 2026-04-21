@@ -15,6 +15,12 @@ enum Constants {
         static let service = "cc.xjpz.DevBar"
         static let tokenKey = "authorization_token"
         static let cookieKey = "cookie_string"
+        static let openAIAccessTokenKey = "openai_access_token"
+    }
+
+    enum OpenAI {
+        static let usageURL = "https://chatgpt.com/backend-api/wham/usage"
+        static let accountIdKey = "openai_account_id"
     }
 
     enum Defaults {
@@ -39,6 +45,9 @@ enum Constants {
         static let lastExhaustedNotificationTimeKey = "last_exhausted_notification_time"
         static let lastResetNotificationTimeKey = "last_reset_notification_time"
         static let lowQuotaNotificationInterval: TimeInterval = 1800 // 30 minutes
+
+        // Account configs
+        static let accountConfigsKey = "account_configs"
     }
 
     enum Update {
@@ -73,6 +82,9 @@ enum Constants {
     enum AppGroup {
         static let groupID = "group.cc.xjpz.DevBar"
         static let sharedDataKey = "widget_shared_data"
+        static func sharedDataKey(for provider: String) -> String {
+            "widget_shared_data_\(provider)"
+        }
     }
 
     enum UI {

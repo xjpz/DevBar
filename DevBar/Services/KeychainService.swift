@@ -31,14 +31,14 @@ final class KeychainService: Sendable {
     func clear() {
         delete(key: Constants.Keychain.tokenKey)
         delete(key: Constants.Keychain.cookieKey)
+        delete(key: Constants.Keychain.openAIAccessTokenKey)
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Generic Key-Value
 
-    private func save(key: String, value: String) {
+    func save(key: String, value: String) {
         guard let data = value.data(using: .utf8) else { return }
 
-        // Delete existing item first
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Constants.Keychain.service,
@@ -46,7 +46,6 @@ final class KeychainService: Sendable {
         ]
         SecItemDelete(deleteQuery as CFDictionary)
 
-        // Add new item
         let addQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Constants.Keychain.service,
@@ -57,7 +56,7 @@ final class KeychainService: Sendable {
         SecItemAdd(addQuery as CFDictionary, nil)
     }
 
-    private func load(key: String) -> String? {
+    func load(key: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Constants.Keychain.service,
@@ -75,7 +74,7 @@ final class KeychainService: Sendable {
         return String(data: data, encoding: .utf8)
     }
 
-    private func delete(key: String) {
+    func delete(key: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: Constants.Keychain.service,

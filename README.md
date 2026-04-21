@@ -10,7 +10,7 @@
 
 
 <p align="center">
-  <strong>A macOS menu bar tool for monitoring Zhipu BigModel API usage in real time</strong><br>
+  <strong>A macOS menu bar tool for monitoring GLM and OpenAI usage in real time</strong><br>
   <a href="#Installation">Installation</a> · <a href="#features">Features</a> · <a href="#preview">Preview</a> · <a href="#development">Development</a>
 </p>
 
@@ -18,14 +18,16 @@
 
 ## Features
 
-- **Menu Bar Display** — Shows the highest usage percentage directly in the macOS menu bar
+- **Multi-Provider Support** — Monitor GLM and OpenAI from the same menu bar app, with configurable provider priority
+- **Menu Bar Display** — Shows the highest GLM usage percentage directly in the macOS menu bar
 - **Token Usage Monitoring** — Real-time progress of Token and time usage with dynamic color indicators
 - **MCP Usage Breakdown** — Per-model MCP call counts (search-prime, web-reader, etc.)
 - **Subscription Management** — Auto-detects plan validity, shows expiry date and renewal price
-- **Multiple Login Methods** — Browser login (QR code / account) and API Key login
+- **Provider-Aware Login** — Switch providers directly in the login view, with GLM browser/API Key login and OpenAI Access Token login
+- **Accounts & Priority Settings** — Enable or disable providers, reorder display priority, and edit credentials per provider
 - **Local Notifications** — Low quota alerts, exhaustion alerts, quota reset alerts with smart debouncing
 - **Auto Refresh** — Configurable 3/5/10/30-minute intervals or manual refresh, auto-pause when closed
-- **Tabbed Settings** — Organized into General, Notifications, and About tabs
+- **Tabbed Settings** — Organized into General, Notifications, Accounts, and About tabs
 - **Dock Visibility Control** — Option to hide from the Dock
 - **Customizable Icon** — Choose from 10 SF Symbol icons
 - **Auto Update Check** — Background update check when settings are opened
@@ -51,18 +53,24 @@ Select `My Mac` as the run destination in Xcode and press `Cmd + R`.
 ## Usage
 
 1. **Login**
-   - **Browser Login** — Click "Browser Login" → Scan QR code or sign in with your account
-   - **API Key Login** — Click "API Key Login" → Enter API Key → Click "Login"
+   - **Choose a Provider** — Switch between GLM and OpenAI in the login view
+   - **GLM** — Use Browser Login or API Key Login
+   - **OpenAI** — Paste an Access Token or read `access_token` from `~/.codex/auth.json`
 2. **View Usage** — Click the menu bar icon to expand the panel and view Token / MCP usage
 3. **Manual Refresh** — Click the refresh button to fetch the latest data
 4. **Settings** — Click the gear icon to open the settings panel
    - **General** — Switch menu bar icon, adjust refresh interval, launch at login, Dock visibility
    - **Notifications** — Enable low quota / exhaustion / reset alerts, set low quota threshold
+   - **Accounts** — Manage enabled providers, change provider order, edit GLM / OpenAI credentials
    - **About** — View version info, GitHub repository, check for updates
 
 ## Preview
 
 ![Preview](preview.png)
+
+<img src="preview-widge.png" width="330" />
+
+
 
 ## Development
 
@@ -72,6 +80,7 @@ Select `My Mac` as the run destination in Xcode and press `Cmd + R`.
 - **Keychain Services** — Secure credential storage
 - **UserNotifications** — Local notification support
 - **URLSession** — HTTP API requests
+- **WidgetKit** — Provider-specific widget data sync
 
 ## Project Structure
 
@@ -80,25 +89,30 @@ DevBar/
 ├── DevBarApp.swift                # App entry point, MenuBarExtra config
 ├── Models/
 │   ├── AuthCredentials.swift      # Auth credentials (Token + Cookie)
+│   ├── QuotaProvider.swift        # Provider definitions and account config model
 │   ├── NotificationSettings.swift # Notification settings model
 │   ├── QuotaResponse.swift       # Usage API response model
 │   ├── SettingsTab.swift         # Settings tab enum
 │   └── SubscriptionResponse.swift # Subscription API response model
 ├── Services/
 │   ├── BigModelAPIClient.swift   # Zhipu BigModel API client
+│   ├── OpenAIAPIClient.swift     # OpenAI usage API client
 │   ├── AuthService.swift         # Authentication state management
+│   ├── CodexAuthFileLoader.swift # Reads OpenAI access_token from ~/.codex/auth.json
 │   ├── KeychainService.swift     # Keychain storage service
 │   └── NotificationService.swift # Notification service (permissions, sending, debounce)
 ├── ViewModels/
 │   ├── AppViewModel.swift        # Global app state
 │   ├── QuotaViewModel.swift     # Usage data & refresh logic
+│   ├── OpenAIQuotaViewModel.swift # OpenAI usage data & refresh logic
 │   └── UpdateViewModel.swift    # Auto update check
 ├── Views/
-│   ├── MenuBarView.swift        # Main popup panel
-│   ├── LoginView.swift          # Browser login flow
+│   ├── MenuBarView.swift        # Main popup panel with provider switching
+│   ├── LoginView.swift          # Provider-aware login flow
 │   ├── QuotaRowView.swift       # Single usage progress bar
 │   ├── SettingsView.swift       # Settings panel container
 │   ├── SettingsGeneral.swift    # General settings
+│   ├── SettingsAccounts.swift   # Provider credentials and priority settings
 │   ├── SettingsNotifications.swift # Notification settings
 │   └── SettingsAbout.swift      # About page
 └── Utils/
@@ -113,7 +127,9 @@ DevBar/
 | `GET /api/biz/subscription/list` | Fetch subscription list | Once after login |
 | `GET /api/monitor/usage/quota/limit` | Fetch usage quota | Periodic refresh |
 
-Authentication: `Authorization` header + `bigmodel_token_production` cookie.
+Authentication:
+- `GLM` — `Authorization` header + `bigmodel_token_production` cookie, or API Key
+- `OpenAI` — Bearer `Access Token` with optional `ChatGPT-Account-Id`
 
 ## Configuration
 

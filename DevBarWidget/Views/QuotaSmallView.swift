@@ -5,6 +5,7 @@ import SwiftUI
 import WidgetKit
 
 struct QuotaSmallView: View {
+    let title: String
     let limits: [WidgetQuotaLimit]
     let level: String?
 
@@ -18,7 +19,7 @@ struct QuotaSmallView: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text("DevBar")
+            Text(title)
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)

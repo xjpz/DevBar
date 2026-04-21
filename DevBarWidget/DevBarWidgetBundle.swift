@@ -9,6 +9,7 @@ import SwiftUI
 @main
 struct DevBarWidgetBundle: WidgetBundle {
     var body: some Widget {
-        DevBarWidget()
+        GLMWidget()
+        OpenAIWidget()
     }
 }

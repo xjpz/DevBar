@@ -20,7 +20,7 @@ struct QuotaData: Codable, Sendable {
 // MARK: - Quota Limit
 
 struct QuotaLimit: Codable, Sendable, Identifiable {
-    var id: String { type }
+    var id: String { "\(type)_\(unit ?? -1)_\(number ?? -1)" }
 
     let type: String
     let unit: Int?
@@ -47,7 +47,15 @@ extension QuotaLimit {
     var displayName: String {
         switch type {
         case "TOKENS_LIMIT":
-            return String(localized: "token_quota")
+            guard let unit else { return String(localized: "token_quota") }
+            switch unit {
+            case 3:
+                return String(format: String(localized: "glm_session_quota"), number ?? 5)
+            case 6:
+                return String(localized: "glm_weekly_quota")
+            default:
+                return String(localized: "token_quota")
+            }
         case "TIME_LIMIT":
             return String(localized: "mcp_monthly_quota")
         default:
@@ -57,19 +65,7 @@ extension QuotaLimit {
 
     /// Description for the limit period
     var unitDescription: String? {
-        switch type {
-        case "TIME_LIMIT":
-            return String(localized: "per_month")
-        case "TOKENS_LIMIT":
-            guard let unit else { return String(localized: "per_hour") }
-            switch unit {
-            case 3: return String(format: String(localized: "per_n_hours"), number ?? 1)
-            case 6: return String(localized: "per_week")
-            default: return String(format: String(localized: "per_n_hours"), number ?? 1)
-            }
-        default:
-            return nil
-        }
+        nil
     }
 
     /// Formatted reset time
@@ -94,6 +90,7 @@ extension QuotaLimit {
 extension QuotaData {
     func toWidgetData(subscriptionName: String?, subscriptionPrice: String?, subscriptionExpireDate: String?) -> WidgetSharedData {
         WidgetSharedData(
+            provider: .glm,
             schemaVersion: WidgetSharedData.currentSchemaVersion,
             limits: limits?.map { $0.toWidgetLimit() } ?? [],
             level: level,

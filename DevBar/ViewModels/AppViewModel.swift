@@ -20,15 +20,73 @@ final class AppViewModel: ObservableObject {
 
     private let authService = AuthService()
     let quotaViewModel = QuotaViewModel()
+    let openAIQuotaViewModel = OpenAIQuotaViewModel()
     let updateViewModel = UpdateViewModel()
     let notificationService = NotificationService()
     private var statusTextUpdateTask: Task<Void, Never>?
     /// Prevents duplicate handleLoginSuccess calls
     private var isHandlingLogin = false
     private var settingsWindow: NSWindow?
-    private var previousQuotaData: QuotaData?
+    private var previousGLMNotificationItems: [NotificationQuotaItem]?
+    private var previousOpenAINotificationItems: [NotificationQuotaItem]?
     private var hasLaunched = false
     weak var languageManager: LanguageManager?
+
+    // MARK: - Account Configs
+
+    @Published var accountConfigs: [AccountConfig] {
+        didSet {
+            saveAccountConfigs()
+        }
+    }
+
+    private func saveAccountConfigs() {
+        if let data = try? JSONEncoder().encode(accountConfigs) {
+            UserDefaults.standard.set(data, forKey: Constants.Defaults.accountConfigsKey)
+        }
+    }
+
+    var enabledProviders: [QuotaProvider] {
+        accountConfigs
+            .filter(\.isEnabled)
+            .sorted { $0.order < $1.order }
+            .map(\.provider)
+    }
+
+    func hasAuthenticatedSession(for provider: QuotaProvider) -> Bool {
+        switch provider {
+        case .glm:
+            return credentials?.token.isEmpty == false
+        case .openai:
+            let token = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey)
+            return token?.isEmpty == false
+        }
+    }
+
+    private var hasAnyAuthenticatedProvider: Bool {
+        enabledProviders.contains { hasAuthenticatedSession(for: $0) }
+    }
+
+    private func syncAuthState() {
+        authState = hasAnyAuthenticatedProvider ? .loggedIn : .notLoggedIn
+    }
+
+    func refreshAuthenticationState() {
+        syncAuthState()
+        updateStatusText()
+    }
+
+    func isProviderEnabled(_ provider: QuotaProvider) -> Bool {
+        accountConfigs.first(where: { $0.provider == provider })?.isEnabled ?? false
+    }
+
+    func updateAccountConfig(provider: QuotaProvider, isEnabled: Bool) {
+        if let idx = accountConfigs.firstIndex(where: { $0.provider == provider }) {
+            accountConfigs[idx].isEnabled = isEnabled
+        }
+        syncAuthState()
+        updateStatusText()
+    }
 
     weak var statusBarButton: NSStatusBarButton?
 
@@ -75,6 +133,17 @@ final class AppViewModel: ObservableObject {
     }
 
     init() {
+        // Load account configs
+        if let data = UserDefaults.standard.data(forKey: Constants.Defaults.accountConfigsKey),
+           let configs = try? JSONDecoder().decode([AccountConfig].self, from: data) {
+            accountConfigs = configs
+        } else {
+            accountConfigs = [
+                AccountConfig(provider: .glm, isEnabled: true, order: 0),
+                AccountConfig(provider: .openai, isEnabled: false, order: 1)
+            ]
+        }
+
         menuBarIcon = UserDefaults.standard.string(forKey: Constants.Defaults.menuBarIconKey)
             ?? Constants.Defaults.defaultMenuBarIcon
         launchAtLogin = UserDefaults.standard.bool(forKey: Constants.Defaults.launchAtLoginKey)
@@ -86,12 +155,11 @@ final class AppViewModel: ObservableObject {
         notificationResetEnabled = UserDefaults.standard.bool(forKey: Constants.Defaults.notificationResetEnabledKey)
         if let saved = authService.credentials {
             credentials = saved
-            authState = .loggedIn
             quotaViewModel.isLoading = true
-        } else {
-            authState = .notLoggedIn
         }
-        if authState == .loggedIn {
+        syncAuthState()
+
+        if hasAuthenticatedSession(for: .glm) {
             Task { @MainActor [weak self] in
                 await Task.yield()
                 guard let self else { return }
@@ -99,6 +167,17 @@ final class AppViewModel: ObservableObject {
                 self.updateStatusText(after: .milliseconds(200))
                 self.checkAndNotify()
                 self.startRefreshIfNeeded()
+            }
+        }
+
+        // Load OpenAI data if enabled
+        if isProviderEnabled(.openai) {
+            let token = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey)
+            if let token, !token.isEmpty {
+                Task { @MainActor [weak self] in
+                    await openAIQuotaViewModel.fetchUsage(silent: true)
+                    self?.checkAndNotify()
+                }
             }
         }
     }
@@ -123,7 +202,7 @@ final class AppViewModel: ObservableObject {
 
         self.credentials = credentials
         authService.saveCredentials(credentials)
-        self.authState = .loggedIn
+        syncAuthState()
         print("[DevBar] ⑥① authState set to loggedIn")
 
         Task { @MainActor [weak self] in
@@ -143,20 +222,26 @@ final class AppViewModel: ObservableObject {
         print("[DevBar] AppViewModel DEINIT")
     }
 
-    func logout() {
+    func logout(provider: QuotaProvider) {
         statusTextUpdateTask?.cancel()
-        quotaViewModel.resetForLogout()
-        credentials = nil
-        authService.logout()
-        authState = .notLoggedIn
-        updateStatusText()
+        switch provider {
+        case .glm:
+            quotaViewModel.resetForLogout()
+            credentials = nil
+            authService.logout()
+        case .openai:
+            openAIQuotaViewModel.resetForLogout()
+            KeychainService.shared.delete(key: Constants.Keychain.openAIAccessTokenKey)
+        }
+        refreshAuthenticationState()
     }
 
     /// Refresh data when the popover opens, unless refreshed within 30s.
     func refreshOnPopoverOpenIfNeeded() {
-        guard authState == .loggedIn, credentials != nil else { return }
+        guard authState == .loggedIn else { return }
         let minimumInterval: TimeInterval = 30
-        if let last = quotaViewModel.lastUpdated,
+        if selectedRefreshProvider == .glm,
+           let last = quotaViewModel.lastUpdated,
            Date().timeIntervalSince(last) < minimumInterval {
             return
         }
@@ -164,17 +249,26 @@ final class AppViewModel: ObservableObject {
     }
 
     func refreshQuota(silent: Bool = false) async {
-        await quotaViewModel.fetchQuota(credentials: credentials, silent: silent)
-        updateStatusText(after: .milliseconds(200))
-        if quotaViewModel.errorMessage == String(localized: "login_expired") {
-            authState = .expired
-            updateStatusText()
+        if isProviderEnabled(.glm), hasAuthenticatedSession(for: .glm) {
+            await quotaViewModel.fetchQuota(credentials: credentials, silent: silent)
+            updateStatusText(after: .milliseconds(200))
+            if quotaViewModel.errorMessage == String(localized: "login_expired") {
+                authState = hasAuthenticatedSession(for: .openai) ? .loggedIn : .expired
+                updateStatusText()
+            }
         }
+
+        if isProviderEnabled(.openai), hasAuthenticatedSession(for: .openai) {
+            await openAIQuotaViewModel.fetchUsage(silent: true)
+        }
+
+        checkAndNotify()
     }
 
     /// Start refresh if not already running (prevents duplicate timers)
     func startRefreshIfNeeded() {
         guard refreshInterval > 0 else { return } // Don't start if "Never"
+        guard hasAuthenticatedSession(for: .glm) else { return }
         print("[DevBar] ⑦ startRefreshIfNeeded, hasCredentials=\(credentials != nil)")
         quotaViewModel.startAutoRefresh(
             credentials: credentials,
@@ -187,17 +281,47 @@ final class AppViewModel: ObservableObject {
     }
 
     private func checkAndNotify() {
-        guard let currentData = quotaViewModel.quotaData else { return }
-        notificationService.checkAndNotify(
-            quotaData: currentData,
-            settings: notificationSettings,
-            previousData: previousQuotaData
-        )
-        previousQuotaData = currentData
+        if let limits = quotaViewModel.quotaData?.limits {
+            let glmItems = limits.map {
+                NotificationQuotaItem(
+                    key: "\($0.type)_\($0.unit ?? -1)_\($0.number ?? -1)",
+                    name: $0.displayName,
+                    percentage: $0.percentage
+                )
+            }
+            notificationService.checkAndNotify(
+                provider: .glm,
+                items: glmItems,
+                settings: notificationSettings,
+                previousItems: previousGLMNotificationItems
+            )
+            previousGLMNotificationItems = glmItems
+        }
+
+        if !openAIQuotaViewModel.quotaRows.isEmpty {
+            let openAIItems = openAIQuotaViewModel.quotaRows.map {
+                NotificationQuotaItem(
+                    key: $0.name,
+                    name: $0.name,
+                    percentage: $0.percentage
+                )
+            }
+            notificationService.checkAndNotify(
+                provider: .openai,
+                items: openAIItems,
+                settings: notificationSettings,
+                previousItems: previousOpenAINotificationItems
+            )
+            previousOpenAINotificationItems = openAIItems
+        }
     }
 
     func stopAutoRefresh() {
         quotaViewModel.stopAutoRefresh()
+    }
+
+    private var selectedRefreshProvider: QuotaProvider {
+        enabledProviders.first(where: { hasAuthenticatedSession(for: $0) }) ?? enabledProviders.first ?? .glm
     }
 
     @Published var isHiddenFromDock: Bool {
@@ -261,7 +385,11 @@ final class AppViewModel: ObservableObject {
 
     // MARK: - Settings Window
 
-    func showSettings() {
+    func showSettings(select tab: SettingsTab? = nil) {
+        if let tab {
+            UserDefaults.standard.set(tab.rawValue, forKey: "selectedSettingsTab")
+        }
+
         // If window exists and is visible, just bring to front
         if let window = settingsWindow, window.isVisible {
             window.makeKeyAndOrderFront(nil)
@@ -274,6 +402,7 @@ final class AppViewModel: ObservableObject {
         let baseView = SettingsView()
             .environmentObject(self)
             .environmentObject(quotaViewModel)
+            .environmentObject(openAIQuotaViewModel)
             .environmentObject(updateViewModel)
             .environmentObject(notificationService)
 

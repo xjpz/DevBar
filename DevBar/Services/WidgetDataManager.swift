@@ -4,8 +4,6 @@
 import Foundation
 import WidgetKit
 
-// MARK: - WidgetDataManager
-
 final class WidgetDataManager {
     static let shared = WidgetDataManager()
 
@@ -17,9 +15,15 @@ final class WidgetDataManager {
 
     func saveSharedData(_ data: WidgetSharedData) {
         guard let defaults else { return }
+        let key: String
+        if let provider = data.provider {
+            key = Constants.AppGroup.sharedDataKey(for: provider.rawValue)
+        } else {
+            key = Constants.AppGroup.sharedDataKey
+        }
         do {
             let encoded = try JSONEncoder().encode(data)
-            defaults.set(encoded, forKey: Constants.AppGroup.sharedDataKey)
+            defaults.set(encoded, forKey: key)
         } catch {
             print("[DevBar] Failed to save widget data: \(error)")
         }
@@ -33,13 +37,37 @@ final class WidgetDataManager {
         return try? JSONDecoder().decode(WidgetSharedData.self, from: data)
     }
 
+    func loadSharedData(for provider: String) -> WidgetSharedData? {
+        guard let defaults else { return nil }
+        let key = Constants.AppGroup.sharedDataKey(for: provider)
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(WidgetSharedData.self, from: data)
+    }
+
     func clearSharedData() {
         guard let defaults else { return }
         defaults.removeObject(forKey: Constants.AppGroup.sharedDataKey)
     }
 
+    func clearSharedData(for provider: String) {
+        guard let defaults else { return }
+        defaults.removeObject(forKey: Constants.AppGroup.sharedDataKey(for: provider))
+    }
+
     func saveAndReload(_ data: WidgetSharedData) {
         saveSharedData(data)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    func saveAndReload(_ data: WidgetSharedData, for provider: String) {
+        guard let defaults else { return }
+        let key = Constants.AppGroup.sharedDataKey(for: provider)
+        do {
+            let encoded = try JSONEncoder().encode(data)
+            defaults.set(encoded, forKey: key)
+        } catch {
+            print("[DevBar] Failed to save widget data: \(error)")
+        }
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

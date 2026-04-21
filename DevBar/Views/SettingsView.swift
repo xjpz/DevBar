@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @EnvironmentObject private var quotaViewModel: QuotaViewModel
+    @EnvironmentObject private var openAIQuotaViewModel: OpenAIQuotaViewModel
     @EnvironmentObject private var updateViewModel: UpdateViewModel
     @EnvironmentObject private var notificationService: NotificationService
 
@@ -28,6 +29,8 @@ struct SettingsView: View {
                 SettingsGeneral()
             case .notifications:
                 SettingsNotifications()
+            case .accounts:
+                SettingsAccounts()
             case .about:
                 SettingsAbout()
             }

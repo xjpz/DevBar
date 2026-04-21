@@ -8,6 +8,7 @@ enum APIError: Error, LocalizedError {
     case invalidResponse
     case httpError(Int)
     case unauthorized
+    case openAIUnauthorized
     case decodingError(Error)
 
     var errorDescription: String? {
@@ -20,6 +21,8 @@ enum APIError: Error, LocalizedError {
             return String(format: String(localized: "http_error"), code)
         case .unauthorized:
             return String(localized: "login_expired")
+        case .openAIUnauthorized:
+            return String(localized: "openai_token_invalid")
         case .decodingError(let error):
             return String(format: String(localized: "decoding_failed"), error.localizedDescription)
         }

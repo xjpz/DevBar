@@ -103,7 +103,7 @@ final class QuotaViewModel: ObservableObject {
             // 共享数据到 Widget
             let widgetData = quotaData?.toWidgetData(subscriptionName: subscription?.productName, subscriptionPrice: subscription?.formattedRenewPrice, subscriptionExpireDate: subscription?.formattedNextRenewDate)
             if let widgetData {
-                WidgetDataManager.shared.saveAndReload(widgetData)
+                WidgetDataManager.shared.saveAndReload(widgetData, for: "glm")
             }
         } catch let error as APIError {
             errorMessage = error.errorDescription

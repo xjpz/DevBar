@@ -20,3 +20,6 @@ Package.resolved
 # Temporary / secret files
 tmp/
 *.env
+
+# Documentation (internal design docs)
+docs/

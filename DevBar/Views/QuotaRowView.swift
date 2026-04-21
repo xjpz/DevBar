@@ -8,16 +8,11 @@ struct QuotaRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header: name + unit description
+            // Header: name
             HStack {
                 Text(limit.displayName)
                     .font(.headline)
                 Spacer()
-                if let unitDesc = limit.unitDescription {
-                    Text(unitDesc)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             // Progress bar with percentage
@@ -33,24 +28,6 @@ struct QuotaRowView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
-            }
-
-            // MCP usage details (only for TIME_LIMIT)
-            if limit.type == "TIME_LIMIT", let details = limit.usageDetails, !details.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(details) { detail in
-                        HStack {
-                            Text(detail.modelCode)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text("\(detail.usage)")
-                                .font(.caption)
-                                .monospacedDigit()
-                        }
-                    }
-                }
-                .padding(.top, 2)
             }
         }
         .padding(.vertical, 4)

@@ -5,6 +5,7 @@ import SwiftUI
 import WidgetKit
 
 struct QuotaMediumView: View {
+    let title: String
     let limits: [WidgetQuotaLimit]
     let level: String?
     let subscriptionName: String?
@@ -29,7 +30,7 @@ struct QuotaMediumView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("DevBar")
+                Text(title)
                     .font(.headline)
                 Spacer()
                 if let lvl = level {
