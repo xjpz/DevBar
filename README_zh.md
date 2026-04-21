@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="DevBar/appstore.png" alt="DevBar" width="120" height="120">
+  <img src="logo.png" alt="DevBar" width="120" height="120">
 </p>
 
 <h1 align="center">DevBar（开发吧）</h1>
