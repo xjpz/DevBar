@@ -2,6 +2,7 @@
 // DevBar
 
 import SwiftUI
+import DevBarCore
 
 struct QuotaRowView: View {
     let limit: QuotaLimit

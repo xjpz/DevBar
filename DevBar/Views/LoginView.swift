@@ -5,6 +5,7 @@
 
 import SwiftUI
 import WebKit
+import DevBarCore
 
 struct LoginView: View {
     @EnvironmentObject private var appViewModel: AppViewModel

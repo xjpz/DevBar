@@ -3,6 +3,7 @@
 
 import WidgetKit
 import SwiftUI
+import DevBarCore
 
 struct GLMTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> QuotaEntry {
@@ -37,8 +38,8 @@ struct GLMTimelineProvider: TimelineProvider {
     }
 
     private static func loadSharedData() -> WidgetSharedData? {
-        guard let defaults = UserDefaults(suiteName: "group.cc.xjpz.DevBar"),
-              let raw = defaults.data(forKey: "widget_shared_data_glm") else {
+        guard let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID),
+              let raw = defaults.data(forKey: DevBarCoreConstants.AppGroup.sharedDataKey(for: "glm")) else {
             return nil
         }
         guard let decoded = try? JSONDecoder().decode(WidgetSharedData.self, from: raw) else {
@@ -61,6 +62,14 @@ struct GLMTimelineProvider: TimelineProvider {
 struct GLMWidget: Widget {
     let kind: String = "DevBarGLMWidget"
 
+    private var supportedFamilies: [WidgetFamily] {
+        #if os(iOS)
+        [.systemSmall, .systemMedium, .systemLarge]
+        #else
+        [.systemSmall, .systemMedium]
+        #endif
+    }
+
     var body: some WidgetConfiguration {
         StaticConfiguration(
             kind: kind,
@@ -73,6 +82,6 @@ struct GLMWidget: Widget {
         }
         .configurationDisplayName("DevBar (GLM)")
         .description(String(localized: "widget_description_glm"))
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies(supportedFamilies)
     }
 }

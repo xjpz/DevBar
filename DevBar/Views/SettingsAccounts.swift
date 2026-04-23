@@ -3,6 +3,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import DevBarCore
 
 struct SettingsAccounts: View {
     @EnvironmentObject private var appViewModel: AppViewModel
@@ -18,6 +19,8 @@ struct SettingsAccounts: View {
     @State private var isValidatingOpenAI = false
     @State private var glmLoginError: String?
     @State private var openAIImportError: String?
+    @State private var transferSheetState: TransferSheetState?
+    @State private var transferExportError: String?
 
     private var sortedConfigs: [AccountConfig] {
         appViewModel.accountConfigs.sorted { $0.order < $1.order }
@@ -51,24 +54,54 @@ struct SettingsAccounts: View {
             loadStoredOpenAIToken()
             loadStoredGLMCredentials()
         }
+        .sheet(item: $transferSheetState) { state in
+            TransferQRCodeSheet(payload: state.payload, url: state.url)
+        }
     }
 
     private var introCard: some View {
-        HStack(spacing: 8) {
-            Label {
-                Text("accounts_section_hint")
-            } icon: {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.caption2)
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-
-            Spacer()
-
-            Text(String(format: String(localized: "accounts_count_format"), sortedConfigs.count))
-                .font(.caption.weight(.medium))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Label {
+                    Text("accounts_section_hint")
+                } icon: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.caption2)
+                }
+                .font(.caption)
                 .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text(String(format: String(localized: "accounts_count_format"), sortedConfigs.count))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("迁移到 iPhone")
+                        .font(.subheadline.weight(.semibold))
+                    Text("生成一个 5 分钟内有效的二维码，在 iPhone 上扫码导入当前配置。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Button {
+                    openTransferSheet()
+                } label: {
+                    Label("显示二维码", systemImage: "qrcode")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+
+            if let transferExportError {
+                Text(transferExportError)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
         .padding(12)
         .background(
@@ -531,6 +564,25 @@ struct SettingsAccounts: View {
         }
         appViewModel.accountConfigs = configs
     }
+
+    private func openTransferSheet() {
+        transferExportError = nil
+
+        do {
+            let payload = appViewModel.makeTransferPayload()
+            let url = try TransferPayloadCodec.makeURL(for: payload)
+            transferSheetState = TransferSheetState(payload: payload, url: url)
+        } catch {
+            transferExportError = error.localizedDescription
+        }
+    }
+}
+
+private struct TransferSheetState: Identifiable {
+    let payload: TransferPayload
+    let url: URL
+
+    var id: String { url.absoluteString }
 }
 
 private struct AccountDropDelegate: DropDelegate {

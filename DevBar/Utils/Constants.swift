@@ -2,30 +2,31 @@
 // DevBar
 
 import Foundation
+import DevBarCore
 
 enum Constants {
     enum API {
-        static let baseURL = "https://bigmodel.cn"
-        static let loginURL = "\(baseURL)/login"
-        static let subscriptionListURL = "\(baseURL)/api/biz/subscription/list"
-        static let quotaLimitURL = "\(baseURL)/api/monitor/usage/quota/limit"
+        static let baseURL = DevBarCoreConstants.API.baseURL
+        static let loginURL = DevBarCoreConstants.API.loginURL
+        static let subscriptionListURL = DevBarCoreConstants.API.subscriptionListURL
+        static let quotaLimitURL = DevBarCoreConstants.API.quotaLimitURL
     }
 
     enum Keychain {
-        static let service = "cc.xjpz.DevBar"
-        static let tokenKey = "authorization_token"
-        static let cookieKey = "cookie_string"
-        static let openAIAccessTokenKey = "openai_access_token"
+        static let service = DevBarCoreConstants.Keychain.service
+        static let tokenKey = DevBarCoreConstants.Keychain.tokenKey
+        static let cookieKey = DevBarCoreConstants.Keychain.cookieKey
+        static let openAIAccessTokenKey = DevBarCoreConstants.Keychain.openAIAccessTokenKey
     }
 
     enum OpenAI {
-        static let usageURL = "https://chatgpt.com/backend-api/wham/usage"
-        static let accountIdKey = "openai_account_id"
+        static let usageURL = DevBarCoreConstants.OpenAI.usageURL
+        static let accountIdKey = DevBarCoreConstants.OpenAI.accountIdKey
     }
 
     enum Defaults {
-        static let refreshIntervalKey = "refresh_interval"
-        static let defaultRefreshInterval: TimeInterval = 300 // 5 minutes
+        static let refreshIntervalKey = DevBarCoreConstants.Defaults.refreshIntervalKey
+        static let defaultRefreshInterval: TimeInterval = DevBarCoreConstants.Defaults.defaultRefreshInterval
         static let menuBarIconKey = "menu_bar_icon"
         static let defaultMenuBarIcon = "sparkles"
         static let hideFromDockKey = "hide_from_dock"
@@ -45,9 +46,11 @@ enum Constants {
         static let lastExhaustedNotificationTimeKey = "last_exhausted_notification_time"
         static let lastResetNotificationTimeKey = "last_reset_notification_time"
         static let lowQuotaNotificationInterval: TimeInterval = 1800 // 30 minutes
+        static let lowQuotaActiveItemsKey = "low_quota_active_items"
+        static let exhaustedActiveItemsKey = "exhausted_active_items"
 
         // Account configs
-        static let accountConfigsKey = "account_configs"
+        static let accountConfigsKey = DevBarCoreConstants.Defaults.accountConfigsKey
     }
 
     enum Update {
@@ -80,10 +83,10 @@ enum Constants {
     }
 
     enum AppGroup {
-        static let groupID = "group.cc.xjpz.DevBar"
-        static let sharedDataKey = "widget_shared_data"
+        static let groupID = DevBarCoreConstants.AppGroup.groupID
+        static let sharedDataKey = DevBarCoreConstants.AppGroup.sharedDataKey
         static func sharedDataKey(for provider: String) -> String {
-            "widget_shared_data_\(provider)"
+            DevBarCoreConstants.AppGroup.sharedDataKey(for: provider)
         }
     }
 

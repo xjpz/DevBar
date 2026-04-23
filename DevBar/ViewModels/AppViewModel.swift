@@ -5,6 +5,7 @@ import SwiftUI
 import Combine
 import ServiceManagement
 import AppKit
+import DevBarCore
 
 @MainActor
 final class AppViewModel: ObservableObject {
@@ -234,6 +235,37 @@ final class AppViewModel: ObservableObject {
             KeychainService.shared.delete(key: Constants.Keychain.openAIAccessTokenKey)
         }
         refreshAuthenticationState()
+    }
+
+    func makeTransferPayload(expirationInterval: TimeInterval = 300) -> TransferPayload {
+        let exportedAt = Date()
+        let glmCredentials = credentials.map {
+            ProviderTransferCredentials(token: $0.token, cookieString: $0.cookieString)
+        }
+        let openAIToken = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey)
+        let openAICredentials = openAIToken.map {
+            ProviderTransferCredentials(token: $0, cookieString: nil)
+        }
+        let openAIAccountId = UserDefaults.standard.string(forKey: Constants.OpenAI.accountIdKey)
+
+        return TransferPayload(
+            exportedAt: exportedAt,
+            expiresAt: exportedAt.addingTimeInterval(expirationInterval),
+            deviceName: Host.current().localizedName,
+            accountConfigs: accountConfigs.sorted { $0.order < $1.order },
+            providers: [
+                ProviderTransferPayload(provider: .glm, credentials: glmCredentials),
+                ProviderTransferPayload(
+                    provider: .openai,
+                    credentials: openAICredentials,
+                    accountId: openAIAccountId
+                ),
+            ]
+        )
+    }
+
+    func makeTransferURL(expirationInterval: TimeInterval = 300) throws -> URL {
+        try TransferPayloadCodec.makeURL(for: makeTransferPayload(expirationInterval: expirationInterval))
     }
 
     /// Refresh data when the popover opens, unless refreshed within 30s.

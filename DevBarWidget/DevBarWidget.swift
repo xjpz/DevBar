@@ -5,6 +5,7 @@
 
 import WidgetKit
 import SwiftUI
+import DevBarCore
 
 struct QuotaTimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> QuotaEntry {
@@ -39,8 +40,8 @@ struct QuotaTimelineProvider: TimelineProvider {
     }
 
     private static func loadSharedData() -> WidgetSharedData? {
-        guard let defaults = UserDefaults(suiteName: "group.cc.xjpz.DevBar"),
-              let raw = defaults.data(forKey: "widget_shared_data") else {
+        guard let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID),
+              let raw = defaults.data(forKey: DevBarCoreConstants.AppGroup.sharedDataKey) else {
             return nil
         }
         guard let decoded = try? JSONDecoder().decode(WidgetSharedData.self, from: raw) else {
@@ -103,6 +104,13 @@ struct DevBarWidgetEntryView: View {
                     subscriptionName: entry.data.subscriptionName,
                     subscriptionPrice: entry.data.subscriptionPrice,
                     subscriptionExpireDate: entry.data.subscriptionExpireDate,
+                    lastUpdated: entry.data.lastUpdated
+                )
+            case .systemLarge:
+                QuotaLargeView(
+                    limits: entry.data.limits,
+                    level: entry.data.level,
+                    subscriptionName: entry.data.subscriptionName,
                     lastUpdated: entry.data.lastUpdated
                 )
             default:

@@ -5,6 +5,7 @@ import Foundation
 import Combine
 import UserNotifications
 import AppKit
+import DevBarCore
 
 struct NotificationQuotaItem {
     let key: String
@@ -80,53 +81,42 @@ final class NotificationService: ObservableObject {
     }
 
     private func checkLowQuota(provider: QuotaProvider, items: [NotificationQuotaItem], settings: NotificationSettings) async {
-        guard settings.lowQuotaEnabled,
-              authorizationStatus == .authorized else { return }
-
-        guard shouldSendLowQuotaNotification(for: provider) else { return }
-
         let threshold = settings.lowQuotaThreshold
-        var lowTypes: [String] = []
+        let currentLowItems = items.filter { Double($0.percentage) >= (100 - threshold) }
+        let currentLowKeys = Set(currentLowItems.map(\.key))
+        let previousLowKeys = loadNotificationState(for: provider, baseKey: Constants.Defaults.lowQuotaActiveItemsKey)
+        let newlyLowItems = currentLowItems.filter { !previousLowKeys.contains($0.key) }
 
-        for item in items {
-            let usedPercent = Double(item.percentage)
-            if usedPercent >= (100 - threshold) {
-                lowTypes.append(item.name)
-            }
-        }
-
-        if !lowTypes.isEmpty {
-            let typesStr = lowTypes.joined(separator: "、")
+        if settings.lowQuotaEnabled,
+           authorizationStatus == .authorized,
+           !newlyLowItems.isEmpty {
+            let typesStr = newlyLowItems.map(\.name).joined(separator: "、")
             send(
                 title: notificationTitle(baseKey: "notif_low_quota_title", provider: provider),
                 body: String(format: String(localized: "notif_low_quota_body"), typesStr, Int(threshold))
             )
-            recordLowQuotaNotificationTime(for: provider)
         }
+
+        saveNotificationState(currentLowKeys, for: provider, baseKey: Constants.Defaults.lowQuotaActiveItemsKey)
     }
 
     private func checkExhausted(provider: QuotaProvider, items: [NotificationQuotaItem], settings: NotificationSettings) async {
-        guard settings.exhaustedEnabled,
-              authorizationStatus == .authorized else { return }
+        let currentExhaustedItems = items.filter { $0.percentage >= 100 }
+        let currentExhaustedKeys = Set(currentExhaustedItems.map(\.key))
+        let previousExhaustedKeys = loadNotificationState(for: provider, baseKey: Constants.Defaults.exhaustedActiveItemsKey)
+        let newlyExhaustedItems = currentExhaustedItems.filter { !previousExhaustedKeys.contains($0.key) }
 
-        guard shouldSendExhaustedNotification(for: provider) else { return }
-
-        var exhaustedTypes: [String] = []
-
-        for item in items {
-            if item.percentage >= 100 {
-                exhaustedTypes.append(item.name)
-            }
-        }
-
-        if !exhaustedTypes.isEmpty {
-            let typesStr = exhaustedTypes.joined(separator: "、")
+        if settings.exhaustedEnabled,
+           authorizationStatus == .authorized,
+           !newlyExhaustedItems.isEmpty {
+            let typesStr = newlyExhaustedItems.map(\.name).joined(separator: "、")
             send(
                 title: notificationTitle(baseKey: "notif_exhausted_title", provider: provider),
                 body: String(format: String(localized: "notif_exhausted_body"), typesStr)
             )
-            recordExhaustedNotificationTime(for: provider)
         }
+
+        saveNotificationState(currentExhaustedKeys, for: provider, baseKey: Constants.Defaults.exhaustedActiveItemsKey)
     }
 
     private func checkReset(provider: QuotaProvider, items: [NotificationQuotaItem], previousItems: [NotificationQuotaItem]?, settings: NotificationSettings) async {
@@ -164,20 +154,6 @@ final class NotificationService: ObservableObject {
         return current.percentage < previous.percentage
     }
 
-    // MARK: - Throttling
-
-    private func shouldSendLowQuotaNotification(for provider: QuotaProvider) -> Bool {
-        let lastTime = UserDefaults.standard.double(forKey: notificationKey(Constants.Defaults.lastLowQuotaNotificationTimeKey, provider: provider))
-        return Date().timeIntervalSince1970 - lastTime >= Constants.Defaults.lowQuotaNotificationInterval
-    }
-
-    private func shouldSendExhaustedNotification(for provider: QuotaProvider) -> Bool {
-        let lastTime = UserDefaults.standard.double(forKey: notificationKey(Constants.Defaults.lastExhaustedNotificationTimeKey, provider: provider))
-        // Exhausted notification: only once per exhaustion cycle
-        // Check if current state is still exhausted
-        return Date().timeIntervalSince1970 - lastTime >= Constants.Defaults.lowQuotaNotificationInterval
-    }
-
     private func notificationKey(_ baseKey: String, provider: QuotaProvider) -> String {
         "\(baseKey)_\(provider.rawValue)"
     }
@@ -206,5 +182,14 @@ final class NotificationService: ObservableObject {
             Date().timeIntervalSince1970,
             forKey: notificationKey(Constants.Defaults.lastResetNotificationTimeKey, provider: provider)
         )
+    }
+
+    private func loadNotificationState(for provider: QuotaProvider, baseKey: String) -> Set<String> {
+        let values = UserDefaults.standard.stringArray(forKey: notificationKey(baseKey, provider: provider)) ?? []
+        return Set(values)
+    }
+
+    private func saveNotificationState(_ state: Set<String>, for provider: QuotaProvider, baseKey: String) {
+        UserDefaults.standard.set(Array(state).sorted(), forKey: notificationKey(baseKey, provider: provider))
     }
 }

@@ -3,6 +3,7 @@
 
 import SwiftUI
 import WidgetKit
+import DevBarCore
 
 struct QuotaSmallView: View {
     let title: String

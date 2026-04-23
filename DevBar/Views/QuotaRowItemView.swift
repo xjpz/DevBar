@@ -2,6 +2,7 @@
 // DevBar
 
 import SwiftUI
+import DevBarCore
 
 struct QuotaRowItemView: View {
     let item: QuotaRowItem

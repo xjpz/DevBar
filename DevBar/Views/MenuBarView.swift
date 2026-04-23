@@ -2,6 +2,7 @@
 // DevBar
 
 import SwiftUI
+import DevBarCore
 
 struct MenuBarView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
@@ -304,7 +305,7 @@ private struct LoggedInContentView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func renewalInfo(sub: Subscription) -> some View {
+    private func renewalInfo(sub: DevBarCore.Subscription) -> some View {
         HStack {
             Text("subscription_ends")
                 .font(.caption)

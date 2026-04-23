@@ -1,6 +1,7 @@
 // SettingsView.swift
 // DevBar
 
+import DevBarCore
 import SwiftUI
 
 struct SettingsView: View {

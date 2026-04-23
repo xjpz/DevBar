@@ -3,6 +3,7 @@
 
 import WidgetKit
 import SwiftUI
+import DevBarCore
 
 struct OpenAITimelineProvider: TimelineProvider {
     func placeholder(in context: Context) -> QuotaEntry {
@@ -37,8 +38,8 @@ struct OpenAITimelineProvider: TimelineProvider {
     }
 
     private static func loadSharedData() -> WidgetSharedData? {
-        guard let defaults = UserDefaults(suiteName: "group.cc.xjpz.DevBar"),
-              let raw = defaults.data(forKey: "widget_shared_data_openai") else {
+        guard let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID),
+              let raw = defaults.data(forKey: DevBarCoreConstants.AppGroup.sharedDataKey(for: "openai")) else {
             return nil
         }
         guard let decoded = try? JSONDecoder().decode(WidgetSharedData.self, from: raw) else {
@@ -61,6 +62,14 @@ struct OpenAITimelineProvider: TimelineProvider {
 struct OpenAIWidget: Widget {
     let kind: String = "DevBarOpenAIWidget"
 
+    private var supportedFamilies: [WidgetFamily] {
+        #if os(iOS)
+        [.systemSmall, .systemMedium, .systemLarge]
+        #else
+        [.systemSmall, .systemMedium]
+        #endif
+    }
+
     var body: some WidgetConfiguration {
         StaticConfiguration(
             kind: kind,
@@ -73,6 +82,6 @@ struct OpenAIWidget: Widget {
         }
         .configurationDisplayName("DevBar (OpenAI)")
         .description(String(localized: "widget_description_openai"))
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies(supportedFamilies)
     }
 }

@@ -3,6 +3,7 @@
 
 import SwiftUI
 import UserNotifications
+import DevBarCore
 
 struct SettingsNotifications: View {
     @EnvironmentObject private var appViewModel: AppViewModel
