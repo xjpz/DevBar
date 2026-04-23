@@ -10,6 +10,10 @@
 		86A450BD2F95172C00748112 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 86A450BC2F95172C00748112 /* WidgetKit.framework */; };
 		86A450BF2F95172C00748112 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 86A450BE2F95172C00748112 /* SwiftUI.framework */; };
 		86A450CE2F95172E00748112 /* DevBarWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		90D001042D00000100000001 /* DevBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 90D001022D00000100000001 /* DevBarCore */; };
+		90D001052D00000100000001 /* DevBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 90D001032D00000100000001 /* DevBarCore */; };
+		90D001082D00000100000001 /* DevBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 90D001072D00000100000001 /* DevBarCore */; };
+		90D001142D00000100000001 /* DevBarWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,6 +38,20 @@
 			remoteGlobalIDString = 86C2897F2F8D19D100A3610C;
 			remoteInfo = DevBar;
 		};
+		90D001152D00000100000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 86C289782F8D19D100A3610C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 86A450B92F95172C00748112;
+			remoteInfo = DevBarWidgetExtension;
+		};
+		90D002042D00000100000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 86C289782F8D19D100A3610C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 90D0010D2D00000100000001;
+			remoteInfo = DevBariOS;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -48,6 +66,17 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		90D001162D00000100000001 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				90D001142D00000100000001 /* DevBarWidgetExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
@@ -58,9 +87,18 @@
 		86C289802F8D19D100A3610C /* DevBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DevBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		86C2898D2F8D19D300A3610C /* DevBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DevBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86C289972F8D19D300A3610C /* DevBarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DevBarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		90D0010A2D00000100000001 /* DevBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DevBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		90D002022D00000100000001 /* DevBariOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DevBariOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		86868B672F986CB900645B30 /* Exceptions for "DevBar" folder in "DevBariOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Resources/Localizable.xcstrings,
+			);
+			target = 90D0010D2D00000100000001 /* DevBariOS */;
+		};
 		86A450CF2F95172E00748112 /* Exceptions for "DevBarWidget" folder in "DevBarWidgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -97,6 +135,7 @@
 		86C289822F8D19D100A3610C /* DevBar */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				86868B672F986CB900645B30 /* Exceptions for "DevBar" folder in "DevBariOS" target */,
 				86A450DF2F95177300748112 /* Exceptions for "DevBar" folder in "DevBarWidgetExtension" target */,
 			);
 			path = DevBar;
@@ -112,6 +151,16 @@
 			path = DevBarUITests;
 			sourceTree = "<group>";
 		};
+		90D001092D00000100000001 /* DevBariOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DevBariOS;
+			sourceTree = "<group>";
+		};
+		90D002032D00000100000001 /* DevBariOSUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DevBariOSUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -119,6 +168,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				90D001052D00000100000001 /* DevBarCore in Frameworks */,
 				86A450BF2F95172C00748112 /* SwiftUI.framework in Frameworks */,
 				86A450BD2F95172C00748112 /* WidgetKit.framework in Frameworks */,
 			);
@@ -128,6 +178,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				90D001042D00000100000001 /* DevBarCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -139,6 +190,21 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		86C289942F8D19D300A3610C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		90D0010C2D00000100000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				90D001082D00000100000001 /* DevBarCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		90D002072D00000100000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -161,6 +227,8 @@
 			isa = PBXGroup;
 			children = (
 				86A450E12F9518A000748112 /* DevBarWidgetExtension.entitlements */,
+				90D001092D00000100000001 /* DevBariOS */,
+				90D002032D00000100000001 /* DevBariOSUITests */,
 				86C289822F8D19D100A3610C /* DevBar */,
 				86C289902F8D19D300A3610C /* DevBarTests */,
 				86C2899A2F8D19D300A3610C /* DevBarUITests */,
@@ -173,6 +241,8 @@
 		86C289812F8D19D100A3610C /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				90D0010A2D00000100000001 /* DevBar.app */,
+				90D002022D00000100000001 /* DevBariOSUITests.xctest */,
 				86C289802F8D19D100A3610C /* DevBar.app */,
 				86C2898D2F8D19D300A3610C /* DevBarTests.xctest */,
 				86C289972F8D19D300A3610C /* DevBarUITests.xctest */,
@@ -201,6 +271,7 @@
 			);
 			name = DevBarWidgetExtension;
 			packageProductDependencies = (
+				90D001032D00000100000001 /* DevBarCore */,
 			);
 			productName = DevBarWidgetExtension;
 			productReference = 86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */;
@@ -225,6 +296,7 @@
 			);
 			name = DevBar;
 			packageProductDependencies = (
+				90D001022D00000100000001 /* DevBarCore */,
 			);
 			productName = DevBar;
 			productReference = 86C289802F8D19D100A3610C /* DevBar.app */;
@@ -276,6 +348,54 @@
 			productReference = 86C289972F8D19D300A3610C /* DevBarUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		90D0010D2D00000100000001 /* DevBariOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 90D001112D00000100000001 /* Build configuration list for PBXNativeTarget "DevBariOS" */;
+			buildPhases = (
+				90D0010E2D00000100000001 /* Sources */,
+				90D0010C2D00000100000001 /* Frameworks */,
+				90D0010F2D00000100000001 /* Resources */,
+				90D001162D00000100000001 /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				90D001172D00000100000001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				90D001092D00000100000001 /* DevBariOS */,
+			);
+			name = DevBariOS;
+			packageProductDependencies = (
+				90D001072D00000100000001 /* DevBarCore */,
+			);
+			productName = DevBariOS;
+			productReference = 90D0010A2D00000100000001 /* DevBar.app */;
+			productType = "com.apple.product-type.application";
+		};
+		90D002052D00000100000001 /* DevBariOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 90D0020A2D00000100000001 /* Build configuration list for PBXNativeTarget "DevBariOSUITests" */;
+			buildPhases = (
+				90D002082D00000100000001 /* Sources */,
+				90D002072D00000100000001 /* Frameworks */,
+				90D002062D00000100000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				90D002092D00000100000001 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				90D002032D00000100000001 /* DevBariOSUITests */,
+			);
+			name = DevBariOSUITests;
+			packageProductDependencies = (
+			);
+			productName = DevBariOSUITests;
+			productReference = 90D002022D00000100000001 /* DevBariOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -300,6 +420,13 @@
 						CreatedOnToolsVersion = 26.4;
 						TestTargetID = 86C2897F2F8D19D100A3610C;
 					};
+					90D0010D2D00000100000001 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+					90D002052D00000100000001 = {
+						CreatedOnToolsVersion = 26.4.1;
+						TestTargetID = 90D0010D2D00000100000001;
+					};
 				};
 			};
 			buildConfigurationList = 86C2897B2F8D19D100A3610C /* Build configuration list for PBXProject "DevBar" */;
@@ -312,11 +439,16 @@
 			);
 			mainGroup = 86C289772F8D19D100A3610C;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				90D001012D00000100000001 /* XCLocalSwiftPackageReference "Packages/DevBarCore" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 86C289812F8D19D100A3610C /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				90D0010D2D00000100000001 /* DevBariOS */,
+				90D002052D00000100000001 /* DevBariOSUITests */,
 				86C2897F2F8D19D100A3610C /* DevBar */,
 				86C2898C2F8D19D300A3610C /* DevBarTests */,
 				86C289962F8D19D300A3610C /* DevBarUITests */,
@@ -354,6 +486,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		90D0010F2D00000100000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		90D002062D00000100000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -385,6 +531,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		90D0010E2D00000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		90D002082D00000100000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -402,6 +562,16 @@
 			isa = PBXTargetDependency;
 			target = 86C2897F2F8D19D100A3610C /* DevBar */;
 			targetProxy = 86C289982F8D19D300A3610C /* PBXContainerItemProxy */;
+		};
+		90D001172D00000100000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 86A450B92F95172C00748112 /* DevBarWidgetExtension */;
+			targetProxy = 90D001152D00000100000001 /* PBXContainerItemProxy */;
+		};
+		90D002092D00000100000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 90D0010D2D00000100000001 /* DevBariOS */;
+			targetProxy = 90D002042D00000100000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -421,6 +591,7 @@
 				INFOPLIST_FILE = DevBarWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DevBarWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -433,10 +604,12 @@
 				REGISTER_APP_GROUPS = YES;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -455,6 +628,7 @@
 				INFOPLIST_FILE = DevBarWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DevBarWidget;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -467,10 +641,12 @@
 				REGISTER_APP_GROUPS = YES;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -673,7 +849,7 @@
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBarTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -694,7 +870,7 @@
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBarTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -713,7 +889,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBarUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -732,7 +908,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBarUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -741,6 +917,116 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = DevBar;
+			};
+			name = Release;
+		};
+		90D001122D00000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DevBariOS/DevBariOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = DevBar;
+				INFOPLIST_KEY_CFBundleName = DevBar;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Scan a QR code from your Mac to import DevBar account settings.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar;
+				PRODUCT_NAME = DevBar;
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		90D001132D00000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DevBariOS/DevBariOS.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = DevBar;
+				INFOPLIST_KEY_CFBundleName = DevBar;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Scan a QR code from your Mac to import DevBar account settings.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar;
+				PRODUCT_NAME = DevBar;
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		90D0020B2D00000100000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBariOSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = DevBariOS;
+			};
+			name = Debug;
+		};
+		90D0020C2D00000100000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBariOSUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = DevBariOS;
 			};
 			name = Release;
 		};
@@ -792,7 +1078,50 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		90D001112D00000100000001 /* Build configuration list for PBXNativeTarget "DevBariOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90D001122D00000100000001 /* Debug */,
+				90D001132D00000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		90D0020A2D00000100000001 /* Build configuration list for PBXNativeTarget "DevBariOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90D0020B2D00000100000001 /* Debug */,
+				90D0020C2D00000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		90D001012D00000100000001 /* XCLocalSwiftPackageReference "Packages/DevBarCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DevBarCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		90D001022D00000100000001 /* DevBarCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 90D001012D00000100000001 /* XCLocalSwiftPackageReference "Packages/DevBarCore" */;
+			productName = DevBarCore;
+		};
+		90D001032D00000100000001 /* DevBarCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 90D001012D00000100000001 /* XCLocalSwiftPackageReference "Packages/DevBarCore" */;
+			productName = DevBarCore;
+		};
+		90D001072D00000100000001 /* DevBarCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 90D001012D00000100000001 /* XCLocalSwiftPackageReference "Packages/DevBarCore" */;
+			productName = DevBarCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 86C289782F8D19D100A3610C /* Project object */;
 }
