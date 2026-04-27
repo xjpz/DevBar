@@ -4,6 +4,8 @@ import SwiftUI
 struct IOSSettingsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @EnvironmentObject private var languageManager: IOSLanguageManager
+    @EnvironmentObject private var themeManager: IOSThemeManager
+    @Environment(\.themeTokens) private var theme
 
     private let intervals: [(LocalizedStringKey, TimeInterval)] = [
         ("ios_settings_interval_3m", 180),
@@ -16,13 +18,40 @@ struct IOSSettingsView: View {
 
     var body: some View {
         Form {
-            Section("ios_settings_language_section") {
+            Section("ios_settings_appearance_section") {
                 Picker("language", selection: $languageManager.selectedLanguage) {
                     Text("follow_system").tag(IOSAppLanguage.system)
                     Text("ios_settings_language_zh_hans").tag(IOSAppLanguage.zhHans)
                     Text("ios_settings_language_en").tag(IOSAppLanguage.en)
                 }
                 .accessibilityIdentifier("ios.settings.language")
+
+                Picker("ios_settings_theme", selection: $themeManager.selectedMode) {
+                    Text("ios_settings_theme_system").tag(IOSThemeMode.system)
+                    Text("ios_settings_theme_light").tag(IOSThemeMode.light)
+                    Text("ios_settings_theme_dark").tag(IOSThemeMode.dark)
+                    Text("ios_settings_theme_geek").tag(IOSThemeMode.geek)
+                }
+                .accessibilityIdentifier("ios.settings.theme")
+            }
+
+            Section("ios_settings_greeting_section") {
+                TextEditor(text: $themeManager.developerGreeting)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(minHeight: 100)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .background(theme.surfaceSecondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(theme.borderSubtle, lineWidth: 1)
+                    )
+
+                Button("ios_settings_greeting_reset") {
+                    themeManager.developerGreeting = IOSThemeManager.defaultGreeting
+                }
+                .font(.caption)
+                .foregroundStyle(theme.textTertiary)
             }
 
             Section("ios_settings_refresh_section") {
@@ -35,16 +64,16 @@ struct IOSSettingsView: View {
 
                 Text("ios_settings_refresh_hint")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.textSecondary)
                     .accessibilityIdentifier("ios.settings.refreshHint")
             }
 
             Section("ios_settings_widget_section") {
                 Text("ios_settings_widget_intro")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.textSecondary)
                 Text("ios_settings_widget_hint")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.textSecondary)
             }
 
             Section("ios_settings_about_section") {
@@ -53,6 +82,8 @@ struct IOSSettingsView: View {
             }
         }
         .navigationTitle("ios_settings_title")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.hidden, for: .tabBar)
         .accessibilityIdentifier("ios.settings.screen")
     }
 }

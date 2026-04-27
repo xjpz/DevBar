@@ -4,27 +4,65 @@ import SwiftUI
 struct IOSDashboardView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @EnvironmentObject private var languageManager: IOSLanguageManager
+    @EnvironmentObject private var themeManager: IOSThemeManager
+    @Environment(\.themeTokens) private var theme
+    @State private var isShowingAccounts = false
 
     var body: some View {
-        List {
-            Section {
-                overviewCard
-                    .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 0, trailing: 16))
-                    .listRowSeparator(.hidden)
-            }
+        ZStack {
+            theme.backgroundPrimary
+                .ignoresSafeArea()
 
-            Section {
-                ForEach(appViewModel.enabledProviders, id: \.self) { provider in
-                    providerCard(provider)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            List {
+                Section {
+                    overviewCard
+                        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 8, trailing: 16))
                         .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
+
+                Section {
+                    ForEach(appViewModel.enabledProviders, id: \.self) { provider in
+                        providerCard(provider)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                    }
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
         }
-        .listStyle(.plain)
         .id("dashboard.list.\(languageManager.selectedLanguage.rawValue)")
         .navigationTitle(Text("ios_dashboard_title"))
+        .toolbarTitleDisplayMode(.inlineLarge)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                NavigationLink {
+                    IOSAccountsView()
+                } label: {
+                    Label("ios_tab_accounts", systemImage: "person.badge.key.fill")
+                        .labelStyle(.iconOnly)
+                }
+                .accessibilityIdentifier("ios.dashboard.accounts")
+
+                NavigationLink {
+                    IOSSettingsView()
+                } label: {
+                    Label("ios_tab_settings", systemImage: "slider.horizontal.3")
+                        .labelStyle(.iconOnly)
+                }
+                .accessibilityIdentifier("ios.dashboard.settings")
+            }
+        }
+        .toolbarBackground(theme.backgroundPrimary, for: .tabBar)
+        .toolbarBackground(.visible, for: .tabBar)
         .accessibilityIdentifier("ios.dashboard.screen")
+        .navigationDestination(isPresented: $isShowingAccounts) {
+            IOSAccountsView()
+        }
         .refreshable {
             await appViewModel.refreshAll()
         }
@@ -32,19 +70,22 @@ struct IOSDashboardView: View {
 
     private var overviewCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("ios_dashboard_providers_title")
-                .font(.headline)
-                .accessibilityIdentifier("ios.dashboard.providersTitle")
-
-            if let trigger = appViewModel.lastRefreshTrigger {
-                Text(refreshSummaryText(trigger))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text(themeManager.developerGreeting)
+                .font(theme.bodyMonoFont)
+                .foregroundStyle(theme.isGeek ? theme.info : theme.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(theme.surfacePrimary)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(theme.isGeek ? theme.info.opacity(0.3) : Color.clear, lineWidth: 1)
+                )
+        )
+        .accessibilityIdentifier("ios.dashboard.overviewCard")
     }
 
     @ViewBuilder
@@ -54,12 +95,12 @@ struct IOSDashboardView: View {
                 HStack(spacing: 10) {
                     providerArtwork(for: provider)
                     Text(provider.localizedName)
-                        .font(.headline)
+                        .font(theme.isGeek ? .system(.headline, design: .monospaced) : .headline)
                 }
                 Spacer()
                 Text(lastRefreshText(for: provider))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(theme.captionFont)
+                    .foregroundStyle(theme.textSecondary)
             }
 
             switch provider {
@@ -71,13 +112,13 @@ struct IOSDashboardView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     private func providerArtwork(for provider: QuotaProvider) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(provider.accentColor.opacity(0.14))
+                .fill(provider.accentColor.opacity(theme.providerPlateOpacity))
 
             Image(provider.assetName)
                 .resizable()
@@ -137,10 +178,10 @@ struct IOSDashboardView: View {
             errorState(error)
         } else if !appViewModel.quotaViewModel.hasValidSubscription {
             Text("ios_dashboard_glm_no_subscription")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.textSecondary)
         } else {
             Text("ios_dashboard_glm_no_usage")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.textSecondary)
         }
     }
 
@@ -171,16 +212,16 @@ struct IOSDashboardView: View {
             errorState(error)
         } else {
             Text("ios_dashboard_openai_no_usage")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.textSecondary)
         }
     }
 
     private func configurePrompt(_ text: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(text)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.textSecondary)
             Button("ios_dashboard_open_accounts") {
-                appViewModel.openAccountsTab()
+                isShowingAccounts = true
             }
             .buttonStyle(.borderedProminent)
         }
@@ -189,7 +230,7 @@ struct IOSDashboardView: View {
     private func errorState(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(message, systemImage: "exclamationmark.triangle.fill")
-                .foregroundStyle(.orange)
+                .foregroundStyle(theme.warning)
             Button("ios_dashboard_retry") {
                 Task { await appViewModel.refreshAll() }
             }
@@ -199,16 +240,16 @@ struct IOSDashboardView: View {
 
     private func refreshWarning(_ message: String) -> some View {
         Label(message, systemImage: "arrow.triangle.2.circlepath.circle")
-            .font(.caption)
-            .foregroundStyle(.orange)
+            .font(theme.captionFont)
+            .foregroundStyle(theme.warning)
     }
 
     private func badge(_ text: String) -> some View {
         Text(text)
-            .font(.caption.weight(.semibold))
+            .font(theme.captionWeightFont)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
-            .background(Color(.tertiarySystemFill), in: Capsule())
+            .background(theme.surfaceSecondary, in: Capsule())
     }
 
     private func localized(_ key: String.LocalizationValue) -> String {
@@ -331,15 +372,16 @@ private struct UsageLimitRow: View {
     let percentage: Int
     let resetText: String?
     let locale: Locale
+    @Environment(\.themeTokens) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(title)
-                    .font(.subheadline.weight(.medium))
+                    .font(theme.subheadlineWeightFont)
                 Spacer()
                 Text(String(format: String(localized: "ios_dashboard_percent_format", locale: locale), locale: locale, percentage))
-                    .font(.subheadline.monospacedDigit().weight(.semibold))
+                    .font(theme.isGeek ? .system(.subheadline, design: .monospaced).monospacedDigit().weight(.semibold) : .subheadline.monospacedDigit().weight(.semibold))
             }
 
             ProgressView(value: Double(percentage), total: 100)
@@ -347,17 +389,17 @@ private struct UsageLimitRow: View {
 
             if let resetText {
                 Text(String(format: String(localized: "ios_dashboard_reset_at", locale: locale), locale: locale, resetText))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(theme.captionFont)
+                    .foregroundStyle(theme.textSecondary)
             }
         }
     }
 
     private var progressColor: Color {
         switch percentage {
-        case ..<50: return .green
-        case 50..<80: return .orange
-        default: return .red
+        case ..<50: return theme.progressSuccess
+        case 50..<80: return theme.progressWarning
+        default: return theme.progressDanger
         }
     }
 }

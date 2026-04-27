@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save generated QR codes to your photo library.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Capture images for text recognition.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Recognize speech for text transcription.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Record audio for speech-to-text conversion.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to unlock encrypted memos.</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>UIAppFonts</key>
+	<array>
+		<string>JetBrainsMono-Regular.ttf</string>
+		<string>JetBrainsMono-Medium.ttf</string>
+		<string>JetBrainsMono-SemiBold.ttf</string>
+		<string>JetBrainsMono-Bold.ttf</string>
+	</array>
+</dict>
+</plist>

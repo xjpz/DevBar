@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct IOSAccountsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
+    @Environment(\.themeTokens) private var theme
     @State private var glmTokenInput = ""
     @State private var openAITokenInput = ""
     @State private var openAIAccountIdInput = ""
@@ -41,7 +42,7 @@ struct IOSAccountsView: View {
                     providerRow(for: config)
                         .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
                         .listRowSeparator(.hidden)
-                        .listRowBackground(Color(.systemGroupedBackground))
+                        .listRowBackground(theme.backgroundSecondary)
                 }
                 .onMove(perform: moveProviders)
             }
@@ -49,16 +50,10 @@ struct IOSAccountsView: View {
         .environment(\.editMode, $listEditMode)
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(Color(.systemGroupedBackground))
+        .background(theme.backgroundSecondary)
         .navigationTitle("ios_accounts_title")
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(topBarActionTitle) {
-                    handleTopBarAction()
-                }
-                .disabled(isSavingGLM || isSavingOpenAI)
-            }
-        }
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.hidden, for: .tabBar)
         .accessibilityIdentifier("ios.accounts.screen")
         .onAppear(perform: loadStoredValues)
         .sheet(isPresented: $isShowingScanner) {
@@ -112,16 +107,16 @@ struct IOSAccountsView: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "qrcode.viewfinder")
                     .font(.title3.weight(.semibold))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(theme.brandPrimary)
                     .frame(width: 36, height: 36)
-                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(theme.brandPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("ios_accounts_migration_section")
                         .font(.headline)
                     Text("ios_accounts_migration_hint")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(theme.textSecondary)
                 }
 
                 Spacer(minLength: 0)
@@ -142,7 +137,7 @@ struct IOSAccountsView: View {
             .accessibilityIdentifier("ios.accounts.scan")
         }
         .padding(16)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 
     private var providerListHeader: some View {
@@ -151,14 +146,19 @@ struct IOSAccountsView: View {
                 Text("ios_accounts_provider_order_section")
                     .font(.headline)
                 Spacer()
-                Text(String(format: String(localized: "accounts_count_format"), sortedConfigs.count))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                Button {
+                    handleTopBarAction()
+                } label: {
+                    Text(topBarActionTitle)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(theme.brandPrimary)
+                }
+                .disabled(isSavingGLM || isSavingOpenAI)
             }
 
             Text("accounts_section_hint")
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.textSecondary)
         }
     }
 
@@ -191,7 +191,7 @@ struct IOSAccountsView: View {
                             .font(.caption.weight(.semibold))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
-                            .background(Color.primary.opacity(0.06), in: Capsule())
+                            .background(theme.borderSubtle.opacity(0.6), in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -209,17 +209,17 @@ struct IOSAccountsView: View {
 
             if isExpanded {
                 Divider()
-                    .overlay(Color.primary.opacity(0.06))
+                    .overlay(theme.borderSubtle.opacity(0.6))
 
                 credentialEditor(for: config.provider)
 
                 if let errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(theme.danger)
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .background(theme.danger.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
             }
         }
@@ -265,7 +265,7 @@ struct IOSAccountsView: View {
 
                 Text("ios_accounts_glm_footer")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.textSecondary)
 
                 HStack(spacing: 10) {
                     Button(role: .destructive) {
@@ -334,19 +334,19 @@ struct IOSAccountsView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(theme.textSecondary)
 
             content()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 11)
-                .background(Color(.tertiarySystemBackground), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .background(theme.surfaceSecondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
     }
 
     private func providerArtwork(for provider: QuotaProvider) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(provider.accentColor.opacity(0.14))
+                .fill(provider.accentColor.opacity(theme.providerPlateOpacity))
 
             Image(provider.assetName)
                 .resizable()
@@ -376,7 +376,7 @@ struct IOSAccountsView: View {
 
     private func rowBackground(for config: AccountConfig) -> some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(Color(.secondarySystemBackground))
+            .fill(theme.surfacePrimary)
             .overlay(
                 LinearGradient(
                     colors: [

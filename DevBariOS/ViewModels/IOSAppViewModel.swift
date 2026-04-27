@@ -14,8 +14,8 @@ final class IOSAppViewModel: ObservableObject {
 
     enum TabSelection: Hashable {
         case dashboard
-        case accounts
-        case settings
+        case webkit
+        case tools
     }
 
     @Published var selectedTab: TabSelection = .dashboard
@@ -279,10 +279,6 @@ final class IOSAppViewModel: ObservableObject {
         }
 
         await refreshAll(trigger: .importTransfer, silent: true)
-    }
-
-    func openAccountsTab() {
-        selectedTab = .accounts
     }
 
     private func normalizeOrders() {

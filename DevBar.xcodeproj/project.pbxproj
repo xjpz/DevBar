@@ -120,6 +120,13 @@
 			);
 			target = 86C2897F2F8D19D100A3610C /* DevBar */;
 		};
+		86B000012F9A000000645B30 /* Exceptions for "DevBariOS" folder in "DevBariOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 90D0010D2D00000100000001 /* DevBariOS */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -153,6 +160,9 @@
 		};
 		90D001092D00000100000001 /* DevBariOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				86B000012F9A000000645B30 /* Exceptions for "DevBariOS" folder in "DevBariOS" target */,
+			);
 			path = DevBariOS;
 			sourceTree = "<group>";
 		};
@@ -930,6 +940,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevBariOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DevBar;
 				INFOPLIST_KEY_CFBundleName = DevBar;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan a QR code from your Mac to import DevBar account settings.";
@@ -962,6 +973,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevBariOS/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = DevBar;
 				INFOPLIST_KEY_CFBundleName = DevBar;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Scan a QR code from your Mac to import DevBar account settings.";

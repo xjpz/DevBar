@@ -6,6 +6,7 @@ struct IOSTransferImportPreviewSheet: View {
     let onImport: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.themeTokens) private var theme
     @State private var isImporting = false
 
     var body: some View {
@@ -20,7 +21,7 @@ struct IOSTransferImportPreviewSheet: View {
                     Section("ios_transfer_attention_section") {
                         Text("ios_transfer_attention_text")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(theme.textSecondary)
                     }
                 }
 
@@ -33,13 +34,13 @@ struct IOSTransferImportPreviewSheet: View {
                                 if change.hasConflict {
                                     Text("ios_transfer_will_replace")
                                         .font(.caption.weight(.semibold))
-                                        .foregroundStyle(.orange)
+                                        .foregroundStyle(theme.warning)
                                 }
                             }
 
                             Text(providerDescription(for: change))
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(theme.textSecondary)
                         }
                     }
                 }

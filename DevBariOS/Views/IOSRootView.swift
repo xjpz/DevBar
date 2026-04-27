@@ -3,35 +3,50 @@ import SwiftUI
 struct IOSRootView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @EnvironmentObject private var languageManager: IOSLanguageManager
+    @Environment(\.themeTokens) private var theme
 
     var body: some View {
-        TabView(selection: $appViewModel.selectedTab) {
-            NavigationStack {
-                IOSDashboardView()
-            }
-            .id("dashboard.\(languageManager.selectedLanguage.rawValue)")
-            .tabItem {
-                Label("ios_tab_overview", systemImage: "sparkles")
-            }
-            .tag(IOSAppViewModel.TabSelection.dashboard)
+        ZStack {
+            currentTabBackground
+                .ignoresSafeArea()
 
-            NavigationStack {
-                IOSAccountsView()
-            }
-            .tabItem {
-                Label("ios_tab_accounts", systemImage: "person.crop.rectangle.stack")
-            }
-            .tag(IOSAppViewModel.TabSelection.accounts)
+            TabView(selection: $appViewModel.selectedTab) {
+                NavigationStack {
+                    IOSDashboardView()
+                }
+                .id("dashboard.\(languageManager.selectedLanguage.rawValue)")
+                .tabItem {
+                    Label("ios_tab_overview", systemImage: "sparkles")
+                }
+                .tag(IOSAppViewModel.TabSelection.dashboard)
 
-            NavigationStack {
-                IOSSettingsView()
+                NavigationStack {
+                    IOSWebKitView()
+                }
+                .tabItem {
+                    Label("WebKit", systemImage: "globe")
+                }
+                .tag(IOSAppViewModel.TabSelection.webkit)
+
+                NavigationStack {
+                    IOSToolsView()
+                }
+                .tabItem {
+                    Label("Tools", systemImage: "hammer")
+                }
+                .tag(IOSAppViewModel.TabSelection.tools)
             }
-            .tabItem {
-                Label("ios_tab_settings", systemImage: "gearshape")
-            }
-            .tag(IOSAppViewModel.TabSelection.settings)
         }
         .id("tabs.\(languageManager.selectedLanguage.rawValue)")
         .accessibilityIdentifier("ios.root.tabs")
+    }
+
+    private var currentTabBackground: Color {
+        switch appViewModel.selectedTab {
+        case .dashboard:
+            theme.backgroundPrimary
+        case .webkit, .tools:
+            theme.backgroundSecondary
+        }
     }
 }
