@@ -24,6 +24,7 @@ final class AppViewModel: ObservableObject {
     let openAIQuotaViewModel = OpenAIQuotaViewModel()
     let updateViewModel = UpdateViewModel()
     let notificationService = NotificationService()
+    let weChatViewModel = WeChatViewModel()
     private var statusTextUpdateTask: Task<Void, Never>?
     /// Prevents duplicate handleLoginSuccess calls
     private var isHandlingLogin = false
@@ -180,6 +181,12 @@ final class AppViewModel: ObservableObject {
                     self?.checkAndNotify()
                 }
             }
+        }
+
+        // Setup WeChat service if enabled
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.weChatViewModel.setup()
         }
     }
 

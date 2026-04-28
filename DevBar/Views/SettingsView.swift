@@ -32,6 +32,8 @@ struct SettingsView: View {
                 SettingsNotifications()
             case .accounts:
                 SettingsAccounts()
+            case .weChat:
+                SettingsWeChat()
             case .about:
                 SettingsAbout()
             }
