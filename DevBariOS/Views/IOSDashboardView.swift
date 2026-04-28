@@ -92,10 +92,13 @@ struct IOSDashboardView: View {
     private func providerCard(_ provider: QuotaProvider) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     providerArtwork(for: provider)
                     Text(provider.localizedName)
                         .font(theme.isGeek ? .system(.headline, design: .monospaced) : .headline)
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                    providerBadge(for: provider)
                 }
                 Spacer()
                 Text(lastRefreshText(for: provider))
@@ -113,6 +116,19 @@ struct IOSDashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func providerBadge(for provider: QuotaProvider) -> some View {
+        let text: String? = switch provider {
+        case .glm:
+            appViewModel.quotaViewModel.quotaData?.level
+        case .openai:
+            appViewModel.openAIQuotaViewModel.planType.map { $0.capitalized }
+        }
+        if let text {
+            badge(text)
+        }
     }
 
     private func providerArtwork(for provider: QuotaProvider) -> some View {
@@ -144,6 +160,7 @@ struct IOSDashboardView: View {
             format: localized("ios_dashboard_last_updated"),
             date.formatted(
                 Date.FormatStyle(date: .omitted, time: .shortened)
+                    .hour(.defaultDigits(amPM: .omitted))
                     .locale(languageManager.currentLocale)
             )
         )
@@ -159,9 +176,6 @@ struct IOSDashboardView: View {
             VStack(alignment: .leading, spacing: 10) {
                 if let error = appViewModel.quotaViewModel.errorMessage {
                     refreshWarning(error)
-                }
-                if let level = appViewModel.quotaViewModel.quotaData?.level {
-                    badge(level)
                 }
                 ForEach(sortedGLMLimits(limits)) { limit in
                     UsageLimitRow(
@@ -193,9 +207,6 @@ struct IOSDashboardView: View {
             VStack(alignment: .leading, spacing: 10) {
                 if let error = appViewModel.openAIQuotaViewModel.errorMessage {
                     refreshWarning(error)
-                }
-                if let planType = appViewModel.openAIQuotaViewModel.planType {
-                    badge(planType.capitalized)
                 }
                 ForEach(openAIUsageRows) { row in
                     UsageLimitRow(
@@ -362,6 +373,7 @@ struct IOSDashboardView: View {
     private func formattedDateTime(from timestamp: TimeInterval) -> String {
         Date(timeIntervalSince1970: timestamp).formatted(
             Date.FormatStyle(date: .numeric, time: .shortened)
+                .hour(.defaultDigits(amPM: .omitted))
                 .locale(languageManager.currentLocale)
         )
     }

@@ -701,7 +701,7 @@ private struct IOSHistoryRecordsView: View {
                                 .font(.caption)
                                 .foregroundStyle(theme.textSecondary)
                                 .lineLimit(1)
-                            Text(record.visitedAt.formatted(date: .abbreviated, time: .shortened))
+                            Text(record.visitedAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).hour(.defaultDigits(amPM: .omitted))))
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(theme.brandPrimary)
                         }

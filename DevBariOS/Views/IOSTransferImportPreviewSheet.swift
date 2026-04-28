@@ -14,7 +14,7 @@ struct IOSTransferImportPreviewSheet: View {
             List {
                 Section("ios_transfer_source_section") {
                     LabeledContent("ios_transfer_device_label", value: preview.payload.deviceName ?? String(localized: "ios_transfer_unknown_mac"))
-                    LabeledContent("ios_transfer_expires_label", value: preview.payload.expiresAt.formatted(date: .omitted, time: .shortened))
+                    LabeledContent("ios_transfer_expires_label", value: preview.payload.expiresAt.formatted(Date.FormatStyle(date: .omitted, time: .shortened).hour(.defaultDigits(amPM: .omitted))))
                 }
 
                 if preview.hasConflicts {
