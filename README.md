@@ -66,11 +66,15 @@ Select `My Mac` as the run destination in Xcode and press `Cmd + R`.
 
 ## Preview
 
-![Preview](preview.png)
+<div style="display: flex; gap: 10px;">
+  <img src="preview.png" width="280" />
+  <img src="preview-widge.png" width="300" height="366" />
+</div>
 
-<img src="preview-widge.png" width="330" />
-
-
+<div style="display: flex; gap: 10px;">
+    <img src="iPhone-overview.png" width="330" />
+    <img src="iPhone-tools.png" width="330" />
+</div>
 
 ## Development
 

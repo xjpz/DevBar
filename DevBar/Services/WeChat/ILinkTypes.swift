@@ -11,33 +11,33 @@ enum ILink {
     nonisolated static let baseURL = "https://ilinkai.weixin.qq.com"
 
     enum MessageType {
-        static let user = 1
-        static let bot = 2
+        nonisolated static let user = 1
+        nonisolated static let bot = 2
     }
 
     enum MessageState {
-        static let `new` = 0
-        static let generating = 1
-        static let finish = 2
+        nonisolated static let `new` = 0
+        nonisolated static let generating = 1
+        nonisolated static let finish = 2
     }
 
     enum ItemType {
-        static let text = 1
-        static let image = 2
-        static let voice = 3
-        static let file = 4
-        static let video = 5
+        nonisolated static let text = 1
+        nonisolated static let image = 2
+        nonisolated static let voice = 3
+        nonisolated static let file = 4
+        nonisolated static let video = 5
     }
 
     enum CDNMediaType {
-        static let image = 1
-        static let video = 2
-        static let file = 3
+        nonisolated static let image = 1
+        nonisolated static let video = 2
+        nonisolated static let file = 3
     }
 
     enum TypingStatus {
-        static let typing = 1
-        static let cancel = 2
+        nonisolated static let typing = 1
+        nonisolated static let cancel = 2
     }
 }
 
@@ -175,7 +175,7 @@ struct BaseInfo: Encodable, Sendable {
     }
 }
 
-struct GetUpdatesRequest: Encodable, Sendable {
+nonisolated struct GetUpdatesRequest: Encodable, Sendable {
     let getUpdatesBuf: String
     let baseInfo: BaseInfo
 
@@ -185,7 +185,7 @@ struct GetUpdatesRequest: Encodable, Sendable {
     }
 }
 
-struct GetUpdatesResponse: Decodable, Sendable {
+nonisolated struct GetUpdatesResponse: Decodable, Sendable {
     let ret: Int?
     let errcode: Int?
     let errmsg: String?
@@ -234,7 +234,7 @@ struct WeixinMessage: Decodable, Identifiable, Sendable {
     }
 }
 
-struct MessageItem: Decodable, Encodable, Sendable {
+nonisolated struct MessageItem: Decodable, Encodable, Sendable {
     let type: Int
     let textItem: TextItem?
     let imageItem: EncodableImageItem?
@@ -271,7 +271,7 @@ struct MessageItem: Decodable, Encodable, Sendable {
     }
 }
 
-struct TextItem: Decodable, Encodable, Sendable {
+nonisolated struct TextItem: Decodable, Encodable, Sendable {
     let text: String
 }
 
@@ -350,7 +350,7 @@ struct MediaInfo: Decodable, Encodable, Sendable {
 
 // MARK: - Send
 
-struct SendMessageRequest: Encodable, Sendable {
+nonisolated struct SendMessageRequest: Encodable, Sendable {
     let msg: SendMsg
     let baseInfo: BaseInfo
 
@@ -379,7 +379,7 @@ struct SendMsg: Encodable, Sendable {
     }
 }
 
-struct SendMessageResponse: Decodable, Sendable {
+nonisolated struct SendMessageResponse: Decodable, Sendable {
     let ret: Int?
     let errmsg: String?
 
@@ -388,7 +388,7 @@ struct SendMessageResponse: Decodable, Sendable {
 
 // MARK: - Upload
 
-struct GetUploadURLRequest: Encodable, Sendable {
+nonisolated struct GetUploadURLRequest: Encodable, Sendable {
     let fileKey: String
     let mediaType: Int
     let toUserID: String
@@ -412,7 +412,7 @@ struct GetUploadURLRequest: Encodable, Sendable {
     }
 }
 
-struct GetUploadURLResponse: Decodable, Sendable {
+nonisolated struct GetUploadURLResponse: Decodable, Sendable {
     let ret: Int
     let errmsg: String?
     let uploadParam: String?
@@ -429,7 +429,7 @@ struct GetUploadURLResponse: Decodable, Sendable {
 
 // MARK: - Config / Typing
 
-struct GetConfigRequest: Encodable, Sendable {
+nonisolated struct GetConfigRequest: Encodable, Sendable {
     let ilinkUserID: String
     let contextToken: String?
     let baseInfo: BaseInfo
@@ -441,7 +441,7 @@ struct GetConfigRequest: Encodable, Sendable {
     }
 }
 
-struct GetConfigResponse: Decodable, Sendable {
+nonisolated struct GetConfigResponse: Decodable, Sendable {
     let ret: Int
     let errmsg: String?
     let typingTicket: String?
@@ -452,7 +452,7 @@ struct GetConfigResponse: Decodable, Sendable {
     }
 }
 
-struct SendTypingRequest: Encodable, Sendable {
+nonisolated struct SendTypingRequest: Encodable, Sendable {
     let ilinkUserID: String
     let typingTicket: String
     let status: Int
@@ -466,7 +466,7 @@ struct SendTypingRequest: Encodable, Sendable {
     }
 }
 
-struct SendTypingResponse: Decodable, Sendable {
+nonisolated struct SendTypingResponse: Decodable, Sendable {
     let ret: Int
     let errmsg: String?
 }

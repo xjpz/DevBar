@@ -4,13 +4,17 @@
 import SwiftUI
 
 struct SettingsWeChat: View {
-    @EnvironmentObject private var appViewModel: AppViewModel
-    @StateObject private var viewModel: WeChatViewModel
+    @ObservedObject var viewModel: WeChatViewModel
+    @ObservedObject private var agentRouter: WeChatAgentRouter
+    @ObservedObject private var approvalCoordinator: WeChatApprovalCoordinator
     @State private var showLoginSheet = false
     @State private var showAddAgent = false
+    @State private var cwdAccessError: String?
 
-    init() {
-        _viewModel = StateObject(wrappedValue: WeChatViewModel())
+    init(viewModel: WeChatViewModel) {
+        self.viewModel = viewModel
+        self.agentRouter = viewModel.agentRouter
+        self.approvalCoordinator = viewModel.agentRouter.approvalCoordinator
     }
 
     var body: some View {
@@ -100,6 +104,12 @@ struct SettingsWeChat: View {
 
                 // Agent config
                 Section {
+                    if hasProtectedWorkingDirectories {
+                        Label("wechat_cwd_protected_notice", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.yellow)
+                    }
+
                     if viewModel.agentRouter.agents.isEmpty {
                         HStack {
                             Spacer()
@@ -120,25 +130,61 @@ struct SettingsWeChat: View {
                         }
 
                         ForEach(viewModel.agentRouter.agents) { agent in
-                            HStack {
-                                Image(systemName: agentIcon(agent.type))
-                                    .foregroundStyle(agent.type == .acp ? .purple : .blue)
-                                    .frame(width: 20)
-                                Text(agent.name)
-                                    .font(.caption)
-                                Spacer()
-                                Text(agent.type.rawValue.uppercased())
-                                    .font(.caption2)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(agent.type == .acp ? Color.purple.opacity(0.15) : Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
-                                Button {
-                                    viewModel.agentRouter.deleteAgent(agent)
-                                } label: {
-                                    Image(systemName: "trash")
-                                        .foregroundStyle(.red)
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Image(systemName: agentIcon(agent.type))
+                                        .foregroundStyle(agent.type == .acp ? .purple : .blue)
+                                        .frame(width: 20)
+                                    Text(agent.name)
+                                        .font(.caption)
+                                    Spacer()
+                                    Text(agent.type.rawValue.uppercased())
+                                        .font(.caption2)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(agent.type == .acp ? Color.purple.opacity(0.15) : Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                                    Button {
+                                        viewModel.agentRouter.deleteAgent(agent)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .foregroundStyle(.red)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
+
+                                if agent.type == .cli || agent.type == .acp {
+                                    HStack(spacing: 6) {
+                                        cwdStatusLabel(for: agent)
+                                        Spacer()
+                                        Button {
+                                            chooseWorkingDirectory(for: agent)
+                                        } label: {
+                                            Image(systemName: "folder")
+                                        }
+                                        .buttonStyle(.plain)
+                                        .help(Text("wechat_cwd_choose"))
+
+                                        if agent.cwd?.isEmpty == false {
+                                            Button {
+                                                viewModel.agentRouter.updateAgentWorkingDirectory(agent, cwd: nil)
+                                                if viewModel.messageService.isRunning {
+                                                    viewModel.restart()
+                                                }
+                                            } label: {
+                                                Image(systemName: "xmark.circle")
+                                            }
+                                            .buttonStyle(.plain)
+                                            .help(Text("wechat_cwd_use_default"))
+                                        }
+                                    }
+
+                                    Picker("授权", selection: approvalPolicyBinding(for: agent)) {
+                                        ForEach(WeChatAgentRouter.AgentConfig.ApprovalPolicy.allCases) { policy in
+                                            Text(policy.displayName).tag(policy)
+                                        }
+                                    }
+                                    .font(.caption2)
+                                }
                             }
                         }
                     }
@@ -167,6 +213,57 @@ struct SettingsWeChat: View {
                     Text("wechat_agents")
                 }
 
+                if !approvalCoordinator.pendingRequests.isEmpty {
+                    Section {
+                        ForEach(approvalCoordinator.pendingRequests) { request in
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("\(request.agentName) · \(request.risk.displayName)")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    Text(request.id)
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Text(request.message)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+
+                                Text(request.cwd ?? "未设置工作目录")
+                                    .font(.system(.caption2, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+
+                                HStack {
+                                    Button("拒绝") {
+                                        _ = approvalCoordinator.resolve(
+                                            id: request.id,
+                                            userID: request.userID,
+                                            approved: false,
+                                            source: .mac
+                                        )
+                                    }
+                                    Button("允许") {
+                                        _ = approvalCoordinator.resolve(
+                                            id: request.id,
+                                            userID: request.userID,
+                                            approved: true,
+                                            source: .mac
+                                        )
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("待授权")
+                    }
+                }
+
                 // Logs
                 Section {
                     ScrollViewReader { proxy in
@@ -193,15 +290,20 @@ struct SettingsWeChat: View {
                             }
                         }
                     }
+
+                    if viewModel.messageService.canOpenLogFile {
+                        Button {
+                            viewModel.messageService.openLogFile()
+                        } label: {
+                            Label("wechat_open_log_file", systemImage: "doc.text")
+                        }
+                    }
                 } header: {
                     Text("wechat_logs")
                 }
             }
         }
         .formStyle(.grouped)
-        .onAppear {
-            viewModel.setup()
-        }
         .sheet(isPresented: $showLoginSheet) {
             WeChatLoginSheet(authService: viewModel.authService) {
                 showLoginSheet = false
@@ -210,6 +312,13 @@ struct SettingsWeChat: View {
         }
         .sheet(isPresented: $showAddAgent) {
             WeChatAddAgentSheet(router: viewModel.agentRouter)
+        }
+        .alert("wechat_cwd_access_failed", isPresented: cwdAccessErrorBinding) {
+            Button("OK", role: .cancel) {
+                cwdAccessError = nil
+            }
+        } message: {
+            Text(cwdAccessError ?? "")
         }
     }
 
@@ -243,6 +352,80 @@ struct SettingsWeChat: View {
         case .cli: return "terminal"
         case .acp: return "cpu"
         }
+    }
+
+    private var hasProtectedWorkingDirectories: Bool {
+        viewModel.agentRouter.agents.contains { agent in
+            switch WeChatWorkingDirectoryPolicy.status(for: agent.cwd) {
+            case .protected:
+                return true
+            case .unset, .normal, .missing:
+                return false
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cwdStatusLabel(for agent: WeChatAgentRouter.AgentConfig) -> some View {
+        switch WeChatWorkingDirectoryPolicy.status(for: agent.cwd) {
+        case .unset:
+            Label("wechat_cwd_default_hint", systemImage: "folder")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        case .normal(let path):
+            Label(WeChatWorkingDirectoryPolicy.displayPath(path), systemImage: "folder")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        case .protected(let path, let kind):
+            Label {
+                Text("\(WeChatWorkingDirectoryPolicy.displayPath(path)) - \(kind.displayName)")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
+            }
+            .font(.caption2)
+            .foregroundStyle(.yellow)
+        case .missing(let path):
+            Label {
+                Text("\(WeChatWorkingDirectoryPolicy.displayPath(path)) - \(String(localized: "wechat_cwd_missing"))")
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            } icon: {
+                Image(systemName: "xmark.octagon.fill")
+            }
+            .font(.caption2)
+            .foregroundStyle(.red)
+        }
+    }
+
+    private func chooseWorkingDirectory(for agent: WeChatAgentRouter.AgentConfig) {
+        guard let path = WeChatWorkingDirectoryPolicy.chooseDirectory(initialPath: agent.cwd) else { return }
+        let access = WeChatWorkingDirectoryPolicy.validateAccess(for: path)
+        guard access.isAccessible else {
+            cwdAccessError = access.message
+            return
+        }
+        viewModel.agentRouter.updateAgentWorkingDirectory(agent, cwd: access.path)
+        if viewModel.messageService.isRunning {
+            viewModel.restart()
+        }
+    }
+
+    private var cwdAccessErrorBinding: Binding<Bool> {
+        Binding(
+            get: { cwdAccessError != nil },
+            set: { if !$0 { cwdAccessError = nil } }
+        )
+    }
+
+    private func approvalPolicyBinding(for agent: WeChatAgentRouter.AgentConfig) -> Binding<WeChatAgentRouter.AgentConfig.ApprovalPolicy> {
+        Binding(
+            get: { agent.effectiveApprovalPolicy },
+            set: { viewModel.agentRouter.updateAgentApprovalPolicy(agent, policy: $0) }
+        )
     }
 }
 

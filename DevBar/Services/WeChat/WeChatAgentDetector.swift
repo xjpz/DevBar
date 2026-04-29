@@ -65,7 +65,10 @@ final class WeChatAgentDetector: ObservableObject {
                 endpoint: nil,
                 apiKey: nil,
                 headers: nil,
-                maxHistory: nil
+                maxHistory: nil,
+                approvalPolicy: nil,
+                approvalTimeoutSeconds: nil,
+                allowWechatConfirmForLowRisk: nil
             )
             configs.append(config)
         }

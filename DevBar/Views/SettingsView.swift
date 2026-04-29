@@ -33,7 +33,7 @@ struct SettingsView: View {
             case .accounts:
                 SettingsAccounts()
             case .weChat:
-                SettingsWeChat()
+                SettingsWeChat(viewModel: appViewModel.weChatViewModel)
             case .about:
                 SettingsAbout()
             }

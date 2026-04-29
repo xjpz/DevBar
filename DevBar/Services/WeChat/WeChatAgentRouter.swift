@@ -67,6 +67,7 @@ final class WeChatAgentRouter: ObservableObject {
     @Published var defaultAgent: String = ""
 
     let conversationStore = WeChatConversationStore()
+    let approvalCoordinator = WeChatApprovalCoordinator()
 
     struct AgentConfig: Codable, Identifiable, Sendable {
         var id: String { name }
@@ -83,9 +84,42 @@ final class WeChatAgentRouter: ObservableObject {
         let apiKey: String?
         let headers: [String: String]?
         let maxHistory: Int?
+        let approvalPolicy: ApprovalPolicy?
+        let approvalTimeoutSeconds: Int?
+        let allowWechatConfirmForLowRisk: Bool?
 
         enum AgentType: String, Codable, Sendable {
             case acp, cli, http
+        }
+
+        enum ApprovalPolicy: String, Codable, Sendable, CaseIterable, Identifiable {
+            case never
+            case wechatConfirm
+            case macConfirm
+            case trusted
+
+            var id: String { rawValue }
+
+            var displayName: String {
+                switch self {
+                case .never: return "拒绝高风险"
+                case .wechatConfirm: return "微信确认"
+                case .macConfirm: return "Mac 确认"
+                case .trusted: return "信任"
+                }
+            }
+        }
+
+        var effectiveApprovalPolicy: ApprovalPolicy {
+            approvalPolicy ?? .macConfirm
+        }
+
+        var effectiveApprovalTimeoutSeconds: Int {
+            max(30, approvalTimeoutSeconds ?? 120)
+        }
+
+        var canWechatApproveLowRisk: Bool {
+            allowWechatConfirmForLowRisk ?? true
         }
     }
 
@@ -121,7 +155,8 @@ final class WeChatAgentRouter: ObservableObject {
             name: name, type: .http, command: nil, args: nil,
             cwd: nil, env: nil, model: model, systemPrompt: nil,
             aliases: nil, endpoint: endpoint, apiKey: apiKey,
-            headers: nil, maxHistory: nil
+            headers: nil, maxHistory: nil,
+            approvalPolicy: nil, approvalTimeoutSeconds: nil, allowWechatConfirmForLowRisk: nil
         )
         agents.append(agent)
         if defaultAgent.isEmpty { defaultAgent = name }
@@ -146,6 +181,22 @@ final class WeChatAgentRouter: ObservableObject {
         saveToWeClawConfig()
     }
 
+    func updateAgentWorkingDirectory(_ agent: AgentConfig, cwd: String?) {
+        guard let index = agents.firstIndex(where: { $0.name == agent.name }) else { return }
+        let trimmed = cwd?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        agents[index] = agent.updating(cwd: trimmed.isEmpty ? nil : trimmed)
+        if let client = acpClients.removeValue(forKey: agent.name) {
+            Task { await client.stop() }
+        }
+        saveToWeClawConfig()
+    }
+
+    func updateAgentApprovalPolicy(_ agent: AgentConfig, policy: AgentConfig.ApprovalPolicy) {
+        guard let index = agents.firstIndex(where: { $0.name == agent.name }) else { return }
+        agents[index] = agent.updating(approvalPolicy: policy)
+        saveToWeClawConfig()
+    }
+
     func saveToWeClawConfig() {
         let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".weclaw")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -162,7 +213,12 @@ final class WeChatAgentRouter: ObservableObject {
 
     // MARK: - Routing
 
-    func route(agentName: String?, userID: String, message: String) async throws -> String {
+    func route(
+        agentName: String?,
+        userID: String,
+        message: String,
+        approvalNotifier: ((String) async -> Void)? = nil
+    ) async throws -> String {
         let targetName = agentName ?? defaultAgent
         guard !targetName.isEmpty else {
             return String(localized: "wechat_no_agent_configured")
@@ -187,7 +243,7 @@ final class WeChatAgentRouter: ObservableObject {
         case .http:
             return try await callHTTPAgent(agent, userID: userID, message: trimmedMessage)
         case .cli:
-            return try await callCLIAgent(agent, userID: userID, message: trimmedMessage)
+            return try await callCLIAgent(agent, userID: userID, message: trimmedMessage, approvalNotifier: approvalNotifier)
         case .acp:
             return try await callACPAgent(agent, userID: userID, message: trimmedMessage)
         }
@@ -213,6 +269,38 @@ final class WeChatAgentRouter: ObservableObject {
         }
 
         return replies.map { "[\($0.0)] \($0.1)" }.joined(separator: "\n---\n")
+    }
+
+    func handleApprovalReply(_ text: String, userID: String) -> String? {
+        let parts = text.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard parts.count == 2 else { return nil }
+        let decision = parts[0].lowercased()
+        guard decision == "y" || decision == "yes" || decision == "n" || decision == "no" else { return nil }
+
+        let id = parts[1]
+        guard let request = approvalCoordinator.pendingRequest(id: id, userID: userID) else {
+            return "未找到待处理授权 \(id)。"
+        }
+
+        let approved = decision == "y" || decision == "yes"
+        if approved {
+            guard let agent = AgentConfig.resolve(name: request.agentName, in: agents) else {
+                return "未找到授权对应的 agent：\(request.agentName)。"
+            }
+            guard agent.effectiveApprovalPolicy == .wechatConfirm else {
+                return "授权 \(request.id) 需要在 Mac 端 DevBar 确认。"
+            }
+            guard request.risk != .high else {
+                return "授权 \(request.id) 风险较高，请在 Mac 端 DevBar 确认。"
+            }
+        }
+
+        return approvalCoordinator.resolve(
+            id: request.id,
+            userID: userID,
+            approved: approved,
+            source: .wechat
+        )
     }
 
     // MARK: - HTTP Agent
@@ -281,7 +369,12 @@ final class WeChatAgentRouter: ObservableObject {
 
     // MARK: - CLI Agent
 
-    private func callCLIAgent(_ agent: AgentConfig, userID: String, message: String) async throws -> String {
+    private func callCLIAgent(
+        _ agent: AgentConfig,
+        userID: String,
+        message: String,
+        approvalNotifier: ((String) async -> Void)?
+    ) async throws -> String {
         guard let command = agent.command else {
             return "Agent \(agent.name): no command configured"
         }
@@ -304,9 +397,8 @@ final class WeChatAgentRouter: ObservableObject {
             }
         } else if isCodex {
             args += ["exec", "--skip-git-repo-check"]
-            if let cwd = agent.cwd, !cwd.isEmpty {
-                args += ["--cd", cwd]
-            }
+            let cwd = Self.effectiveWorkingDirectory(for: agent)
+            args += ["--cd", cwd]
             args += [message]
         } else {
             args += [message]
@@ -315,15 +407,27 @@ final class WeChatAgentRouter: ObservableObject {
         // Resolve shebang: for scripts with #!/usr/bin/env, find interpreter and run directly.
         // This avoids relying on zsh login shell (which fails in GUI context due to nvm init issues).
         let (resolvedExec, resolvedArgs) = Self.resolveShebang(command: command, args: args)
+        let cwd = Self.effectiveWorkingDirectory(for: agent)
+
+        if let approvalResult = await requestCLIApprovalIfNeeded(
+            agent: agent,
+            userID: userID,
+            message: message,
+            command: resolvedExec,
+            arguments: resolvedArgs,
+            cwd: cwd,
+            approvalNotifier: approvalNotifier
+        ), !approvalResult.allowed {
+            return approvalResult.message
+        }
+
         process.executableURL = URL(fileURLWithPath: resolvedExec)
         process.arguments = resolvedArgs
 
         process.standardOutput = pipe
         process.standardError = stderrPipe
 
-        if let cwd = agent.cwd {
-            process.currentDirectoryURL = URL(fileURLWithPath: cwd)
-        }
+        process.currentDirectoryURL = URL(fileURLWithPath: cwd)
 
         // Build environment: start with the app environment, then enrich PATH dynamically.
         var envDict = ProcessInfo.processInfo.environment
@@ -571,7 +675,7 @@ final class WeChatAgentRouter: ObservableObject {
                 executable: agent.command ?? agent.name,
                 arguments: agent.args ?? [],
                 variant: variant,
-                workingDirectory: agent.cwd,
+                workingDirectory: Self.effectiveWorkingDirectory(for: agent),
                 environment: agent.env
             )
             try await client.start()
@@ -603,6 +707,100 @@ final class WeChatAgentRouter: ObservableObject {
             Task { await client.stop() }
         }
         acpClients.removeAll()
+    }
+
+    // MARK: - CLI Approval
+
+    private struct CLIApprovalResult {
+        let allowed: Bool
+        let message: String
+    }
+
+    private func requestCLIApprovalIfNeeded(
+        agent: AgentConfig,
+        userID: String,
+        message: String,
+        command: String,
+        arguments: [String],
+        cwd: String,
+        approvalNotifier: ((String) async -> Void)?
+    ) async -> CLIApprovalResult? {
+        let risk = assessCLIRisk(agent: agent, command: command, arguments: arguments, message: message)
+
+        switch agent.effectiveApprovalPolicy {
+        case .trusted:
+            return nil
+        case .never:
+            guard risk == .low else {
+                return CLIApprovalResult(
+                    allowed: false,
+                    message: "已拒绝执行：\(agent.name) 的授权策略为拒绝高风险，当前风险=\(risk.displayName)。"
+                )
+            }
+            return nil
+        case .macConfirm, .wechatConfirm:
+            guard risk != .low else { return nil }
+        }
+
+        let request = approvalCoordinator.makeRequest(
+            agentName: agent.name,
+            userID: userID,
+            message: message,
+            command: command,
+            arguments: arguments,
+            cwd: cwd,
+            risk: risk,
+            timeoutSeconds: agent.effectiveApprovalTimeoutSeconds
+        )
+
+        let approvalTask = Task { @MainActor in
+            await approvalCoordinator.requestApproval(request)
+        }
+        await approvalNotifier?(request.wechatPrompt)
+        let approved = await approvalTask.value
+        if approved {
+            return nil
+        }
+        return CLIApprovalResult(
+            allowed: false,
+            message: "授权 \(request.id) 已拒绝或超时，任务未执行。"
+        )
+    }
+
+    private func assessCLIRisk(
+        agent: AgentConfig,
+        command: String,
+        arguments: [String],
+        message: String
+    ) -> WeChatApprovalRequest.Risk {
+        let lowerMessage = message.lowercased()
+        let riskyMessageHints = [
+            "修改", "写", "删除", "移除", "安装", "运行", "执行", "提交", "重置",
+            "edit", "write", "delete", "remove", "install", "run", "execute", "commit", "reset", "apply patch"
+        ]
+        if riskyMessageHints.contains(where: { lowerMessage.contains($0) }) {
+            return .high
+        }
+
+        let executable = URL(fileURLWithPath: command).lastPathComponent.lowercased()
+        let argText = arguments.joined(separator: " ").lowercased()
+        let highRiskCommands = ["rm", "sudo", "curl", "wget", "chmod", "chown", "brew", "npm", "pnpm", "yarn", "pip", "gem"]
+        if highRiskCommands.contains(executable) || highRiskCommands.contains(where: { argText.contains($0 + " ") }) {
+            return .high
+        }
+
+        if executable == "codex" || command.hasSuffix("/codex") {
+            if argText.contains("danger-full-access") || argText.contains("workspace-write") {
+                return .high
+            }
+            return .low
+        }
+
+        if executable == "claude" || command.hasSuffix("/claude") {
+            return .medium
+        }
+
+        return agent.type == .cli ? .medium : .low
     }
 
     // MARK: - CLI Output Parsing
@@ -660,5 +858,55 @@ final class WeChatAgentRouter: ObservableObject {
         if let resultText, !resultText.isEmpty { return resultText }
         let combined = textParts.joined().trimmingCharacters(in: .whitespacesAndNewlines)
         return combined
+    }
+}
+
+private extension WeChatAgentRouter.AgentConfig {
+    func updating(cwd: String?) -> Self {
+        .init(
+            name: name,
+            type: type,
+            command: command,
+            args: args,
+            cwd: cwd,
+            env: env,
+            model: model,
+            systemPrompt: systemPrompt,
+            aliases: aliases,
+            endpoint: endpoint,
+            apiKey: apiKey,
+            headers: headers,
+            maxHistory: maxHistory,
+            approvalPolicy: approvalPolicy,
+            approvalTimeoutSeconds: approvalTimeoutSeconds,
+            allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk
+        )
+    }
+
+    func updating(approvalPolicy: ApprovalPolicy) -> Self {
+        .init(
+            name: name,
+            type: type,
+            command: command,
+            args: args,
+            cwd: cwd,
+            env: env,
+            model: model,
+            systemPrompt: systemPrompt,
+            aliases: aliases,
+            endpoint: endpoint,
+            apiKey: apiKey,
+            headers: headers,
+            maxHistory: maxHistory,
+            approvalPolicy: approvalPolicy,
+            approvalTimeoutSeconds: approvalTimeoutSeconds,
+            allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk
+        )
+    }
+}
+
+private extension WeChatAgentRouter {
+    nonisolated static func effectiveWorkingDirectory(for agent: AgentConfig) -> String {
+        WeChatWorkingDirectoryPolicy.effectiveDirectory(for: agent.cwd)
     }
 }

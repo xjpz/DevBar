@@ -69,6 +69,11 @@ final class WeChatViewModel: ObservableObject {
     }
 
     func startIfConfigured() {
+        guard !messageService.isRunning else {
+            connectionState = .connected
+            return
+        }
+
         let accounts = authService.accounts
         guard !accounts.isEmpty else {
             connectionState = .disconnected

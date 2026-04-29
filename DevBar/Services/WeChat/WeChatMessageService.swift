@@ -1,6 +1,7 @@
 // WeChatMessageService.swift
 // DevBar
 
+import AppKit
 import Combine
 import Foundation
 
@@ -15,12 +16,39 @@ final class WeChatMessageService: ObservableObject {
         let message: String
     }
 
+    nonisolated static let logFileURL: URL = {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = support.appendingPathComponent("DevBar/WeChatLogs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("wechat.log")
+    }()
+
+    var canOpenLogFile: Bool {
+        FileManager.default.fileExists(atPath: Self.logFileURL.path)
+    }
+
+    func openLogFile() {
+        NSWorkspace.shared.open(Self.logFileURL)
+    }
+
     private var clients: [String: ILinkClient] = [:]
     private var pollTasks: [String: Task<Void, Never>] = [:]
     private var agentRouter: WeChatAgentRouter?
-    private let dedup = WeChatMessageDedup()
+    private static let sharedDedup = WeChatMessageDedup()
+    private let dedup = WeChatMessageService.sharedDedup
+    private let logQueue = DispatchQueue(label: "com.devbar.wechat.log", qos: .utility)
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+        return f
+    }()
 
     func start(accounts: [ILinkCredentials], router: WeChatAgentRouter?) {
+        guard !isRunning else {
+            print("[WeChat:Poll] start skipped: already running")
+            return
+        }
+
         stop()
         self.agentRouter = router
 
@@ -68,14 +96,18 @@ final class WeChatMessageService: ObservableObject {
                 let response = try await client.getUpdates(buf: buf)
                 consecutiveErrors = 0
 
-                print("[WeChat:Poll:\(botID)] getUpdates ret=\(response.ret) errcode=\(response.errcode.map { String($0) } ?? "nil") msgs=\(response.msgs.map { "\($0.count)" } ?? "nil") buf=\(response.getUpdatesBuf?.prefix(16) ?? "nil")")
+                let retText = response.ret.map(String.init) ?? "nil"
+                let errcodeText = response.errcode.map(String.init) ?? "nil"
+                let msgCountText = response.msgs.map { "\($0.count)" } ?? "nil"
+                let bufText = response.getUpdatesBuf.map { String($0.prefix(16)) } ?? "nil"
+                print("[WeChat:Poll:\(botID)] getUpdates ret=\(retText) errcode=\(errcodeText) msgs=\(msgCountText) buf=\(bufText)")
 
                 if response.isSessionExpired {
                     addLog("Session expired for \(botID)")
                     break
                 }
                 if !response.isSuccess {
-                    addLog("getUpdates error: ret=\(response.ret) \(response.errmsg ?? "unknown")")
+                    addLog("getUpdates error: ret=\(retText) \(response.errmsg ?? "unknown")")
                     try? await Task.sleep(nanoseconds: 5_000_000_000)
                     continue
                 }
@@ -148,6 +180,12 @@ final class WeChatMessageService: ObservableObject {
             return
         }
 
+        if let approvalReply = router.handleApprovalReply(text, userID: fromID) {
+            addLog("Reply (approval): \(approvalReply.prefix(40))")
+            await sendReply(approvalReply, client: client, from: botID, to: fromID, token: msg.contextToken)
+            return
+        }
+
         // 1. Check built-in commands
         if WeChatBuiltInCommands.isBuiltIn(text) {
             print("[WeChat:Msg] built-in command: \(text)")
@@ -175,7 +213,12 @@ final class WeChatMessageService: ObservableObject {
                 )
             } else {
                 reply = try await router.route(
-                    agentName: agentNames?.first, userID: fromID, message: message
+                    agentName: agentNames?.first,
+                    userID: fromID,
+                    message: message,
+                    approvalNotifier: { pendingMessage in
+                        await self.sendReply(pendingMessage, client: client, from: botID, to: fromID, token: msg.contextToken)
+                    }
                 )
             }
 
@@ -234,7 +277,8 @@ final class WeChatMessageService: ObservableObject {
                 addLog("Reply sent to \(to)")
             } else {
                 addLog("Send failed: \(response.errmsg ?? "unknown")")
-                print("[WeChat:Send] failed: ret=\(response.ret) \(response.errmsg ?? "")")
+                let retText = response.ret.map(String.init) ?? "nil"
+                print("[WeChat:Send] failed: ret=\(retText) \(response.errmsg ?? "")")
             }
         } catch {
             addLog("Send error: \(error.localizedDescription)")
@@ -247,6 +291,16 @@ final class WeChatMessageService: ObservableObject {
         logLines.append(entry)
         if logLines.count > 200 {
             logLines.removeFirst(logLines.count - 200)
+        }
+        let line = "\(Self.dateFormatter.string(from: entry.time)) \(message)\n"
+        logQueue.async {
+            if let handle = try? FileHandle(forWritingTo: Self.logFileURL) {
+                handle.seekToEndOfFile()
+                handle.write(line.data(using: .utf8)!)
+                try? handle.close()
+            } else {
+                try? line.write(to: Self.logFileURL, atomically: true, encoding: .utf8)
+            }
         }
     }
 }
