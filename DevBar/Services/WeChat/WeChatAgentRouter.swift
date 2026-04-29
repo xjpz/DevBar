@@ -284,10 +284,7 @@ final class WeChatAgentRouter: ObservableObject {
 
         let approved = decision == "y" || decision == "yes"
         if approved {
-            guard let agent = AgentConfig.resolve(name: request.agentName, in: agents) else {
-                return "未找到授权对应的 agent：\(request.agentName)。"
-            }
-            guard agent.effectiveApprovalPolicy == .wechatConfirm else {
+            guard request.allowsWechatApproval else {
                 return "授权 \(request.id) 需要在 Mac 端 DevBar 确认。"
             }
             guard request.risk != .high else {
@@ -750,6 +747,7 @@ final class WeChatAgentRouter: ObservableObject {
             arguments: arguments,
             cwd: cwd,
             risk: risk,
+            allowsWechatApproval: agent.effectiveApprovalPolicy == .wechatConfirm && risk != .high,
             timeoutSeconds: agent.effectiveApprovalTimeoutSeconds
         )
 

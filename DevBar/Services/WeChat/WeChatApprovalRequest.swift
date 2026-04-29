@@ -33,6 +33,7 @@ struct WeChatApprovalRequest: Identifiable, Codable, Sendable {
     let arguments: [String]
     let cwd: String?
     let risk: Risk
+    let allowsWechatApproval: Bool
     let createdAt: Date
     let expiresAt: Date
     var status: Status
@@ -46,14 +47,16 @@ struct WeChatApprovalRequest: Identifiable, Codable, Sendable {
     }
 
     var wechatPrompt: String {
-        """
+        let instruction = allowsWechatApproval
+            ? "回复 Y \(id) 可允许，回复 N \(id) 可取消。"
+            : "请在 Mac 端 DevBar 确认。\n回复 N \(id) 可取消。"
+        return """
         需要授权 \(id)：
         agent=\(agentName)
         风险=\(risk.displayName)
         目录=\(cwd ?? "未设置")
 
-        请在 Mac 端 DevBar 确认。
-        回复 N \(id) 可取消。
+        \(instruction)
         """
     }
 }

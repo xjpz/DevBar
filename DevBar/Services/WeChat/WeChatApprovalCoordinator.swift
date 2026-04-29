@@ -21,6 +21,7 @@ final class WeChatApprovalCoordinator: ObservableObject {
         arguments: [String],
         cwd: String?,
         risk: WeChatApprovalRequest.Risk,
+        allowsWechatApproval: Bool,
         timeoutSeconds: Int
     ) -> WeChatApprovalRequest {
         let id = Self.makeID()
@@ -34,6 +35,7 @@ final class WeChatApprovalCoordinator: ObservableObject {
             arguments: arguments,
             cwd: cwd,
             risk: risk,
+            allowsWechatApproval: allowsWechatApproval,
             createdAt: now,
             expiresAt: now.addingTimeInterval(TimeInterval(timeoutSeconds)),
             status: .pending
@@ -42,7 +44,9 @@ final class WeChatApprovalCoordinator: ObservableObject {
 
     func requestApproval(_ request: WeChatApprovalRequest) async -> Bool {
         pendingRequests.append(request)
-        sendNotification(for: request)
+        if !request.allowsWechatApproval {
+            sendNotification(for: request)
+        }
 
         let timeoutSeconds = max(1, Int(request.expiresAt.timeIntervalSince(request.createdAt)))
         timeoutTasks[request.id]?.cancel()

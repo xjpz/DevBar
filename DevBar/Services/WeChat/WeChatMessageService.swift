@@ -119,7 +119,9 @@ final class WeChatMessageService: ObservableObject {
                     for msg in msgs {
                         print("[WeChat:Poll:\(botID)] msg seq=\(msg.seq?.description ?? "nil") type=\(msg.messageType?.description ?? "nil") from=\(msg.fromUserID?.description ?? "nil") isUser=\(msg.isFromUser) text=\(msg.textContent.map { String($0.prefix(40)) } ?? "nil")")
                         if msg.isFromUser {
-                            await handleMessage(msg, client: client, botID: botID)
+                            Task { [weak self] in
+                                await self?.handleMessage(msg, client: client, botID: botID)
+                            }
                         }
                     }
                 } else {
