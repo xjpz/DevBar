@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum IOSThemeMode: String, CaseIterable, Identifiable {
     case system
@@ -7,6 +8,118 @@ enum IOSThemeMode: String, CaseIterable, Identifiable {
     case geek
 
     var id: String { rawValue }
+}
+
+enum IOSAppFont: String, CaseIterable, Identifiable {
+    case system
+    case geist
+    case geistMono
+    case jetBrainsMono
+
+    var id: String { rawValue }
+
+    var titleKey: LocalizedStringKey {
+        switch self {
+        case .system: return "ios_settings_font_system"
+        case .geist: return "ios_settings_font_geist"
+        case .geistMono: return "ios_settings_font_geist_mono"
+        case .jetBrainsMono: return "ios_settings_font_jetbrains_mono"
+        }
+    }
+
+    func font(_ style: Font.TextStyle, weight: Font.Weight? = nil, monospaced: Bool = false) -> Font {
+        let base: Font
+        if let family = fontFamily(monospaced: monospaced) {
+            let fontName = uiFontName(family: family, weight: uiWeight(for: weight))
+            base = .custom(fontName, size: pointSize(for: style), relativeTo: style)
+        } else {
+            base = monospaced ? .system(style, design: .monospaced) : .system(style)
+        }
+        return weight.map { base.weight($0) } ?? base
+    }
+
+    func uiFont(textStyle: UIFont.TextStyle, weight: UIFont.Weight = .regular, monospaced: Bool = false) -> UIFont {
+        let preferredSize = UIFont.preferredFont(forTextStyle: textStyle).pointSize
+        if let family = fontFamily(monospaced: monospaced),
+           let font = UIFont(name: uiFontName(family: family, weight: weight), size: preferredSize) ?? UIFont(name: family, size: preferredSize) {
+            return UIFontMetrics(forTextStyle: textStyle).scaledFont(for: font)
+        }
+        if monospaced {
+            return UIFontMetrics(forTextStyle: textStyle).scaledFont(
+                for: .monospacedSystemFont(ofSize: preferredSize, weight: weight)
+            )
+        }
+        return UIFontMetrics(forTextStyle: textStyle).scaledFont(
+            for: .systemFont(ofSize: preferredSize, weight: weight)
+        )
+    }
+
+    private func fontFamily(monospaced: Bool) -> String? {
+        switch self {
+        case .system:
+            return nil
+        case .geist:
+            return monospaced ? "Geist Mono" : "Geist"
+        case .geistMono:
+            return "Geist Mono"
+        case .jetBrainsMono:
+            return "JetBrains Mono"
+        }
+    }
+
+    private func uiFontName(family: String, weight: UIFont.Weight) -> String {
+        switch family {
+        case "Geist":
+            if weight.rawValue >= UIFont.Weight.bold.rawValue { return "Geist-Bold" }
+            if weight.rawValue >= UIFont.Weight.semibold.rawValue { return "Geist-SemiBold" }
+            if weight.rawValue >= UIFont.Weight.medium.rawValue { return "Geist-Medium" }
+            return "Geist-Regular"
+        case "Geist Mono":
+            if weight.rawValue >= UIFont.Weight.bold.rawValue { return "GeistMono-Bold" }
+            if weight.rawValue >= UIFont.Weight.medium.rawValue { return "GeistMono-Medium" }
+            return "GeistMono-Regular"
+        case "JetBrains Mono":
+            if weight.rawValue >= UIFont.Weight.bold.rawValue { return "JetBrainsMono-Bold" }
+            if weight.rawValue >= UIFont.Weight.medium.rawValue { return "JetBrainsMono-Medium" }
+            return "JetBrainsMono-Regular"
+        default:
+            return family
+        }
+    }
+
+    private func uiWeight(for weight: Font.Weight?) -> UIFont.Weight {
+        switch weight {
+        case .bold, .heavy, .black:
+            return .bold
+        case .semibold:
+            return .semibold
+        case .medium:
+            return .medium
+        default:
+            return .regular
+        }
+    }
+
+    private func pointSize(for style: Font.TextStyle) -> CGFloat {
+        UIFont.preferredFont(forTextStyle: uiTextStyle(for: style)).pointSize
+    }
+
+    private func uiTextStyle(for style: Font.TextStyle) -> UIFont.TextStyle {
+        switch style {
+        case .largeTitle: return .largeTitle
+        case .title: return .title1
+        case .title2: return .title2
+        case .title3: return .title3
+        case .headline: return .headline
+        case .subheadline: return .subheadline
+        case .callout: return .callout
+        case .caption: return .caption1
+        case .caption2: return .caption2
+        case .footnote: return .footnote
+        case .body: return .body
+        @unknown default: return .body
+        }
+    }
 }
 
 struct IOSThemeTokens: Equatable {
@@ -29,6 +142,7 @@ struct IOSThemeTokens: Equatable {
     let heroGradientEnd: Color
     let providerPlateOpacity: Double
     let isGeek: Bool
+    let appFont: IOSAppFont
 
     var heroGradient: LinearGradient {
         LinearGradient(
@@ -46,35 +160,60 @@ struct IOSThemeTokens: Equatable {
 
     /// Body font: SF Mono in geek mode, system default otherwise
     var bodyFont: Font {
-        isGeek ? .system(.body, design: .monospaced) : .body
+        appFont.font(.body, monospaced: isGeek && appFont == .system)
     }
 
     var bodyMonoFont: Font {
-        isGeek ? .system(.body, design: .monospaced) : .system(.body, design: .monospaced)
+        appFont.font(.body, monospaced: true)
     }
 
     var subheadlineFont: Font {
-        isGeek ? .system(.subheadline, design: .monospaced) : .subheadline
+        appFont.font(.subheadline, monospaced: isGeek && appFont == .system)
     }
 
     var subheadlineWeightFont: Font {
-        isGeek ? .system(.subheadline, design: .monospaced).weight(.medium) : .subheadline.weight(.medium)
+        appFont.font(.subheadline, weight: .medium, monospaced: isGeek && appFont == .system)
     }
 
     var captionFont: Font {
-        isGeek ? .system(.caption, design: .monospaced) : .caption
+        appFont.font(.caption, monospaced: isGeek && appFont == .system)
     }
 
     var captionWeightFont: Font {
-        isGeek ? .system(.caption, design: .monospaced).weight(.medium) : .caption.weight(.medium)
+        appFont.font(.caption, weight: .medium, monospaced: isGeek && appFont == .system)
     }
 
     var caption2Font: Font {
-        isGeek ? .system(.caption2, design: .monospaced) : .caption2
+        appFont.font(.caption2, monospaced: isGeek && appFont == .system)
     }
 
     var footnoteFont: Font {
-        isGeek ? .system(.footnote, design: .monospaced) : .footnote
+        appFont.font(.footnote, monospaced: isGeek && appFont == .system)
+    }
+
+    func applying(font: IOSAppFont) -> IOSThemeTokens {
+        IOSThemeTokens(
+            backgroundPrimary: backgroundPrimary,
+            backgroundSecondary: backgroundSecondary,
+            surfacePrimary: surfacePrimary,
+            surfaceSecondary: surfaceSecondary,
+            textPrimary: textPrimary,
+            textSecondary: textSecondary,
+            textTertiary: textTertiary,
+            borderSubtle: borderSubtle,
+            borderStrong: borderStrong,
+            brandPrimary: brandPrimary,
+            brandSecondary: brandSecondary,
+            success: success,
+            warning: warning,
+            danger: danger,
+            info: info,
+            heroGradientStart: heroGradientStart,
+            heroGradientEnd: heroGradientEnd,
+            providerPlateOpacity: providerPlateOpacity,
+            isGeek: isGeek,
+            appFont: font
+        )
     }
 }
 
@@ -98,7 +237,8 @@ extension IOSThemeTokens {
         heroGradientStart: Color(hex: "FFFFFF"),
         heroGradientEnd: Color(hex: "F2F7F3"),
         providerPlateOpacity: 0.14,
-        isGeek: false
+        isGeek: false,
+        appFont: .system
     )
 
     static let dark = IOSThemeTokens(
@@ -120,7 +260,8 @@ extension IOSThemeTokens {
         heroGradientStart: Color(hex: "12161C"),
         heroGradientEnd: Color(hex: "0F1115"),
         providerPlateOpacity: 0.16,
-        isGeek: false
+        isGeek: false,
+        appFont: .system
     )
 
     static let geek = IOSThemeTokens(
@@ -142,7 +283,8 @@ extension IOSThemeTokens {
         heroGradientStart: Color(hex: "121821"),
         heroGradientEnd: Color(hex: "0B0F14"),
         providerPlateOpacity: 0.18,
-        isGeek: true
+        isGeek: true,
+        appFont: .system
     )
 }
 

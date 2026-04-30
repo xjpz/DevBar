@@ -21,6 +21,12 @@ final class IOSThemeManager: ObservableObject {
         }
     }
 
+    @Published var selectedFont: IOSAppFont {
+        didSet {
+            UserDefaults.standard.set(selectedFont.rawValue, forKey: "app_font_choice")
+        }
+    }
+
     @Published var developerGreeting: String {
         didSet {
             UserDefaults.standard.set(developerGreeting, forKey: "app_developer_greeting")
@@ -35,12 +41,12 @@ final class IOSThemeManager: ObservableObject {
         switch selectedMode {
         case .system:
             switch systemColorScheme {
-            case .dark: return .dark
-            default: return .light
+            case .dark: return .dark.applying(font: selectedFont)
+            default: return .light.applying(font: selectedFont)
             }
-        case .light: return .light
-        case .dark: return .dark
-        case .geek: return .geek
+        case .light: return .light.applying(font: selectedFont)
+        case .dark: return .dark.applying(font: selectedFont)
+        case .geek: return .geek.applying(font: selectedFont)
         }
     }
 
@@ -56,6 +62,8 @@ final class IOSThemeManager: ObservableObject {
     init() {
         let saved = UserDefaults.standard.string(forKey: "app_theme_mode") ?? IOSThemeMode.system.rawValue
         selectedMode = IOSThemeMode(rawValue: saved) ?? .system
+        let savedFont = UserDefaults.standard.string(forKey: "app_font_choice") ?? IOSAppFont.system.rawValue
+        selectedFont = IOSAppFont(rawValue: savedFont) ?? .system
         developerGreeting = UserDefaults.standard.string(forKey: "app_developer_greeting") ?? Self.defaultGreeting
     }
 
@@ -71,9 +79,11 @@ final class IOSThemeManager: ObservableObject {
         standardAppearance.shadowImage = UIImage()
         standardAppearance.titleTextAttributes = [
             .foregroundColor: primaryText,
+            .font: tokens.appFont.uiFont(textStyle: .headline, weight: .semibold, monospaced: tokens.isGeek),
         ]
         standardAppearance.largeTitleTextAttributes = [
             .foregroundColor: primaryText,
+            .font: tokens.appFont.uiFont(textStyle: .largeTitle, weight: .bold, monospaced: tokens.isGeek),
         ]
 
         let scrollEdgeAppearance = UINavigationBarAppearance()
@@ -83,9 +93,11 @@ final class IOSThemeManager: ObservableObject {
         scrollEdgeAppearance.shadowImage = UIImage()
         scrollEdgeAppearance.titleTextAttributes = [
             .foregroundColor: primaryText,
+            .font: tokens.appFont.uiFont(textStyle: .headline, weight: .semibold, monospaced: tokens.isGeek),
         ]
         scrollEdgeAppearance.largeTitleTextAttributes = [
             .foregroundColor: primaryText,
+            .font: tokens.appFont.uiFont(textStyle: .largeTitle, weight: .bold, monospaced: tokens.isGeek),
         ]
 
         UINavigationBar.appearance().standardAppearance = standardAppearance

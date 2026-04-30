@@ -33,6 +33,13 @@ struct IOSSettingsView: View {
                     Text("ios_settings_theme_geek").tag(IOSThemeMode.geek)
                 }
                 .accessibilityIdentifier("ios.settings.theme")
+
+                Picker("ios_settings_font", selection: $themeManager.selectedFont) {
+                    ForEach(IOSAppFont.allCases) { font in
+                        Text(font.titleKey).tag(font)
+                    }
+                }
+                .accessibilityIdentifier("ios.settings.font")
             }
 
             Section("ios_settings_greeting_section") {

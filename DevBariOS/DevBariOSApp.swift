@@ -16,6 +16,7 @@ struct DevBariOSApp: App {
                 .environmentObject(themeManager)
                 .environment(\.locale, languageManager.currentLocale)
                 .environment(\.themeTokens, themeManager.resolvedTokens)
+                .font(themeManager.resolvedTokens.bodyFont)
                 .preferredColorScheme(themeManager.preferredColorScheme)
                 .id("app.root.\(languageManager.selectedLanguage.rawValue)")
                 .task {
@@ -44,6 +45,9 @@ private struct ThemeRootView: View {
                 themeManager.updateBarAppearance()
             }
             .onChange(of: themeManager.selectedMode) { _, _ in
+                themeManager.updateBarAppearance()
+            }
+            .onChange(of: themeManager.selectedFont) { _, _ in
                 themeManager.updateBarAppearance()
             }
     }
