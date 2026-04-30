@@ -111,6 +111,8 @@ struct IOSDashboardView: View {
                 glmContent
             case .openai:
                 openAIContent
+            case .mimo:
+                mimoContent
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -125,6 +127,8 @@ struct IOSDashboardView: View {
             appViewModel.quotaViewModel.quotaData?.level
         case .openai:
             appViewModel.openAIQuotaViewModel.planType.map { $0.capitalized }
+        case .mimo:
+            appViewModel.mimoQuotaViewModel.planName
         }
         if let text {
             badge(text)
@@ -150,6 +154,8 @@ struct IOSDashboardView: View {
             appViewModel.quotaViewModel.lastUpdated
         case .openai:
             appViewModel.openAIQuotaViewModel.lastUpdated
+        case .mimo:
+            appViewModel.mimoQuotaViewModel.lastUpdated
         }
 
         guard let date else {
@@ -182,6 +188,7 @@ struct IOSDashboardView: View {
                         title: glmLimitTitle(limit),
                         percentage: limit.percentage,
                         resetText: glmLimitResetText(limit),
+                        detailText: nil,
                         locale: languageManager.currentLocale
                     )
                 }
@@ -213,6 +220,7 @@ struct IOSDashboardView: View {
                         title: row.name,
                         percentage: row.percentage,
                         resetText: row.resetTime,
+                        detailText: nil,
                         locale: languageManager.currentLocale
                     )
                 }
@@ -223,6 +231,42 @@ struct IOSDashboardView: View {
             errorState(error)
         } else {
             Text("ios_dashboard_openai_no_usage")
+                .foregroundStyle(theme.textSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private var mimoContent: some View {
+        if !appViewModel.hasAuthenticatedSession(for: .mimo) {
+            configurePrompt(localized("ios_dashboard_mimo_configure_prompt"))
+        } else if !appViewModel.mimoQuotaViewModel.quotaRows.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                if let error = appViewModel.mimoQuotaViewModel.errorMessage {
+                    refreshWarning(error)
+                }
+
+                if let currentPeriodEnd = appViewModel.mimoQuotaViewModel.currentPeriodEnd {
+                    Text(String(format: localized("mimo_plan_expire_at"), formattedDateTime(from: currentPeriodEnd.timeIntervalSince1970)))
+                        .font(theme.captionFont)
+                        .foregroundStyle(theme.textSecondary)
+                }
+
+                ForEach(appViewModel.mimoQuotaViewModel.quotaRows) { row in
+                    UsageLimitRow(
+                        title: row.name,
+                        percentage: row.percentage,
+                        resetText: row.resetTime,
+                        detailText: row.unitDescription,
+                        locale: languageManager.currentLocale
+                    )
+                }
+            }
+        } else if appViewModel.mimoQuotaViewModel.isLoading && appViewModel.mimoQuotaViewModel.usageResponse == nil {
+            ProgressView("ios_dashboard_mimo_loading")
+        } else if let error = appViewModel.mimoQuotaViewModel.errorMessage {
+            errorState(error)
+        } else {
+            Text("ios_dashboard_mimo_no_usage")
                 .foregroundStyle(theme.textSecondary)
         }
     }
@@ -383,6 +427,7 @@ private struct UsageLimitRow: View {
     let title: String
     let percentage: Int
     let resetText: String?
+    let detailText: String?
     let locale: Locale
     @Environment(\.themeTokens) private var theme
 
@@ -401,6 +446,12 @@ private struct UsageLimitRow: View {
 
             if let resetText {
                 Text(String(format: String(localized: "ios_dashboard_reset_at", locale: locale), locale: locale, resetText))
+                    .font(theme.captionFont)
+                    .foregroundStyle(theme.textSecondary)
+            }
+
+            if let detailText {
+                Text(detailText)
                     .font(theme.captionFont)
                     .foregroundStyle(theme.textSecondary)
             }

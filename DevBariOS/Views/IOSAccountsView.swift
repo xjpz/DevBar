@@ -8,10 +8,13 @@ struct IOSAccountsView: View {
     @State private var glmTokenInput = ""
     @State private var openAITokenInput = ""
     @State private var openAIAccountIdInput = ""
+    @State private var mimoCookieInput = ""
     @State private var glmError: String?
     @State private var openAIError: String?
+    @State private var mimoError: String?
     @State private var isSavingGLM = false
     @State private var isSavingOpenAI = false
+    @State private var isSavingMimo = false
     @State private var isShowingScanner = false
     @State private var pendingImportPreview: TransferImportPreview?
     @State private var transferImportError: String?
@@ -327,6 +330,40 @@ struct IOSAccountsView: View {
                     .disabled(isSavingOpenAI)
                 }
             }
+        case .mimo:
+            VStack(alignment: .leading, spacing: 12) {
+                inputField(title: "serviceToken") {
+                    SecureField("mimo_cookie_placeholder", text: $mimoCookieInput)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.system(.body, design: .monospaced))
+                }
+
+                Text("mimo_cookie_hint")
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+
+                HStack(spacing: 10) {
+                    Button(role: .destructive) {
+                        appViewModel.clearMimoCredentials()
+                        mimoCookieInput = ""
+                        mimoError = nil
+                    } label: {
+                        Text("ios_accounts_remove_mimo")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        saveMimo()
+                    } label: {
+                        Text("accounts_done_editing")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isSavingMimo)
+                }
+            }
         }
     }
 
@@ -362,6 +399,8 @@ struct IOSAccountsView: View {
             return isSavingGLM
         case .openai:
             return isSavingOpenAI
+        case .mimo:
+            return isSavingMimo
         }
     }
 
@@ -371,6 +410,8 @@ struct IOSAccountsView: View {
             return glmError
         case .openai:
             return openAIError
+        case .mimo:
+            return mimoError
         }
     }
 
@@ -404,6 +445,7 @@ struct IOSAccountsView: View {
         } else {
             glmError = nil
             openAIError = nil
+            mimoError = nil
             pageMode = .editing(provider)
         }
     }
@@ -421,6 +463,7 @@ struct IOSAccountsView: View {
         case .normal:
             glmError = nil
             openAIError = nil
+            mimoError = nil
             pageMode = .reordering
             listEditMode = .active
         case let .editing(provider):
@@ -438,6 +481,8 @@ struct IOSAccountsView: View {
             return saveGLM()
         case .openai:
             return saveOpenAI()
+        case .mimo:
+            return saveMimo()
         }
     }
 
@@ -450,6 +495,9 @@ struct IOSAccountsView: View {
         }
         if openAIAccountIdInput.isEmpty {
             openAIAccountIdInput = appViewModel.openAIAccountId
+        }
+        if mimoCookieInput.isEmpty {
+            mimoCookieInput = appViewModel.mimoServiceToken
         }
     }
 
@@ -527,6 +575,38 @@ struct IOSAccountsView: View {
         return false
     }
 
+    @discardableResult
+    private func saveMimo() -> Bool {
+        mimoError = nil
+        let trimmedValue = mimoCookieInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let originalValue = appViewModel.mimoServiceToken.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmedValue == originalValue {
+            pageMode = .normal
+            return true
+        }
+
+        if trimmedValue.isEmpty {
+            appViewModel.clearMimoCredentials()
+            mimoCookieInput = ""
+            pageMode = .normal
+            return true
+        }
+
+        isSavingMimo = true
+        Task {
+            defer { isSavingMimo = false }
+            do {
+                try await appViewModel.saveMimoCookie(trimmedValue)
+                mimoCookieInput = appViewModel.mimoServiceToken
+                pageMode = .normal
+            } catch {
+                mimoError = error.localizedDescription
+            }
+        }
+        return false
+    }
+
     private func moveProviders(from source: IndexSet, to destination: Int) {
         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
             appViewModel.moveProviders(fromOffsets: source, toOffset: destination)
@@ -548,8 +628,10 @@ struct IOSAccountsView: View {
             glmTokenInput = appViewModel.glmCredentials?.token.replacingOccurrences(of: "Bearer ", with: "") ?? ""
             openAITokenInput = appViewModel.openAIAccessToken
             openAIAccountIdInput = appViewModel.openAIAccountId
+            mimoCookieInput = appViewModel.mimoServiceToken
             glmError = nil
             openAIError = nil
+            mimoError = nil
             pendingImportPreview = nil
         } catch {
             transferImportError = error.localizedDescription

@@ -13,12 +13,17 @@ struct SettingsAccounts: View {
     @State private var openAITokenInput: String = ""
     @State private var originalOpenAITokenInput: String = ""
     @State private var showOpenAIToken = false
+    @State private var mimoCookieInput: String = ""
+    @State private var originalMimoCookieInput: String = ""
+    @State private var showMimoCookie = false
     @State private var editingProviders: Set<QuotaProvider> = []
     @State private var draggedProvider: QuotaProvider?
     @State private var isValidatingGLM = false
     @State private var isValidatingOpenAI = false
+    @State private var isValidatingMimo = false
     @State private var glmLoginError: String?
     @State private var openAIImportError: String?
+    @State private var mimoImportError: String?
     @State private var transferSheetState: TransferSheetState?
     @State private var transferExportError: String?
 
@@ -53,6 +58,7 @@ struct SettingsAccounts: View {
         .task {
             loadStoredOpenAIToken()
             loadStoredGLMCredentials()
+            loadStoredMimoCookie()
         }
         .sheet(item: $transferSheetState) { state in
             TransferQRCodeSheet(payload: state.payload, url: state.url)
@@ -125,7 +131,7 @@ struct SettingsAccounts: View {
 
                 Spacer(minLength: 8)
 
-                if config.provider == .glm || config.provider == .openai {
+                if QuotaProvider.allCases.contains(config.provider) {
                     Button {
                         handleEditAction(for: config.provider)
                     } label: {
@@ -151,7 +157,7 @@ struct SettingsAccounts: View {
                 .help(String(localized: config.isEnabled ? "accounts_disable" : "accounts_enable"))
             }
 
-            if config.isEnabled && editingProviders.contains(config.provider) {
+            if editingProviders.contains(config.provider) {
                 Divider()
                     .overlay(Color.primary.opacity(0.06))
 
@@ -160,6 +166,8 @@ struct SettingsAccounts: View {
                     glmCredentialsEditor
                 case .openai:
                     openAICredentialsEditor
+                case .mimo:
+                    mimoCredentialsEditor
                 }
             }
         }
@@ -271,6 +279,52 @@ struct SettingsAccounts: View {
         }
     }
 
+    private var mimoCredentialsEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            fieldBlock(title: "serviceToken") {
+                HStack(spacing: 10) {
+                    Group {
+                        if showMimoCookie {
+                            TextField(String(localized: "mimo_cookie_placeholder"), text: $mimoCookieInput)
+                        } else {
+                            SecureField(String(localized: "mimo_cookie_placeholder"), text: $mimoCookieInput)
+                        }
+                    }
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.body, design: .monospaced))
+
+                    Button {
+                        showMimoCookie.toggle()
+                    } label: {
+                        Image(systemName: showMimoCookie ? "eye.slash" : "eye")
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.borderless)
+                    .help(String(localized: showMimoCookie ? "accounts_hide_token" : "accounts_show_token"))
+                }
+            } footer: {
+                Text("mimo_cookie_hint")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.primary.opacity(0.035))
+            )
+
+            if let mimoImportError {
+                Label(mimoImportError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+        }
+    }
+
     private var sensitiveTokenField: some View {
         fieldBlock(title: "Access Token") {
             HStack(spacing: 10) {
@@ -358,6 +412,14 @@ struct SettingsAccounts: View {
         originalGLMAPIKeyInput = credentials.token
     }
 
+    private func loadStoredMimoCookie() {
+        guard mimoCookieInput.isEmpty else { return }
+        if let token = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey) {
+            mimoCookieInput = token
+            originalMimoCookieInput = token
+        }
+    }
+
     private func handleEditAction(for provider: QuotaProvider) {
         if editingProviders.contains(provider) {
             switch provider {
@@ -365,6 +427,8 @@ struct SettingsAccounts: View {
                 finishGLMEditing()
             case .openai:
                 finishOpenAIEditing()
+            case .mimo:
+                finishMimoEditing()
             }
             return
         }
@@ -381,6 +445,9 @@ struct SettingsAccounts: View {
         case .openai:
             openAIImportError = nil
             originalOpenAITokenInput = openAITokenInput
+        case .mimo:
+            mimoImportError = nil
+            originalMimoCookieInput = mimoCookieInput
         }
 
         editingProviders.insert(provider)
@@ -421,6 +488,26 @@ struct SettingsAccounts: View {
         }
 
         validateAndStoreOpenAIToken(trimmed)
+    }
+
+    private func finishMimoEditing() {
+        let trimmed = mimoCookieInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let originalTrimmed = originalMimoCookieInput.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard trimmed != originalTrimmed else {
+            editingProviders.remove(.mimo)
+            return
+        }
+
+        guard !trimmed.isEmpty else {
+            appViewModel.logout(provider: .mimo)
+            editingProviders.remove(.mimo)
+            originalMimoCookieInput = ""
+            mimoImportError = nil
+            return
+        }
+
+        validateAndStoreMimoCookie(trimmed)
     }
 
     private func openGLMLoginWindow() {
@@ -528,6 +615,42 @@ struct SettingsAccounts: View {
                 openAIImportError = error.errorDescription
             } catch {
                 openAIImportError = error.localizedDescription
+            }
+        }
+    }
+
+    private func validateAndStoreMimoCookie(_ rawValue: String) {
+        isValidatingMimo = true
+        mimoImportError = nil
+
+        let credential = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let serviceToken = MimoAPIClient.normalizedServiceToken(from: credential)
+
+        Task { @MainActor in
+            defer { isValidatingMimo = false }
+
+            do {
+                _ = try await appViewModel.mimoQuotaViewModel.fetchUsage(
+                    serviceToken: credential,
+                    silent: true
+                )
+                await appViewModel.mimoQuotaViewModel.fetchPlanDetailIfNeeded(
+                    serviceToken: credential,
+                    force: true
+                )
+                KeychainService.shared.save(
+                    key: DevBarCoreConstants.Keychain.mimoServiceTokenKey,
+                    value: credential
+                )
+                mimoCookieInput = credential
+                originalMimoCookieInput = credential
+                editingProviders.remove(.mimo)
+                appViewModel.updateAccountConfig(provider: .mimo, isEnabled: true)
+                appViewModel.refreshAuthenticationState()
+            } catch let error as APIError {
+                mimoImportError = error.errorDescription
+            } catch {
+                mimoImportError = error.localizedDescription
             }
         }
     }

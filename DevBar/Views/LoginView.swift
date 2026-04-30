@@ -17,6 +17,7 @@ struct LoginView: View {
     @State private var loginError: String?
     @State private var glmAPIKey = ""
     @State private var openAIToken = ""
+    @State private var mimoCookie = ""
 
     var body: some View {
         VStack(spacing: 16) {
@@ -30,6 +31,8 @@ struct LoginView: View {
                     glmLoginCard
                 case .openai:
                     openAILoginCard
+                case .mimo:
+                    mimoLoginCard
                 }
             }
 
@@ -41,6 +44,10 @@ struct LoginView: View {
             if let token = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey),
                !token.isEmpty {
                 openAIToken = token
+            }
+            if let token = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey),
+               !token.isEmpty {
+                mimoCookie = token
             }
         }
     }
@@ -141,6 +148,14 @@ private extension LoginView {
         .background(cardBackground)
     }
 
+    var mimoLoginCard: some View {
+        VStack(spacing: 12) {
+            mimoCookieSection
+        }
+        .padding(16)
+        .background(cardBackground)
+    }
+
     var browserLoginSection: some View {
         VStack(spacing: 10) {
             Button(action: openLoginWindow) {
@@ -227,6 +242,42 @@ private extension LoginView {
                 }
             }
             .buttonStyle(DevBarButtonStyle(isPrimary: !openAIToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+            .disabled(isValidating)
+
+            errorMessageView
+        }
+    }
+
+    var mimoCookieSection: some View {
+        VStack(spacing: 10) {
+            SecureField(String(localized: "mimo_cookie_placeholder"), text: $mimoCookie)
+                .textFieldStyle(.plain)
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color(NSColor.textBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.gray.opacity(0.2))
+                )
+                .font(.system(size: 12, design: .monospaced))
+                .onSubmit { loginWithMimoCookie() }
+
+            Text("mimo_cookie_hint")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: loginWithMimoCookie) {
+                HStack {
+                    if isValidating {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text("mimo_cookie_login")
+                }
+            }
+            .buttonStyle(DevBarButtonStyle(isPrimary: !mimoCookie.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
             .disabled(isValidating)
 
             errorMessageView
@@ -323,6 +374,40 @@ private extension LoginView {
                 )
                 KeychainService.shared.save(key: Constants.Keychain.openAIAccessTokenKey, value: token)
                 appViewModel.updateAccountConfig(provider: .openai, isEnabled: true)
+                appViewModel.refreshAuthenticationState()
+            } catch let error as APIError {
+                loginError = error.errorDescription
+            } catch {
+                loginError = error.localizedDescription
+            }
+        }
+    }
+
+    func loginWithMimoCookie() {
+        let credential = mimoCookie.trimmingCharacters(in: .whitespacesAndNewlines)
+        let serviceToken = MimoAPIClient.normalizedServiceToken(from: credential)
+        guard !serviceToken.isEmpty else { return }
+
+        loginError = nil
+        isValidating = true
+
+        Task { @MainActor in
+            defer { isValidating = false }
+
+            do {
+                _ = try await appViewModel.mimoQuotaViewModel.fetchUsage(
+                    serviceToken: credential,
+                    silent: true
+                )
+                await appViewModel.mimoQuotaViewModel.fetchPlanDetailIfNeeded(
+                    serviceToken: credential,
+                    force: true
+                )
+                KeychainService.shared.save(
+                    key: DevBarCoreConstants.Keychain.mimoServiceTokenKey,
+                    value: credential
+                )
+                appViewModel.updateAccountConfig(provider: .mimo, isEnabled: true)
                 appViewModel.refreshAuthenticationState()
             } catch let error as APIError {
                 loginError = error.errorDescription
