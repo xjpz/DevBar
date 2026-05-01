@@ -7,24 +7,36 @@ import WidgetKit
 import SwiftUI
 import DevBarCore
 
-struct QuotaTimelineProvider: TimelineProvider {
+struct QuotaTimelineProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> QuotaEntry {
-        QuotaEntry(data: .placeholder, isLoggedIn: false, date: Date())
+        QuotaEntry(data: .placeholder, selectedProvider: .glm, isLoggedIn: false, date: Date())
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (QuotaEntry) -> Void) {
-        let data = Self.loadSharedData() ?? .placeholder
+    func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> QuotaEntry {
+        let data = Self.loadSharedData(for: configuration.provider) ?? .placeholder
         let isLoggedIn = data.lastUpdated != .distantPast
-        completion(QuotaEntry(data: data, isLoggedIn: isLoggedIn, date: Date()))
+        return QuotaEntry(
+            data: data,
+            selectedProvider: configuration.provider,
+            isLoggedIn: isLoggedIn,
+            date: Date()
+        )
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<QuotaEntry>) -> Void) {
-        let data = Self.loadSharedData() ?? .placeholder
+    func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<QuotaEntry> {
+        let data = Self.loadSharedData(for: configuration.provider) ?? .placeholder
         let isLoggedIn = data.lastUpdated != .distantPast
         let now = Date()
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: now)!
 
-        var entries = [QuotaEntry(data: data, isLoggedIn: isLoggedIn, date: now)]
+        var entries = [
+            QuotaEntry(
+                data: data,
+                selectedProvider: configuration.provider,
+                isLoggedIn: isLoggedIn,
+                date: now
+            )
+        ]
 
         let earliestReset = data.limits
             .compactMap { $0.formattedResetTime }
@@ -33,15 +45,22 @@ struct QuotaTimelineProvider: TimelineProvider {
             .min()
 
         if let resetTime = earliestReset {
-            entries.append(QuotaEntry(data: data, isLoggedIn: isLoggedIn, date: resetTime))
+            entries.append(
+                QuotaEntry(
+                    data: data,
+                    selectedProvider: configuration.provider,
+                    isLoggedIn: isLoggedIn,
+                    date: resetTime
+                )
+            )
         }
 
-        completion(Timeline(entries: entries, policy: .after(nextUpdate)))
+        return Timeline(entries: entries, policy: .after(nextUpdate))
     }
 
-    private static func loadSharedData() -> WidgetSharedData? {
+    private static func loadSharedData(for provider: WidgetProviderSelection) -> WidgetSharedData? {
         guard let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID),
-              let raw = defaults.data(forKey: DevBarCoreConstants.AppGroup.sharedDataKey) else {
+              let raw = defaults.data(forKey: DevBarCoreConstants.AppGroup.sharedDataKey(for: provider.rawValue)) else {
             return nil
         }
         guard let decoded = try? JSONDecoder().decode(WidgetSharedData.self, from: raw) else {
@@ -63,8 +82,21 @@ struct QuotaTimelineProvider: TimelineProvider {
 
 struct QuotaEntry: TimelineEntry {
     let data: WidgetSharedData
+    let selectedProvider: WidgetProviderSelection
     let isLoggedIn: Bool
     let date: Date
+
+    init(
+        data: WidgetSharedData,
+        selectedProvider: WidgetProviderSelection = .glm,
+        isLoggedIn: Bool,
+        date: Date
+    ) {
+        self.data = data
+        self.selectedProvider = selectedProvider
+        self.isLoggedIn = isLoggedIn
+        self.date = date
+    }
 }
 
 struct DevBarWidgetEntryView: View {
@@ -78,16 +110,18 @@ struct DevBarWidgetEntryView: View {
             return "GLM"
         case .openai:
             return "OpenAI"
+        case .mimo:
+            return "MiMO"
         case nil:
-            return "DevBar"
+            return entry.selectedProvider.displayName
         }
     }
 
     var body: some View {
         if !entry.isLoggedIn {
-            NotLoggedInView()
+            NotLoggedInView(title: providerTitle)
         } else if entry.data.limits.isEmpty {
-            NoDataView(lastUpdated: entry.data.lastUpdated)
+            NoDataView(title: providerTitle, lastUpdated: entry.data.lastUpdated)
         } else {
             switch family {
             case .systemSmall:
@@ -132,8 +166,9 @@ struct DevBarWidget: Widget {
     let kind: String = "DevBarWidget"
 
     var body: some WidgetConfiguration {
-        StaticConfiguration(
+        AppIntentConfiguration(
             kind: kind,
+            intent: ConfigurationAppIntent.self,
             provider: QuotaTimelineProvider()
         ) { entry in
             DevBarWidgetEntryView(entry: entry)
@@ -143,18 +178,31 @@ struct DevBarWidget: Widget {
         }
         .configurationDisplayName(String(localized: "widget_name"))
         .description(String(localized: "widget_description"))
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies(supportedFamilies)
+    }
+
+    private var supportedFamilies: [WidgetFamily] {
+        #if os(iOS)
+        [.systemSmall, .systemMedium, .systemLarge]
+        #else
+        [.systemSmall, .systemMedium]
+        #endif
     }
 }
 
 // MARK: - Placeholder Views
 
 struct NotLoggedInView: View {
+    let title: String
+
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "person.crop.circle.badge.exclamationmark")
                 .font(.title2)
                 .foregroundStyle(.secondary)
+            Text(title)
+                .font(.headline.weight(.semibold))
+                .lineLimit(1)
             Text(String(localized: "widget_not_logged_in"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -164,6 +212,7 @@ struct NotLoggedInView: View {
 }
 
 struct NoDataView: View {
+    let title: String
     let lastUpdated: Date
 
     var body: some View {
@@ -171,6 +220,9 @@ struct NoDataView: View {
             Image(systemName: "chart.bar.xaxis")
                 .font(.title2)
                 .foregroundStyle(.secondary)
+            Text(title)
+                .font(.headline.weight(.semibold))
+                .lineLimit(1)
             Text(String(localized: "widget_waiting_data"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
