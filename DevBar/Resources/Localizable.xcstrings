@@ -1048,6 +1048,9 @@
         }
       }
     },
+    "Choose the Provider shown by this widget." : {
+
+    },
     "CLI" : {
 
     },
@@ -1071,9 +1074,6 @@
 
     },
     "Compact" : {
-
-    },
-    "Configuration" : {
 
     },
     "Convert to Date" : {
@@ -1143,7 +1143,7 @@
     "DevBar %@" : {
 
     },
-    "DevBar Quota Widget" : {
+    "DevBar Quota" : {
 
     },
     "devbar_update" : {
@@ -1344,6 +1344,9 @@
           }
         }
       }
+    },
+    "GLM" : {
+
     },
     "glm_configure_hint" : {
       "localizations" : {
@@ -1978,6 +1981,22 @@
         }
       }
     },
+    "ios_accounts_remove_mimo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        }
+      }
+    },
     "ios_accounts_remove_openai" : {
       "localizations" : {
         "en" : {
@@ -2185,6 +2204,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近更新于 %@"
+          }
+        }
+      }
+    },
+    "ios_dashboard_mimo_configure_prompt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configure MiMO cookie in Accounts to load usage."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先在账号页配置 MiMO Cookie，再加载额度数据。"
+          }
+        }
+      }
+    },
+    "ios_dashboard_mimo_loading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading MiMO usage…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载 MiMO 额度…"
+          }
+        }
+      }
+    },
+    "ios_dashboard_mimo_no_usage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No MiMO usage data yet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂时还没有 MiMO 额度数据。"
           }
         }
       }
@@ -2670,6 +2737,86 @@
         }
       }
     },
+    "ios_settings_font" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Font"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字体"
+          }
+        }
+      }
+    },
+    "ios_settings_font_geist" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geist"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geist"
+          }
+        }
+      }
+    },
+    "ios_settings_font_geist_mono" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geist Mono"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geist Mono"
+          }
+        }
+      }
+    },
+    "ios_settings_font_jetbrains_mono" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JetBrains Mono"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JetBrains Mono"
+          }
+        }
+      }
+    },
+    "ios_settings_font_system" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "System"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统"
+          }
+        }
+      }
+    },
     "ios_settings_greeting_reset" : {
       "localizations" : {
         "en" : {
@@ -2891,86 +3038,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "外观"
-          }
-        }
-      }
-    },
-    "ios_settings_font" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Font"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "字体"
-          }
-        }
-      }
-    },
-    "ios_settings_font_geist" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geist"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geist"
-          }
-        }
-      }
-    },
-    "ios_settings_font_geist_mono" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geist Mono"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Geist Mono"
-          }
-        }
-      }
-    },
-    "ios_settings_font_jetbrains_mono" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "JetBrains Mono"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "JetBrains Mono"
-          }
-        }
-      }
-    },
-    "ios_settings_font_system" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "System"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统"
           }
         }
       }
@@ -4796,6 +4863,70 @@
         }
       }
     },
+    "ios_transfer_mimo_clear" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Will clear the current MiMO cookie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会清除当前 MiMO Cookie"
+          }
+        }
+      }
+    },
+    "ios_transfer_mimo_import_new" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Will import MiMO cookie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会导入 MiMO Cookie"
+          }
+        }
+      }
+    },
+    "ios_transfer_mimo_keep_missing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No MiMO credential included"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未包含 MiMO 凭证"
+          }
+        }
+      }
+    },
+    "ios_transfer_mimo_replace" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Will replace the current MiMO cookie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会替换当前 MiMO Cookie"
+          }
+        }
+      }
+    },
     "ios_transfer_openai_clear" : {
       "localizations" : {
         "en" : {
@@ -5143,6 +5274,173 @@
     "Method: %@" : {
 
     },
+    "MiMO" : {
+
+    },
+    "mimo_configure_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configure MiMO cookie in Settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在设置中配置 MiMO Cookie"
+          }
+        }
+      }
+    },
+    "mimo_cookie_expired" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMO cookie expired, refresh it from browser"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMO Cookie 已过期，请从浏览器重新获取"
+          }
+        }
+      }
+    },
+    "mimo_cookie_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste serviceToken or a full Cookie from platform.xiaomimimo.com."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴 platform.xiaomimimo.com 中的 serviceToken 或完整 Cookie。"
+          }
+        }
+      }
+    },
+    "mimo_cookie_invalid" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid MiMO cookie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMO Cookie 无效"
+          }
+        }
+      }
+    },
+    "mimo_cookie_login" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use MiMO Cookie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用 MiMO Cookie"
+          }
+        }
+      }
+    },
+    "mimo_cookie_placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "serviceToken or Cookie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "serviceToken 或 Cookie"
+          }
+        }
+      }
+    },
+    "mimo_cookie_required" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter MiMO cookie"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入 MiMO Cookie"
+          }
+        }
+      }
+    },
+    "mimo_monthly_token_quota" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monthly Tokens"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "月度 Token"
+          }
+        }
+      }
+    },
+    "mimo_plan_expire_at" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Valid until %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有效期至 %@"
+          }
+        }
+      }
+    },
+    "mimo_token_plan" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token Plan"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token 套餐"
+          }
+        }
+      }
+    },
     "minutes_3" : {
       "localizations" : {
         "en" : {
@@ -5485,7 +5783,13 @@
         }
       }
     },
+    "OK" : {
+
+    },
     "Open a page from Quick Open or tap +." : {
+
+    },
+    "OpenAI" : {
 
     },
     "openai_accountid_placeholder" : {
@@ -5778,6 +6082,9 @@
     "Pretty Print" : {
 
     },
+    "Provider" : {
+
+    },
     "Query: %lld" : {
 
     },
@@ -5831,6 +6138,9 @@
           }
         }
       }
+    },
+    "Requires iOS 18+" : {
+
     },
     "reset_at" : {
       "localizations" : {
@@ -5915,6 +6225,9 @@
         }
       }
     },
+    "save" : {
+
+    },
     "Save pages from the browser detail view." : {
 
     },
@@ -5962,6 +6275,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置"
+          }
+        }
+      }
+    },
+    "show_original" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Original"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示原文"
           }
         }
       }
@@ -6164,6 +6493,56 @@
     },
     "Tools" : {
 
+    },
+    "translate_to_chinese" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate to Chinese"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译为中文"
+          }
+        }
+      }
+    },
+    "translation_framework_error" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translation service unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译服务不可用"
+          }
+        }
+      }
+    },
+    "translation_timeout" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translation timed out"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译超时，请重试"
+          }
+        }
+      }
     },
     "Unfavorite" : {
 
@@ -6573,22 +6952,6 @@
         }
       }
     },
-    "wechat_cwd_choose" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Choose Folder"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "选择目录"
-          }
-        }
-      }
-    },
     "wechat_cwd_access_denied" : {
       "localizations" : {
         "en" : {
@@ -6617,6 +6980,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "目录访问验证失败"
+          }
+        }
+      }
+    },
+    "wechat_cwd_choose" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Folder"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择目录"
           }
         }
       }

@@ -98,6 +98,17 @@ struct IOSTransferImportPreviewSheet: View {
             case .clearExisting:
                 credentialDescription = String(localized: "ios_transfer_openai_clear")
             }
+        case .mimo:
+            switch change.credentialAction {
+            case .keepMissing:
+                credentialDescription = String(localized: "ios_transfer_mimo_keep_missing")
+            case .importNew:
+                credentialDescription = String(localized: "ios_transfer_mimo_import_new")
+            case .replaceExisting:
+                credentialDescription = String(localized: "ios_transfer_mimo_replace")
+            case .clearExisting:
+                credentialDescription = String(localized: "ios_transfer_mimo_clear")
+            }
         }
 
         let configDescription: String

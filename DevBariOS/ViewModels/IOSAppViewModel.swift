@@ -34,6 +34,7 @@ final class IOSAppViewModel: ObservableObject {
 
     let quotaViewModel = QuotaViewModel()
     let openAIQuotaViewModel = OpenAIQuotaViewModel()
+    let mimoQuotaViewModel = MimoQuotaViewModel()
 
     private let authService = AuthService()
     private let settingsStore = UserDefaultsAccountSettingsStore()
@@ -65,12 +66,18 @@ final class IOSAppViewModel: ObservableObject {
         settingsStore.loadOpenAIAccountId() ?? ""
     }
 
+    var mimoServiceToken: String {
+        KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey) ?? ""
+    }
+
     func hasAuthenticatedSession(for provider: QuotaProvider) -> Bool {
         switch provider {
         case .glm:
             return glmCredentials?.token.isEmpty == false
         case .openai:
             return !openAIAccessToken.isEmpty
+        case .mimo:
+            return !mimoServiceToken.isEmpty
         }
     }
 
@@ -156,6 +163,13 @@ final class IOSAppViewModel: ObservableObject {
                 silent: silent
             )
         }
+
+        if isProviderEnabled(.mimo), !mimoServiceToken.isEmpty {
+            await mimoQuotaViewModel.fetchUsage(
+                storedServiceToken: mimoServiceToken,
+                silent: silent
+            )
+        }
     }
 
     func saveGLMAPIKey(_ rawValue: String) async throws {
@@ -208,6 +222,27 @@ final class IOSAppViewModel: ObservableObject {
         KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.openAIAccessTokenKey)
         settingsStore.saveOpenAIAccountId(nil)
         openAIQuotaViewModel.resetForLogout()
+    }
+
+    func saveMimoCookie(_ rawValue: String) async throws {
+        let credential = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let serviceToken = MimoAPIClient.normalizedServiceToken(from: credential)
+        guard !serviceToken.isEmpty else {
+            throw CredentialsError.emptyMimoCookie
+        }
+
+        _ = try await mimoQuotaViewModel.fetchUsage(serviceToken: credential, silent: true)
+        await mimoQuotaViewModel.fetchPlanDetailIfNeeded(serviceToken: credential, force: true)
+
+        KeychainService.shared.save(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey, value: credential)
+        if !isProviderEnabled(.mimo) {
+            updateProvider(.mimo, enabled: true)
+        }
+    }
+
+    func clearMimoCredentials() {
+        KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
+        mimoQuotaViewModel.resetForLogout()
     }
 
     func prepareTransferImport(from rawValue: String) throws -> TransferPayload {
@@ -275,6 +310,19 @@ final class IOSAppViewModel: ObservableObject {
 
                 settingsStore.saveOpenAIAccountId(providerPayload.accountId)
                 openAIQuotaViewModel.resetForLogout()
+
+            case .mimo:
+                if let cookie = providerPayload.credentials?.cookieString?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !cookie.isEmpty {
+                    KeychainService.shared.save(
+                        key: DevBarCoreConstants.Keychain.mimoServiceTokenKey,
+                        value: cookie
+                    )
+                } else {
+                    KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
+                }
+
+                mimoQuotaViewModel.resetForLogout()
             }
         }
 
@@ -299,10 +347,16 @@ final class IOSAppViewModel: ObservableObject {
                 self?.objectWillChange.send()
             }
             .store(in: &childObservers)
+
+        mimoQuotaViewModel.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &childObservers)
     }
 
     private var latestRefreshDate: Date? {
-        [quotaViewModel.lastUpdated, openAIQuotaViewModel.lastUpdated]
+        [quotaViewModel.lastUpdated, openAIQuotaViewModel.lastUpdated, mimoQuotaViewModel.lastUpdated]
             .compactMap { $0 }
             .max()
     }
@@ -319,6 +373,11 @@ final class IOSAppViewModel: ObservableObject {
                 isEnabled: isProviderEnabled(.openai),
                 hasCredential: !openAIAccessToken.isEmpty,
                 accountIdentifier: openAIAccountId
+            ),
+            LocalProviderState(
+                provider: .mimo,
+                isEnabled: isProviderEnabled(.mimo),
+                hasCredential: !mimoServiceToken.isEmpty
             ),
         ]
     }
@@ -368,6 +427,7 @@ extension IOSAppViewModel {
         case emptyGLMAPIKey
         case invalidGLMAPIKey
         case emptyOpenAIToken
+        case emptyMimoCookie
 
         var errorDescription: String? {
             switch self {
@@ -377,6 +437,8 @@ extension IOSAppViewModel {
                 return String(localized: "ios_error_invalid_glm_api_key")
             case .emptyOpenAIToken:
                 return String(localized: "ios_error_enter_openai_token")
+            case .emptyMimoCookie:
+                return String(localized: "mimo_cookie_required")
             }
         }
     }

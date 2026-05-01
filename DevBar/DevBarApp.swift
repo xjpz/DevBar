@@ -35,6 +35,7 @@ struct DevBarApp: App {
                 .environmentObject(appViewModel)
                 .environmentObject(appViewModel.quotaViewModel)
                 .environmentObject(appViewModel.openAIQuotaViewModel)
+                .environmentObject(appViewModel.mimoQuotaViewModel)
                 .environmentObject(appViewModel.updateViewModel)
                 .environmentObject(languageManager)
                 .environment(\.locale, languageManager.currentLocale)

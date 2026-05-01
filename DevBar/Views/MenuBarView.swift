@@ -51,6 +51,7 @@ private struct LoggedInContentView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @EnvironmentObject private var quotaViewModel: QuotaViewModel
     @EnvironmentObject private var openAIQuotaViewModel: OpenAIQuotaViewModel
+    @EnvironmentObject private var mimoQuotaViewModel: MimoQuotaViewModel
     @EnvironmentObject private var updateViewModel: UpdateViewModel
     @State private var selectedProvider: QuotaProvider = .glm
 
@@ -74,10 +75,13 @@ private struct LoggedInContentView: View {
             Divider()
 
             // Content area
-            if selectedProvider == .glm {
+            switch selectedProvider {
+            case .glm:
                 glmContent
-            } else {
+            case .openai:
                 openAIContent
+            case .mimo:
+                mimoContent
             }
 
             Divider()
@@ -136,8 +140,7 @@ private struct LoggedInContentView: View {
             }
             Spacer()
 
-            if selectedProvider == .glm && quotaViewModel.isLoading
-                || selectedProvider == .openai && openAIQuotaViewModel.isLoading {
+            if isSelectedProviderLoading {
                 ProgressView()
                     .controlSize(.small)
             }
@@ -165,6 +168,17 @@ private struct LoggedInContentView: View {
             }
             .buttonStyle(.borderless)
             .help("settings")
+        }
+    }
+
+    private var isSelectedProviderLoading: Bool {
+        switch selectedProvider {
+        case .glm:
+            return quotaViewModel.isLoading
+        case .openai:
+            return openAIQuotaViewModel.isLoading
+        case .mimo:
+            return mimoQuotaViewModel.isLoading || mimoQuotaViewModel.isLoadingDetail
         }
     }
 
@@ -233,6 +247,63 @@ private struct LoggedInContentView: View {
             }
 
             ForEach(openAIQuotaViewModel.quotaRows) { row in
+                QuotaRowItemView(item: row)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: - MiMO Content
+
+    private var mimoContent: some View {
+        Group {
+            if !appViewModel.hasAuthenticatedSession(for: .mimo) {
+                providerConfigureView(
+                    icon: "bolt.hexagon",
+                    hint: String(localized: "mimo_configure_hint")
+                )
+            } else if mimoQuotaViewModel.isLoading && mimoQuotaViewModel.usageResponse == nil {
+                ProgressView("fetching_usage")
+                    .padding()
+            } else if !mimoQuotaViewModel.quotaRows.isEmpty {
+                mimoQuotaListView
+            } else if let error = mimoQuotaViewModel.errorMessage {
+                errorView(error)
+            } else {
+                Text("no_data")
+                    .foregroundStyle(.secondary)
+                    .padding()
+            }
+        }
+    }
+
+    private var mimoQuotaListView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let planName = mimoQuotaViewModel.planName {
+                levelBadge(planName)
+            }
+
+            if let currentPeriodEnd = mimoQuotaViewModel.currentPeriodEnd {
+                HStack {
+                    Text(String(format: String(localized: "mimo_plan_expire_at"), formattedMimoDate(currentPeriodEnd)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+            }
+
+            if let error = mimoQuotaViewModel.errorMessage {
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath.circle")
+                    Text(error)
+                }
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+
+            ForEach(mimoQuotaViewModel.quotaRows) { row in
                 QuotaRowItemView(item: row)
             }
         }
@@ -344,6 +415,13 @@ private struct LoggedInContentView: View {
             .controlSize(.small)
         }
         .padding()
+    }
+
+    private func formattedMimoDate(_ date: Date) -> String {
+        date.formatted(
+            Date.FormatStyle(date: .numeric, time: .shortened)
+                .hour(.defaultDigits(amPM: .omitted))
+        )
     }
 
     // MARK: - Footer

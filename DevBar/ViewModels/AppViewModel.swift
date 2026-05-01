@@ -22,6 +22,7 @@ final class AppViewModel: ObservableObject {
     private let authService = AuthService()
     let quotaViewModel = QuotaViewModel()
     let openAIQuotaViewModel = OpenAIQuotaViewModel()
+    let mimoQuotaViewModel = MimoQuotaViewModel()
     let updateViewModel = UpdateViewModel()
     let notificationService = NotificationService()
     let weChatViewModel = WeChatViewModel()
@@ -61,6 +62,9 @@ final class AppViewModel: ObservableObject {
             return credentials?.token.isEmpty == false
         case .openai:
             let token = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey)
+            return token?.isEmpty == false
+        case .mimo:
+            let token = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
             return token?.isEmpty == false
         }
     }
@@ -138,12 +142,9 @@ final class AppViewModel: ObservableObject {
         // Load account configs
         if let data = UserDefaults.standard.data(forKey: Constants.Defaults.accountConfigsKey),
            let configs = try? JSONDecoder().decode([AccountConfig].self, from: data) {
-            accountConfigs = configs
+            accountConfigs = UserDefaultsAccountSettingsStore.normalizedConfigs(configs)
         } else {
-            accountConfigs = [
-                AccountConfig(provider: .glm, isEnabled: true, order: 0),
-                AccountConfig(provider: .openai, isEnabled: false, order: 1)
-            ]
+            accountConfigs = UserDefaultsAccountSettingsStore.defaultConfigs
         }
 
         menuBarIcon = UserDefaults.standard.string(forKey: Constants.Defaults.menuBarIconKey)
@@ -178,6 +179,16 @@ final class AppViewModel: ObservableObject {
             if let token, !token.isEmpty {
                 Task { @MainActor [weak self] in
                     await openAIQuotaViewModel.fetchUsage(silent: true)
+                    self?.checkAndNotify()
+                }
+            }
+        }
+
+        if isProviderEnabled(.mimo) {
+            let token = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
+            if let token, !token.isEmpty {
+                Task { @MainActor [weak self] in
+                    await mimoQuotaViewModel.fetchUsage(storedServiceToken: token, silent: true)
                     self?.checkAndNotify()
                 }
             }
@@ -240,6 +251,9 @@ final class AppViewModel: ObservableObject {
         case .openai:
             openAIQuotaViewModel.resetForLogout()
             KeychainService.shared.delete(key: Constants.Keychain.openAIAccessTokenKey)
+        case .mimo:
+            mimoQuotaViewModel.resetForLogout()
+            KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
         }
         refreshAuthenticationState()
     }
@@ -252,6 +266,10 @@ final class AppViewModel: ObservableObject {
         let openAIToken = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey)
         let openAICredentials = openAIToken.map {
             ProviderTransferCredentials(token: $0, cookieString: nil)
+        }
+        let mimoServiceToken = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
+        let mimoCredentials = mimoServiceToken.map {
+            ProviderTransferCredentials(token: nil, cookieString: $0)
         }
         let openAIAccountId = UserDefaults.standard.string(forKey: Constants.OpenAI.accountIdKey)
 
@@ -267,6 +285,7 @@ final class AppViewModel: ObservableObject {
                     credentials: openAICredentials,
                     accountId: openAIAccountId
                 ),
+                ProviderTransferPayload(provider: .mimo, credentials: mimoCredentials),
             ]
         )
     }
@@ -299,6 +318,10 @@ final class AppViewModel: ObservableObject {
 
         if isProviderEnabled(.openai), hasAuthenticatedSession(for: .openai) {
             await openAIQuotaViewModel.fetchUsage(silent: true)
+        }
+
+        if isProviderEnabled(.mimo), hasAuthenticatedSession(for: .mimo) {
+            await mimoQuotaViewModel.fetchUsage(silent: silent)
         }
 
         checkAndNotify()
@@ -442,6 +465,7 @@ final class AppViewModel: ObservableObject {
             .environmentObject(self)
             .environmentObject(quotaViewModel)
             .environmentObject(openAIQuotaViewModel)
+            .environmentObject(mimoQuotaViewModel)
             .environmentObject(updateViewModel)
             .environmentObject(notificationService)
 
