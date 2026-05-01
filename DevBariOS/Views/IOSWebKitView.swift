@@ -1,9 +1,11 @@
 import Combine
 import SwiftData
 import SwiftUI
+import Translation
 import UIKit
 import WebKit
 
+@available(iOS 18.0, *)
 struct IOSWebKitView: View {
     @Environment(\.themeTokens) private var theme
     @Environment(\.modelContext) private var modelContext
@@ -380,6 +382,7 @@ struct IOSWebKitView: View {
     }
 }
 
+@available(iOS 18.0, *)
 private struct IOSBrowserView: View {
     @ObservedObject var browser: IOSBrowserStore
     @Environment(\.themeTokens) private var theme
@@ -388,6 +391,8 @@ private struct IOSBrowserView: View {
     @State private var addressText = ""
     @State private var isShowingAddressBar = false
     @State private var isShowingSaveToast = false
+
+    @StateObject private var translator = PageTranslator()
 
     var body: some View {
         ZStack {
@@ -407,6 +412,27 @@ private struct IOSBrowserView: View {
                     }
             } else {
                 ContentUnavailableView("No Tabs", systemImage: "safari")
+            }
+
+            // Translation progress banner
+            if translator.isTranslating {
+                VStack {
+                    Spacer()
+                    HStack(spacing: 10) {
+                        ProgressView()
+                            .tint(.white)
+                        Text(translator.progress.isEmpty ? "Translating..." : translator.progress)
+                            .font(.caption)
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Capsule().fill(Color.black.opacity(0.75)))
+                    .padding(.bottom, 80)
+                }
+                .allowsHitTesting(false)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .animation(.easeInOut, value: translator.isTranslating)
             }
 
             if isShowingSaveToast {
@@ -469,47 +495,11 @@ private struct IOSBrowserView: View {
             }
 
             ToolbarItemGroup(placement: .bottomBar) {
-                Menu {
-                    ForEach(Array((browser.currentTab?.backList.reversed() ?? []).enumerated()), id: \.offset) { _, item in
-                        Button(item.title ?? item.url.absoluteString) {
-                            browser.currentTab?.webView.go(to: item)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "chevron.backward")
-                } primaryAction: {
-                    browser.goBack()
-                }
-                .disabled(!(browser.currentTab?.canGoBack ?? false))
-
-                Menu {
-                    ForEach(Array((browser.currentTab?.forwardList ?? []).enumerated()), id: \.offset) { _, item in
-                        Button(item.title ?? item.url.absoluteString) {
-                            browser.currentTab?.webView.go(to: item)
-                        }
-                    }
-                } label: {
-                    Image(systemName: "chevron.forward")
-                } primaryAction: {
-                    browser.goForward()
-                }
-                .disabled(!(browser.currentTab?.canGoForward ?? false))
-
+                browserBackButton
+                browserForwardButton
                 Spacer()
-
-                Button {
-                    browser.reload()
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                }
-                .disabled(browser.currentURL == nil)
-
-                Button {
-                    saveCurrentPage()
-                } label: {
-                    Image(systemName: "bookmark")
-                }
-                .disabled(browser.latestAPIRequest == nil)
+                browserReloadButton
+                browserMoreMenu
             }
         }
         .onReceive(browser.$selectedTabID) { _ in
@@ -520,8 +510,87 @@ private struct IOSBrowserView: View {
         }
         .onDisappear {
             browser.currentTab?.webView.stopLoading()
+            translator.resetState()
         }
+        .onChange(of: browser.selectedTabID) {
+            translator.resetState()
+        }
+        .background(TranslationBridgeView(translator: translator))
         .animation(.spring(response: 0.24, dampingFraction: 0.9), value: isShowingSaveToast)
+    }
+
+    // MARK: - Toolbar Items
+
+    private var browserBackButton: some View {
+        Menu {
+            ForEach(Array((browser.currentTab?.backList.reversed() ?? []).enumerated()), id: \.offset) { _, item in
+                Button(item.title ?? item.url.absoluteString) {
+                    browser.currentTab?.webView.go(to: item)
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.backward")
+        } primaryAction: {
+            browser.goBack()
+        }
+        .disabled(!(browser.currentTab?.canGoBack ?? false))
+    }
+
+    private var browserForwardButton: some View {
+        Menu {
+            ForEach(Array((browser.currentTab?.forwardList ?? []).enumerated()), id: \.offset) { _, item in
+                Button(item.title ?? item.url.absoluteString) {
+                    browser.currentTab?.webView.go(to: item)
+                }
+            }
+        } label: {
+            Image(systemName: "chevron.forward")
+        } primaryAction: {
+            browser.goForward()
+        }
+        .disabled(!(browser.currentTab?.canGoForward ?? false))
+    }
+
+    private var browserReloadButton: some View {
+        Button {
+            browser.reload()
+        } label: {
+            Image(systemName: "arrow.clockwise")
+        }
+        .disabled(browser.currentURL == nil)
+    }
+
+    private var browserMoreMenu: some View {
+        Menu {
+            Button {
+                saveCurrentPage()
+            } label: {
+                Label("save", systemImage: "arrow.forward.folder.fill")
+            }
+            .disabled(browser.latestAPIRequest == nil)
+
+            Divider()
+
+            if translator.isTranslated {
+                Button {
+                    if let webView = browser.currentTab?.webView {
+                        Task { await translator.restore(webView: webView) }
+                    }
+                } label: {
+                    Label("show_original", systemImage: "textformat")
+                }
+            } else {
+                Button {
+                    translator.prepareForTranslation(webView: browser.currentTab?.webView)
+                    translator.triggerTranslation()
+                } label: {
+                    Label("translate_to_chinese", systemImage: "character.book.closed")
+                }
+                .disabled(translator.isTranslating)
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
     }
 
     private var addressBar: some View {
@@ -585,6 +654,7 @@ private struct IOSBrowserView: View {
     }
 }
 
+@available(iOS 18.0, *)
 private struct IOSTabsSheet: View {
     @ObservedObject var browser: IOSBrowserStore
     @Environment(\.dismiss) private var dismiss
@@ -653,6 +723,7 @@ private struct IOSTabsSheet: View {
     }
 }
 
+@available(iOS 18.0, *)
 private struct IOSAPIRecordsSheet: View {
     let records: [IOSAPIRecord]
     let openRecord: (IOSAPIRecord) -> Void
@@ -670,6 +741,7 @@ private struct IOSAPIRecordsSheet: View {
     }
 }
 
+@available(iOS 18.0, *)
 private struct IOSHistoryRecordsView: View {
     let records: [IOSWebHistoryRecord]
     let openHistory: (IOSWebHistoryRecord) -> Void
@@ -723,6 +795,7 @@ private struct IOSHistoryRecordsView: View {
     }
 }
 
+@available(iOS 18.0, *)
 private struct IOSBrowserWebView: UIViewRepresentable {
     let webView: WKWebView
 
@@ -1055,6 +1128,7 @@ final class IOSBrowserTab: NSObject, ObservableObject, Identifiable, WKNavigatio
         webView.configuration.userContentController.add(IOSWeakScriptMessageHandler(delegate: self), name: "devBarAPIRecord")
     }
 
+
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard
             message.name == "devBarAPIRecord",
@@ -1133,6 +1207,19 @@ private enum IOSSearchEngine: String, CaseIterable {
         if host.range(of: #"^\d{1,3}(\.\d{1,3}){3}$"#, options: .regularExpression) != nil { return true }
 
         return false
+    }
+}
+
+
+@available(iOS 18.0, *)
+private struct TranslationBridgeView: View {
+    @ObservedObject var translator: PageTranslator
+
+    var body: some View {
+        Color.clear
+            .translationTask(translator.translationConfig) { session in
+                await translator.translate(with: session)
+            }
     }
 }
 

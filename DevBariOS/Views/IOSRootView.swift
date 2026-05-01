@@ -21,7 +21,11 @@ struct IOSRootView: View {
                 .tag(IOSAppViewModel.TabSelection.dashboard)
 
                 NavigationStack {
-                    IOSWebKitView()
+                    if #available(iOS 18.0, *) {
+                        IOSWebKitView()
+                    } else {
+                        ContentUnavailableView("Requires iOS 18+", systemImage: "globe")
+                    }
                 }
                 .tabItem {
                     Label("WebKit", systemImage: "globe")
