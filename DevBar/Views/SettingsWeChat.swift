@@ -7,6 +7,7 @@ struct SettingsWeChat: View {
     @ObservedObject var viewModel: WeChatViewModel
     @ObservedObject private var agentRouter: WeChatAgentRouter
     @ObservedObject private var approvalCoordinator: WeChatApprovalCoordinator
+    @ObservedObject private var authorizedDirectoryStore: WeChatAuthorizedDirectoryStore
     @State private var showLoginSheet = false
     @State private var showAddAgent = false
     @State private var cwdAccessError: String?
@@ -15,6 +16,7 @@ struct SettingsWeChat: View {
         self.viewModel = viewModel
         self.agentRouter = viewModel.agentRouter
         self.approvalCoordinator = viewModel.agentRouter.approvalCoordinator
+        self.authorizedDirectoryStore = viewModel.agentRouter.authorizedDirectoryStore
     }
 
     var body: some View {
@@ -153,28 +155,34 @@ struct SettingsWeChat: View {
                                 }
 
                                 if agent.type == .cli || agent.type == .acp {
-                                    HStack(spacing: 6) {
-                                        cwdStatusLabel(for: agent)
-                                        Spacer()
-                                        Button {
-                                            chooseWorkingDirectory(for: agent)
-                                        } label: {
-                                            Image(systemName: "folder")
-                                        }
-                                        .buttonStyle(.plain)
-                                        .help(Text("wechat_cwd_choose"))
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("当前工作目录")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
 
-                                        if agent.cwd?.isEmpty == false {
+                                        HStack(spacing: 6) {
+                                            cwdStatusLabel(for: agent)
+                                            Spacer()
                                             Button {
-                                                viewModel.agentRouter.updateAgentWorkingDirectory(agent, cwd: nil)
-                                                if viewModel.messageService.isRunning {
-                                                    viewModel.restart()
-                                                }
+                                                chooseWorkingDirectory(for: agent)
                                             } label: {
-                                                Image(systemName: "xmark.circle")
+                                                Image(systemName: "folder")
                                             }
                                             .buttonStyle(.plain)
-                                            .help(Text("wechat_cwd_use_default"))
+                                            .help(Text("选择当前工作目录，所选目录会加入远程可用目录"))
+
+                                            if agent.cwd?.isEmpty == false {
+                                                Button {
+                                                    viewModel.agentRouter.updateAgentWorkingDirectory(agent, cwd: nil)
+                                                    if viewModel.messageService.isRunning {
+                                                        viewModel.restart()
+                                                    }
+                                                } label: {
+                                                    Image(systemName: "xmark.circle")
+                                                }
+                                                .buttonStyle(.plain)
+                                                .help(Text("wechat_cwd_use_default"))
+                                            }
                                         }
                                     }
 
@@ -219,6 +227,66 @@ struct SettingsWeChat: View {
                     }
                 } header: {
                     Text("wechat_agents")
+                }
+
+                Section {
+                    Text("这些目录是微信远程 /cwd 可切换范围。每个 Agent 的当前工作目录需位于这里或默认安全目录下。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Label {
+                        Text("默认安全目录: \(WeChatWorkingDirectoryPolicy.ensureDefaultDirectory())")
+                    } icon: {
+                        Image(systemName: "folder")
+                    }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
+                    if authorizedDirectoryStore.directories.isEmpty {
+                        Text("未添加授权目录")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(authorizedDirectoryStore.directories) { directory in
+                            HStack(spacing: 8) {
+                                Image(systemName: directory.isStale ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                                    .foregroundStyle(directory.isStale ? .yellow : .green)
+                                    .frame(width: 18)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(WeChatWorkingDirectoryPolicy.displayPath(directory.path))
+                                        .font(.caption2)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                    if directory.isStale {
+                                        Text("需重新授权")
+                                            .font(.caption2)
+                                            .foregroundStyle(.yellow)
+                                    }
+                                }
+
+                                Spacer()
+
+                                Button {
+                                    authorizedDirectoryStore.removeDirectory(id: directory.id)
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .foregroundStyle(.red)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+
+                    Button {
+                        addAuthorizedDirectory()
+                    } label: {
+                        Label("添加远程可用目录", systemImage: "folder.badge.plus")
+                    }
+                } header: {
+                    Text("远程可用目录")
                 }
 
                 if !approvalCoordinator.pendingRequests.isEmpty {
@@ -410,7 +478,15 @@ struct SettingsWeChat: View {
     }
 
     private func chooseWorkingDirectory(for agent: WeChatAgentRouter.AgentConfig) {
-        guard let path = WeChatWorkingDirectoryPolicy.chooseDirectory(initialPath: agent.cwd) else { return }
+        guard let url = WeChatWorkingDirectoryPolicy.chooseDirectoryURL(initialPath: agent.cwd) else { return }
+        do {
+            try authorizedDirectoryStore.addDirectory(url: url)
+        } catch {
+            cwdAccessError = error.localizedDescription
+            return
+        }
+
+        let path = url.path
         let access = WeChatWorkingDirectoryPolicy.validateAccess(for: path)
         guard access.isAccessible else {
             cwdAccessError = access.message
@@ -419,6 +495,16 @@ struct SettingsWeChat: View {
         viewModel.agentRouter.updateAgentWorkingDirectory(agent, cwd: access.path)
         if viewModel.messageService.isRunning {
             viewModel.restart()
+        }
+    }
+
+    private func addAuthorizedDirectory() {
+        guard let url = WeChatWorkingDirectoryPolicy.chooseDirectoryURL(initialPath: nil) else { return }
+        do {
+            try authorizedDirectoryStore.addDirectory(url: url)
+            cwdAccessError = nil
+        } catch {
+            cwdAccessError = error.localizedDescription
         }
     }
 

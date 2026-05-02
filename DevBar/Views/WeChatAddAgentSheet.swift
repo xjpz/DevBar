@@ -113,8 +113,15 @@ struct WeChatAddAgentSheet: View {
                 .font(.system(.body, design: .monospaced))
 
             Button {
-                if let path = WeChatWorkingDirectoryPolicy.chooseDirectory(initialPath: cwd) {
-                    let access = WeChatWorkingDirectoryPolicy.validateAccess(for: path)
+                if let url = WeChatWorkingDirectoryPolicy.chooseDirectoryURL(initialPath: cwd) {
+                    do {
+                        try router.authorizedDirectoryStore.addDirectory(url: url)
+                    } catch {
+                        cwdAccessError = error.localizedDescription
+                        return
+                    }
+
+                    let access = WeChatWorkingDirectoryPolicy.validateAccess(for: url.path)
                     if access.isAccessible {
                         cwd = access.path
                         cwdAccessError = nil
@@ -239,6 +246,22 @@ struct WeChatAddAgentSheet: View {
         guard !trimmedCwd.isEmpty else {
             cwdAccessError = nil
             return nil
+        }
+
+        guard router.authorizedDirectoryStore.isPathAllowedRemotely(trimmedCwd) else {
+            cwdAccessError = router.authorizedDirectoryStore.unauthorizedRemoteMessage(for: trimmedCwd)
+            return nil
+        }
+
+        let directoryAccess: WeChatAuthorizedDirectoryAccess?
+        do {
+            directoryAccess = try router.authorizedDirectoryStore.accessHandle(for: trimmedCwd)
+        } catch {
+            cwdAccessError = error.localizedDescription
+            return nil
+        }
+        defer {
+            directoryAccess?.stop()
         }
 
         let access = WeChatWorkingDirectoryPolicy.validateAccess(for: trimmedCwd)

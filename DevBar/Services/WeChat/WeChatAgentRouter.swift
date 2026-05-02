@@ -68,6 +68,7 @@ final class WeChatAgentRouter: ObservableObject {
 
     let conversationStore = WeChatConversationStore()
     let approvalCoordinator = WeChatApprovalCoordinator()
+    let authorizedDirectoryStore = WeChatAuthorizedDirectoryStore()
 
     struct AgentConfig: Codable, Identifiable, Sendable {
         var id: String { name }
@@ -146,6 +147,7 @@ final class WeChatAgentRouter: ObservableObject {
     // MARK: - ACP Client Pool
 
     private var acpClients: [String: ACPClient] = [:]
+    private var acpDirectoryAccess: [String: WeChatAuthorizedDirectoryAccess] = [:]
 
     // MARK: - Config I/O
 
@@ -187,7 +189,11 @@ final class WeChatAgentRouter: ObservableObject {
         }
         // Stop ACP client if running
         if let client = acpClients.removeValue(forKey: agent.name) {
-            Task { await client.stop() }
+            let directoryAccess = acpDirectoryAccess.removeValue(forKey: agent.name)
+            Task {
+                await client.stop()
+                directoryAccess?.stop()
+            }
         }
         saveToWeClawConfig()
     }
@@ -197,7 +203,11 @@ final class WeChatAgentRouter: ObservableObject {
         let trimmed = cwd?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         agents[index] = agent.updating(cwd: trimmed.isEmpty ? nil : trimmed)
         if let client = acpClients.removeValue(forKey: agent.name) {
-            Task { await client.stop() }
+            let directoryAccess = acpDirectoryAccess.removeValue(forKey: agent.name)
+            Task {
+                await client.stop()
+                directoryAccess?.stop()
+            }
         }
         saveToWeClawConfig()
     }
@@ -430,6 +440,16 @@ final class WeChatAgentRouter: ObservableObject {
             approvalNotifier: approvalNotifier
         ), !approvalResult.allowed {
             return approvalResult.message
+        }
+
+        let directoryAccess: WeChatAuthorizedDirectoryAccess?
+        do {
+            directoryAccess = try authorizedDirectoryStore.accessHandle(for: cwd)
+        } catch {
+            return error.localizedDescription
+        }
+        defer {
+            directoryAccess?.stop()
         }
 
         process.executableURL = URL(fileURLWithPath: resolvedExec)
@@ -693,8 +713,15 @@ final class WeChatAgentRouter: ObservableObject {
                 workingDirectory: Self.effectiveWorkingDirectory(for: agent),
                 environment: agent.env
             )
-            try await client.start()
+            let directoryAccess = try authorizedDirectoryStore.accessHandle(for: Self.effectiveWorkingDirectory(for: agent))
+            do {
+                try await client.start()
+            } catch {
+                directoryAccess?.stop()
+                throw error
+            }
             acpClients[clientKey] = client
+            acpDirectoryAccess[clientKey] = directoryAccess
         }
 
         let client = acpClients[clientKey]!
@@ -722,6 +749,10 @@ final class WeChatAgentRouter: ObservableObject {
             Task { await client.stop() }
         }
         acpClients.removeAll()
+        for (_, directoryAccess) in acpDirectoryAccess {
+            directoryAccess.stop()
+        }
+        acpDirectoryAccess.removeAll()
     }
 
     // MARK: - CLI Approval

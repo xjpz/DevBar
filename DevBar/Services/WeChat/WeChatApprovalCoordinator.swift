@@ -71,8 +71,8 @@ final class WeChatApprovalCoordinator: ObservableObject {
         guard request.status == .pending else {
             return "授权 \(id) 已处理。"
         }
-        if source == .wechat, approved, request.risk == .high {
-            return "授权 \(id) 风险较高，请在 Mac 端 DevBar 确认。"
+        if source == .wechat, approved, !request.allowsWechatApproval {
+            return "授权 \(id) 需要在 Mac 端 DevBar 确认。"
         }
 
         complete(id: request.id, approved: approved, status: approved ? .approved : .denied)

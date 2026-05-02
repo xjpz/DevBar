@@ -103,6 +103,11 @@ enum WeChatWorkingDirectoryPolicy {
 
     @MainActor
     static func chooseDirectory(initialPath: String?) -> String? {
+        chooseDirectoryURL(initialPath: initialPath)?.path
+    }
+
+    @MainActor
+    static func chooseDirectoryURL(initialPath: String?) -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -117,7 +122,7 @@ enum WeChatWorkingDirectoryPolicy {
             panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
         }
 
-        return panel.runModal() == .OK ? panel.url?.path : nil
+        return panel.runModal() == .OK ? panel.url : nil
     }
 
     nonisolated static func validateAccess(for path: String) -> DirectoryAccessResult {
@@ -148,9 +153,15 @@ enum WeChatWorkingDirectoryPolicy {
         }
     }
 
-    nonisolated private static func normalizedPath(_ path: String) -> String {
+    nonisolated static func normalizedPath(_ path: String) -> String {
         let expanded = (path as NSString).expandingTildeInPath
         return URL(fileURLWithPath: expanded).standardizedFileURL.path
+    }
+
+    nonisolated static func path(_ path: String, isInsideOrEqualTo root: String) -> Bool {
+        let candidatePath = normalizedPath(path)
+        let rootPath = normalizedPath(root)
+        return candidatePath == rootPath || candidatePath.hasPrefix(rootPath + "/")
     }
 
     nonisolated private static func protectedDirectoryKind(for path: String) -> ProtectedDirectory? {

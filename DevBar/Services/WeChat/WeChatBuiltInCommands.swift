@@ -51,9 +51,28 @@ struct WeChatBuiltInCommands {
         case "/cwd":
             if parts.count > 1 {
                 let rawPath = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if rawPath.lowercased() == "list" {
+                    let agent = WeChatAgentRouter.AgentConfig.resolve(name: agentRouter.defaultAgent, in: agentRouter.agents)
+                    return agentRouter.authorizedDirectoryStore.remoteListText(currentAgent: agent)
+                }
+
                 let path = normalizedInputPath(rawPath)
                 guard let agent = WeChatAgentRouter.AgentConfig.resolve(name: agentRouter.defaultAgent, in: agentRouter.agents) else {
                     return "[DevBar] 当前没有默认 agent，无法设置工作目录。请先使用 /default <agent_name> 设置默认 agent。"
+                }
+
+                guard agentRouter.authorizedDirectoryStore.isPathAllowedRemotely(path) else {
+                    return "[DevBar] 工作目录设置失败: \(agentRouter.authorizedDirectoryStore.unauthorizedRemoteMessage(for: path))"
+                }
+
+                let directoryAccess: WeChatAuthorizedDirectoryAccess?
+                do {
+                    directoryAccess = try agentRouter.authorizedDirectoryStore.accessHandle(for: path)
+                } catch {
+                    return "[DevBar] 工作目录设置失败: \(error.localizedDescription)"
+                }
+                defer {
+                    directoryAccess?.stop()
                 }
 
                 let access = WeChatWorkingDirectoryPolicy.validateAccess(for: path)
@@ -86,6 +105,7 @@ struct WeChatBuiltInCommands {
             "  /info     - 显示 agent 信息",
             "  /default  - 查看/切换默认 agent",
             "  /cwd [path] - 查看/设置工作目录",
+            "  /cwd list - 查看远程可用目录",
             "",
             "调用 agent:",
             "  @agent_name 消息   (指定 agent)",

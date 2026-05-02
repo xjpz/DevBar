@@ -143,8 +143,6 @@ public final class TransferRelayService: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let bearerToken {
             request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
-            request.setValue(bearerToken, forHTTPHeaderField: "X-DevBar-Transfer-Token")
-            request.setValue(bearerToken, forHTTPHeaderField: "X-Transfer-Token")
         }
         if let body {
             let encoder = JSONEncoder()
