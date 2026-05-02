@@ -184,6 +184,14 @@ struct SettingsWeChat: View {
                                         }
                                     }
                                     .font(.caption2)
+
+                                    if agent.type == .cli && agent.effectiveApprovalPolicy == .wechatConfirm {
+                                        Toggle(isOn: highRiskWechatApprovalBinding(for: agent)) {
+                                            Text("高风险也允许微信确认")
+                                        }
+                                        .font(.caption2)
+                                        .help(Text("提交代码、写文件、删除、安装、执行等高风险操作也可通过微信 Y 放行"))
+                                    }
                                 }
                             }
                         }
@@ -425,6 +433,13 @@ struct SettingsWeChat: View {
         Binding(
             get: { agent.effectiveApprovalPolicy },
             set: { viewModel.agentRouter.updateAgentApprovalPolicy(agent, policy: $0) }
+        )
+    }
+
+    private func highRiskWechatApprovalBinding(for agent: WeChatAgentRouter.AgentConfig) -> Binding<Bool> {
+        Binding(
+            get: { agent.canWechatApproveHighRisk },
+            set: { viewModel.agentRouter.updateAgentHighRiskWechatApproval(agent, isAllowed: $0) }
         )
     }
 }

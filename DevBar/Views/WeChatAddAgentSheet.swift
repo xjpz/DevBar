@@ -210,7 +210,8 @@ struct WeChatAddAgentSheet: View {
                 cwd: normalizedCwd,
                 env: nil, model: nil, systemPrompt: nil, aliases: nil,
                 endpoint: nil, apiKey: nil, headers: nil, maxHistory: nil,
-                approvalPolicy: nil, approvalTimeoutSeconds: nil, allowWechatConfirmForLowRisk: nil
+                approvalPolicy: nil, approvalTimeoutSeconds: nil,
+                allowWechatConfirmForLowRisk: nil, allowWechatConfirmForHighRisk: nil
             )
             router.addAgent(agent)
         case .acp:
@@ -225,7 +226,8 @@ struct WeChatAddAgentSheet: View {
                 cwd: normalizedCwd,
                 env: nil, model: nil, systemPrompt: nil, aliases: nil,
                 endpoint: nil, apiKey: nil, headers: nil, maxHistory: nil,
-                approvalPolicy: nil, approvalTimeoutSeconds: nil, allowWechatConfirmForLowRisk: nil
+                approvalPolicy: nil, approvalTimeoutSeconds: nil,
+                allowWechatConfirmForLowRisk: nil, allowWechatConfirmForHighRisk: nil
             )
             router.addAgent(agent)
         }

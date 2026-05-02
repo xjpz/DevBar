@@ -27,6 +27,12 @@ public enum DevBarCoreConstants {
         public static let platformPlanDetailURL = "\(dashboardURL)/api/v1/tokenPlan/detail"
     }
 
+    public enum TransferRelay {
+        public static let baseURL = "https://dev.xjpz.cc"
+        public static let transfersPath = "/api/devbar/transfers"
+        public static let directQRCodeLengthThreshold = 1_800
+    }
+
     public enum AppGroup {
         public static let groupID = "group.cc.xjpz.DevBar"
         public static let sharedDataKey = "widget_shared_data"

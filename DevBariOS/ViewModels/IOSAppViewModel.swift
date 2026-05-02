@@ -245,8 +245,8 @@ final class IOSAppViewModel: ObservableObject {
         mimoQuotaViewModel.resetForLogout()
     }
 
-    func prepareTransferImport(from rawValue: String) throws -> TransferPayload {
-        try TransferPayloadCodec.decode(from: rawValue)
+    func prepareTransferImport(from rawValue: String) async throws -> TransferPayload {
+        try await TransferPayloadCodec.decodeResolvingRelay(from: rawValue)
     }
 
     func makeTransferImportPreview(for payload: TransferPayload) -> TransferImportPreview {

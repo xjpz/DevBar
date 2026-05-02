@@ -52,3 +52,24 @@ func transferPayloadCodecRejectsExpiredPayload() throws {
         try TransferPayloadCodec.decode(from: url)
     }
 }
+
+@Test
+func transferPayloadCodecBuildsRelayURL() throws {
+    let url = try TransferPayloadCodec.makeRelayURL(
+        transferID: "tr_abc",
+        readToken: "rt_read",
+        encryptionKey: "ek_key"
+    )
+
+    #expect(url.absoluteString == "devbar://transfer/relay?id=tr_abc&token=rt_read#key=ek_key")
+    #expect(TransferPayloadCodec.isRelayTransferURL(url.absoluteString))
+}
+
+@Test
+func transferPayloadCodecRejectsRelayURLWithoutKey() async throws {
+    let url = "devbar://transfer/relay?id=tr_abc&token=rt_read"
+
+    await #expect(throws: TransferPayloadError.missingRelayParameters) {
+        try await TransferPayloadCodec.decodeResolvingRelay(from: url)
+    }
+}

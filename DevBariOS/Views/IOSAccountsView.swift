@@ -16,7 +16,9 @@ struct IOSAccountsView: View {
     @State private var isSavingOpenAI = false
     @State private var isSavingMimo = false
     @State private var isShowingScanner = false
+    @State private var isResolvingTransfer = false
     @State private var pendingImportPreview: TransferImportPreview?
+    @State private var pendingRelayTransferURL: URL?
     @State private var transferImportError: String?
     @State private var pageMode: AccountsPageMode = .normal
     @State private var listEditMode: EditMode = .inactive
@@ -63,7 +65,9 @@ struct IOSAccountsView: View {
             NavigationStack {
                 IOSQRScannerView { code in
                     isShowingScanner = false
-                    handleScannedCode(code)
+                    Task {
+                        await handleScannedCode(code)
+                    }
                 }
                 .ignoresSafeArea()
                 .toolbar {
@@ -87,6 +91,13 @@ struct IOSAccountsView: View {
             Button("ios_common_ok", role: .cancel) {}
         } message: {
             Text(transferImportError ?? "")
+        }
+        .overlay {
+            if isResolvingTransfer {
+                ProgressView("正在读取迁移配置...")
+                    .padding(18)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
         }
     }
 
@@ -613,11 +624,22 @@ struct IOSAccountsView: View {
         }
     }
 
-    private func handleScannedCode(_ code: String) {
+    @MainActor
+    private func handleScannedCode(_ code: String) async {
+        transferImportError = nil
+        isResolvingTransfer = true
+        defer { isResolvingTransfer = false }
+
         do {
-            let payload = try appViewModel.prepareTransferImport(from: code)
+            let payload = try await appViewModel.prepareTransferImport(from: code)
+            if TransferPayloadCodec.isRelayTransferURL(code) {
+                pendingRelayTransferURL = URL(string: code)
+            } else {
+                pendingRelayTransferURL = nil
+            }
             pendingImportPreview = appViewModel.makeTransferImportPreview(for: payload)
         } catch {
+            pendingRelayTransferURL = nil
             transferImportError = error.localizedDescription
         }
     }
@@ -633,6 +655,10 @@ struct IOSAccountsView: View {
             openAIError = nil
             mimoError = nil
             pendingImportPreview = nil
+            if let pendingRelayTransferURL {
+                try? await TransferRelayService.shared.deleteRelayTransfer(from: pendingRelayTransferURL)
+                self.pendingRelayTransferURL = nil
+            }
         } catch {
             transferImportError = error.localizedDescription
         }

@@ -50,10 +50,25 @@ struct WeChatBuiltInCommands {
 
         case "/cwd":
             if parts.count > 1 {
-                let path = String(parts[1]).trimmingCharacters(in: .whitespaces)
-                return "[DevBar] 工作目录已设为: \(path)"
+                let rawPath = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let path = normalizedInputPath(rawPath)
+                guard let agent = WeChatAgentRouter.AgentConfig.resolve(name: agentRouter.defaultAgent, in: agentRouter.agents) else {
+                    return "[DevBar] 当前没有默认 agent，无法设置工作目录。请先使用 /default <agent_name> 设置默认 agent。"
+                }
+
+                let access = WeChatWorkingDirectoryPolicy.validateAccess(for: path)
+                guard access.isAccessible else {
+                    return "[DevBar] 工作目录设置失败: \(access.path)\n\(access.message ?? String(localized: "wechat_cwd_access_failed"))"
+                }
+
+                agentRouter.updateAgentWorkingDirectory(agent, cwd: access.path)
+                await conversationStore.clearSession(userID: userID, agentName: agent.name)
+                return "[DevBar] \(agent.name) 工作目录已设为: \(access.path)"
             }
-            return "[DevBar] 当前工作目录: \(FileManager.default.currentDirectoryPath)"
+            if let agent = WeChatAgentRouter.AgentConfig.resolve(name: agentRouter.defaultAgent, in: agentRouter.agents) {
+                return "[DevBar] \(agent.name) 当前工作目录: \(WeChatWorkingDirectoryPolicy.effectiveDirectory(for: agent.cwd))"
+            }
+            return "[DevBar] 当前工作目录: \(WeChatWorkingDirectoryPolicy.ensureDefaultDirectory())"
 
         default:
             return nil
@@ -110,5 +125,15 @@ struct WeChatBuiltInCommands {
             lines.append(detail)
         }
         return lines.joined(separator: "\n")
+    }
+
+    private static func normalizedInputPath(_ path: String) -> String {
+        if path.hasPrefix("/") || path.hasPrefix("~") {
+            return path
+        }
+        if path.hasPrefix("Users/") {
+            return "/" + path
+        }
+        return path
     }
 }

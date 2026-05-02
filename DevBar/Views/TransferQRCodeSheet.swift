@@ -5,6 +5,7 @@ import SwiftUI
 struct TransferQRCodeSheet: View {
     let payload: TransferPayload
     let url: URL
+    let mode: TransferQRCodeMode
 
     @Environment(\.dismiss) private var dismiss
 
@@ -24,6 +25,7 @@ struct TransferQRCodeSheet: View {
                 qrCodeView
 
                 VStack(alignment: .leading, spacing: 10) {
+                    Label(modeText, systemImage: modeSystemImage)
                     Label(payload.deviceName ?? "This Mac", systemImage: "desktopcomputer")
                     Label(expirationText, systemImage: "clock")
                     Label(providerSummaryText, systemImage: "person.crop.circle.badge.checkmark")
@@ -35,6 +37,12 @@ struct TransferQRCodeSheet: View {
             Text("如果二维码过期，请关闭后重新生成。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            if mode == .relay {
+                Text("当前使用安全中继：账号凭证已在本机加密，服务端只临时保存密文。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             HStack {
                 Spacer()
@@ -80,6 +88,24 @@ struct TransferQRCodeSheet: View {
     private var providerSummaryText: String {
         let names = payload.importedProviders.map(\.localizedName).joined(separator: " / ")
         return "包含 Provider：\(names)"
+    }
+
+    private var modeText: String {
+        switch mode {
+        case .direct:
+            return "离线二维码"
+        case .relay:
+            return "安全中继二维码"
+        }
+    }
+
+    private var modeSystemImage: String {
+        switch mode {
+        case .direct:
+            return "qrcode"
+        case .relay:
+            return "lock.shield"
+        }
     }
 
     private func makeQRCodeImage(from value: String) -> CGImage? {

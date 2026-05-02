@@ -87,6 +87,7 @@ final class WeChatAgentRouter: ObservableObject {
         let approvalPolicy: ApprovalPolicy?
         let approvalTimeoutSeconds: Int?
         let allowWechatConfirmForLowRisk: Bool?
+        let allowWechatConfirmForHighRisk: Bool?
 
         enum AgentType: String, Codable, Sendable {
             case acp, cli, http
@@ -120,6 +121,15 @@ final class WeChatAgentRouter: ObservableObject {
 
         var canWechatApproveLowRisk: Bool {
             allowWechatConfirmForLowRisk ?? true
+        }
+
+        var canWechatApproveHighRisk: Bool {
+            allowWechatConfirmForHighRisk ?? false
+        }
+
+        func allowsWechatApproval(for risk: WeChatApprovalRequest.Risk) -> Bool {
+            guard effectiveApprovalPolicy == .wechatConfirm else { return false }
+            return risk != .high || canWechatApproveHighRisk
         }
     }
 
@@ -156,7 +166,8 @@ final class WeChatAgentRouter: ObservableObject {
             cwd: nil, env: nil, model: model, systemPrompt: nil,
             aliases: nil, endpoint: endpoint, apiKey: apiKey,
             headers: nil, maxHistory: nil,
-            approvalPolicy: nil, approvalTimeoutSeconds: nil, allowWechatConfirmForLowRisk: nil
+            approvalPolicy: nil, approvalTimeoutSeconds: nil,
+            allowWechatConfirmForLowRisk: nil, allowWechatConfirmForHighRisk: nil
         )
         agents.append(agent)
         if defaultAgent.isEmpty { defaultAgent = name }
@@ -194,6 +205,12 @@ final class WeChatAgentRouter: ObservableObject {
     func updateAgentApprovalPolicy(_ agent: AgentConfig, policy: AgentConfig.ApprovalPolicy) {
         guard let index = agents.firstIndex(where: { $0.name == agent.name }) else { return }
         agents[index] = agent.updating(approvalPolicy: policy)
+        saveToWeClawConfig()
+    }
+
+    func updateAgentHighRiskWechatApproval(_ agent: AgentConfig, isAllowed: Bool) {
+        guard let index = agents.firstIndex(where: { $0.name == agent.name }) else { return }
+        agents[index] = agent.updating(allowWechatConfirmForHighRisk: isAllowed)
         saveToWeClawConfig()
     }
 
@@ -286,9 +303,6 @@ final class WeChatAgentRouter: ObservableObject {
         if approved {
             guard request.allowsWechatApproval else {
                 return "授权 \(request.id) 需要在 Mac 端 DevBar 确认。"
-            }
-            guard request.risk != .high else {
-                return "授权 \(request.id) 风险较高，请在 Mac 端 DevBar 确认。"
             }
         }
 
@@ -501,6 +515,10 @@ final class WeChatAgentRouter: ObservableObject {
             if !parsed.isEmpty { return parsed }
 
             if process.terminationStatus != 0 {
+                let reason = cleanCLIError(stderr)
+                if !reason.isEmpty {
+                    return "Claude exited with code \(process.terminationStatus):\n\(reason)"
+                }
                 return "Claude exited with code \(process.terminationStatus)"
             }
             return "Claude returned empty response"
@@ -747,7 +765,7 @@ final class WeChatAgentRouter: ObservableObject {
             arguments: arguments,
             cwd: cwd,
             risk: risk,
-            allowsWechatApproval: agent.effectiveApprovalPolicy == .wechatConfirm && risk != .high,
+            allowsWechatApproval: agent.allowsWechatApproval(for: risk),
             timeoutSeconds: agent.effectiveApprovalTimeoutSeconds
         )
 
@@ -877,7 +895,8 @@ private extension WeChatAgentRouter.AgentConfig {
             maxHistory: maxHistory,
             approvalPolicy: approvalPolicy,
             approvalTimeoutSeconds: approvalTimeoutSeconds,
-            allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk
+            allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk,
+            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk
         )
     }
 
@@ -898,7 +917,30 @@ private extension WeChatAgentRouter.AgentConfig {
             maxHistory: maxHistory,
             approvalPolicy: approvalPolicy,
             approvalTimeoutSeconds: approvalTimeoutSeconds,
-            allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk
+            allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk,
+            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk
+        )
+    }
+
+    func updating(allowWechatConfirmForHighRisk: Bool) -> Self {
+        .init(
+            name: name,
+            type: type,
+            command: command,
+            args: args,
+            cwd: cwd,
+            env: env,
+            model: model,
+            systemPrompt: systemPrompt,
+            aliases: aliases,
+            endpoint: endpoint,
+            apiKey: apiKey,
+            headers: headers,
+            maxHistory: maxHistory,
+            approvalPolicy: approvalPolicy,
+            approvalTimeoutSeconds: approvalTimeoutSeconds,
+            allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk,
+            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk
         )
     }
 }

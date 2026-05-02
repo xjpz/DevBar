@@ -26,6 +26,7 @@ struct SettingsAccounts: View {
     @State private var mimoImportError: String?
     @State private var transferSheetState: TransferSheetState?
     @State private var transferExportError: String?
+    @State private var isGeneratingTransferQRCode = false
 
     private var sortedConfigs: [AccountConfig] {
         appViewModel.accountConfigs.sorted { $0.order < $1.order }
@@ -61,7 +62,7 @@ struct SettingsAccounts: View {
             loadStoredMimoCookie()
         }
         .sheet(item: $transferSheetState) { state in
-            TransferQRCodeSheet(payload: state.payload, url: state.url)
+            TransferQRCodeSheet(payload: state.payload, url: state.url, mode: state.mode)
         }
     }
 
@@ -96,11 +97,19 @@ struct SettingsAccounts: View {
                 Spacer()
 
                 Button {
-                    openTransferSheet()
+                    Task {
+                        await openTransferSheet()
+                    }
                 } label: {
-                    Label("显示二维码", systemImage: "qrcode")
+                    if isGeneratingTransferQRCode {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Label("显示二维码", systemImage: "qrcode")
+                    }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(isGeneratingTransferQRCode)
             }
 
             if let transferExportError {
@@ -624,7 +633,6 @@ struct SettingsAccounts: View {
         mimoImportError = nil
 
         let credential = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let serviceToken = MimoAPIClient.normalizedServiceToken(from: credential)
 
         Task { @MainActor in
             defer { isValidatingMimo = false }
@@ -688,13 +696,26 @@ struct SettingsAccounts: View {
         appViewModel.accountConfigs = configs
     }
 
-    private func openTransferSheet() {
+    @MainActor
+    private func openTransferSheet() async {
         transferExportError = nil
+        isGeneratingTransferQRCode = true
+        defer { isGeneratingTransferQRCode = false }
 
         do {
             let payload = appViewModel.makeTransferPayload()
-            let url = try TransferPayloadCodec.makeURL(for: payload)
-            transferSheetState = TransferSheetState(payload: payload, url: url)
+            let result = try await TransferRelayService.shared.makeTransferQRCode(
+                for: payload,
+                client: TransferRelayClientInfo(
+                    platform: "macos",
+                    appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+                    buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String,
+                    deviceName: Host.current().localizedName,
+                    locale: Locale.current.identifier,
+                    timezone: TimeZone.current.identifier
+                )
+            )
+            transferSheetState = TransferSheetState(payload: result.payload, url: result.url, mode: result.mode)
         } catch {
             transferExportError = error.localizedDescription
         }
@@ -704,6 +725,7 @@ struct SettingsAccounts: View {
 private struct TransferSheetState: Identifiable {
     let payload: TransferPayload
     let url: URL
+    let mode: TransferQRCodeMode
 
     var id: String { url.absoluteString }
 }
