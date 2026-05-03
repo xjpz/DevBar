@@ -108,10 +108,11 @@ struct IOSMemoListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(theme.backgroundSecondary)
+        .background(theme.backgroundSecondary.ignoresSafeArea())
         .navigationTitle("ios_tools_memo")
         .toolbarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .iosToolNavigationChrome(theme)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("ios_tools_memo")
@@ -292,6 +293,7 @@ struct IOSMemoEditView: View {
         .background(theme.backgroundSecondary.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .iosToolNavigationChrome(theme)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("ios_tools_memo_save") {
@@ -318,8 +320,12 @@ struct IOSMemoEditView: View {
     }
 
     private func saveMemo() {
+        let finalTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? content.components(separatedBy: .newlines).first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) ?? ""
+            : title
+
         if let existing = memo {
-            existing.title = title
+            existing.title = finalTitle
             existing.updatedAt = Date()
 
             if existing.isEncrypted, vault.isUnlocked {
@@ -330,7 +336,7 @@ struct IOSMemoEditView: View {
                 existing.encryptedData = nil
             }
         } else {
-            let newMemo = IOSMemoItem(title: title, content: content)
+            let newMemo = IOSMemoItem(title: finalTitle, content: content)
             modelContext.insert(newMemo)
         }
 
@@ -426,6 +432,7 @@ struct IOSMemoPasswordSheet: View {
             .background(theme.backgroundSecondary.ignoresSafeArea())
             .navigationTitle(mode == .setPassword ? "ios_tools_memo_set_password" : "ios_tools_memo_unlock")
             .navigationBarTitleDisplayMode(.inline)
+            .iosToolNavigationChrome(theme)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Cancel") {
@@ -603,6 +610,7 @@ struct IOSSecurityPickerSheet: View {
             .background(theme.backgroundSecondary.ignoresSafeArea())
             .navigationTitle("ios_memo_security_pick_title")
             .navigationBarTitleDisplayMode(.inline)
+            .iosToolNavigationChrome(theme)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Cancel") {

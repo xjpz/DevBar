@@ -2,6 +2,7 @@ import Foundation
 
 public final class MimoAPIClient: Sendable {
     private static let cookieName = "serviceToken"
+    private static let platformCookiePrefix = "api-platform_"
 
     private let session: URLSession
     private let decoder = JSONDecoder()
@@ -35,13 +36,32 @@ public final class MimoAPIClient: Sendable {
         return response
     }
 
+    /// Build a cookie string from platform cookies for Keychain storage.
+    public static func platformCookieString(from cookies: [HTTPCookie]) -> String {
+        let targetNames: Set<String> = [
+            "\(platformCookiePrefix)serviceToken",
+            "\(platformCookiePrefix)slh",
+            "\(platformCookiePrefix)ph",
+            "userId",
+            "passToken",
+        ]
+        return cookies
+            .filter { targetNames.contains($0.name) }
+            .map { cookie in
+                let value = stripQuotes(cookie.value)
+                return "\(cookie.name)=\"\(value)\""
+            }
+            .joined(separator: "; ")
+    }
+
     public static func normalizedServiceToken(from rawValue: String) -> String {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
 
         for pair in cookiePairs(from: trimmed) {
-            guard pair.name == cookieName else { continue }
-            return pair.value
+            if pair.name == cookieName || pair.name == "\(platformCookiePrefix)\(cookieName)" {
+                return pair.value
+            }
         }
 
         return stripQuotes(trimmed)
@@ -49,6 +69,17 @@ public final class MimoAPIClient: Sendable {
 
     public static func cookieHeaderValue(for rawValue: String) -> String {
         let pairs = cookiePairs(from: rawValue)
+
+        // Input already contains api-platform_* cookies from WebView — send as-is
+        if pairs.contains(where: { $0.name.hasPrefix(platformCookiePrefix) }) {
+            return pairs
+                .map { pair in
+                    pair.wasQuoted ? "\(pair.name)=\"\(pair.value)\"" : "\(pair.name)=\(pair.value)"
+                }
+                .joined(separator: "; ")
+        }
+
+        // Legacy: user pasted serviceToken=... or raw value
         if pairs.contains(where: { $0.name == cookieName }) {
             return pairs
                 .map { pair in
@@ -57,6 +88,7 @@ public final class MimoAPIClient: Sendable {
                 .joined(separator: "; ")
         }
 
+        // Raw token value — wrap as serviceToken="value"
         return "\(cookieName)=\"\(normalizedServiceToken(from: rawValue))\""
     }
 
@@ -68,9 +100,16 @@ public final class MimoAPIClient: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue(Self.cookieHeaderValue(for: serviceToken), forHTTPHeaderField: "Cookie")
+        let cookieHeader = Self.cookieHeaderValue(for: serviceToken)
+        request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("en", forHTTPHeaderField: "Accept-Language")
+
+        #if DEBUG
+        print("[MimoAPIClient] GET \(url.absoluteString)")
+        print("[MimoAPIClient] Cookie: \(cookieHeader.prefix(80))...")
+        print("[MimoAPIClient] normalizedToken prefix: \(normalizedToken.prefix(30))...")
+        #endif
 
         let (data, response) = try await session.data(for: request)
 
@@ -78,13 +117,21 @@ public final class MimoAPIClient: Sendable {
             throw APIError.invalidResponse
         }
 
+        #if DEBUG
+        print("[MimoAPIClient] Response: \(httpResponse.statusCode)")
+        if httpResponse.statusCode != 200 {
+            let body = String(data: data, encoding: .utf8) ?? "(not utf8)"
+            print("[MimoAPIClient] Error body: \(body.prefix(500))")
+        }
+        #endif
+
         switch httpResponse.statusCode {
         case 200:
             break
         case 401, 403:
             throw APIError.mimoCookieExpired
         default:
-            throw APIError.httpError(httpResponse.statusCode)
+            throw mimoHTTPError(httpResponse.statusCode)
         }
 
         do {
@@ -97,11 +144,23 @@ public final class MimoAPIClient: Sendable {
     private func validatePlatformResponse(code: Int?, message: String?, dataExists: Bool) throws {
         if let code, code != 0 {
             let text = message?.trimmingCharacters(in: .whitespacesAndNewlines)
-            throw APIError.providerMessage(text?.isEmpty == false ? text! : CoreL10n.text("invalid_response"))
+            let serverMessage = text?.isEmpty == false ? text! : CoreL10n.text("invalid_response")
+            throw APIError.providerMessage("\(serverMessage) (platform.xiaomimimo.com)")
         }
 
         guard dataExists else {
             throw APIError.invalidResponse
+        }
+    }
+
+    private func mimoHTTPError(_ statusCode: Int) -> APIError {
+        switch statusCode {
+        case 429:
+            return .providerMessage(CoreL10n.text("mimo_rate_limited"))
+        case 500...599:
+            return .providerMessage(CoreL10n.text("mimo_server_error"))
+        default:
+            return .httpError(statusCode)
         }
     }
 

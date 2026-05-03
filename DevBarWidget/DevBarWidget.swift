@@ -111,7 +111,7 @@ struct DevBarWidgetEntryView: View {
         case .openai:
             return "OpenAI"
         case .mimo:
-            return "MiMO"
+            return "MiMo"
         case nil:
             return entry.selectedProvider.displayName
         }

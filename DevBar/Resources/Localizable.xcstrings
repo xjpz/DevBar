@@ -1073,9 +1073,6 @@
     "Close" : {
 
     },
-    "Compact" : {
-
-    },
     "Convert to Date" : {
 
     },
@@ -1328,6 +1325,9 @@
           }
         }
       }
+    },
+    "Format" : {
+
     },
     "general" : {
       "localizations" : {
@@ -2213,13 +2213,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Configure MiMO cookie in Accounts to load usage."
+            "value" : "Configure MiMo cookie in Accounts to load usage."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请先在账号页配置 MiMO Cookie，再加载额度数据。"
+            "value" : "请先在账号页配置 MiMo Cookie，再加载额度数据。"
           }
         }
       }
@@ -2229,13 +2229,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Loading MiMO usage…"
+            "value" : "Loading MiMo usage…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在加载 MiMO 额度…"
+            "value" : "正在加载 MiMo 额度…"
           }
         }
       }
@@ -2245,13 +2245,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No MiMO usage data yet."
+            "value" : "No MiMo usage data yet."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "暂时还没有 MiMO 额度数据。"
+            "value" : "暂时还没有 MiMo 额度数据。"
           }
         }
       }
@@ -3371,6 +3371,150 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Formatter"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "格式化"
+          }
+        }
+      }
+    },
+    "ios_tools_formatter_compact" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "压缩"
+          }
+        }
+      }
+    },
+    "ios_tools_formatter_decode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解码"
+          }
+        }
+      }
+    },
+    "ios_tools_formatter_encode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编码"
+          }
+        }
+      }
+    },
+    "ios_tools_formatter_format" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "格式化"
+          }
+        }
+      }
+    },
+    "ios_tools_formatter_input" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Input"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入"
+          }
+        }
+      }
+    },
+    "ios_tools_formatter_invalid_input" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Invalid input"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入无效"
+          }
+        }
+      }
+    },
+    "ios_tools_formatter_minify" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Minify"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "压缩"
+          }
+        }
+      }
+    },
+    "ios_tools_formatter_output" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Output"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输出"
+          }
+        }
+      }
+    },
+    "ios_tools_formatter_pretty_print" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pretty Print"
           }
         },
         "zh-Hans" : {
@@ -4868,13 +5012,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Will clear the current MiMO cookie"
+            "value" : "Will clear the current MiMo cookie"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "会清除当前 MiMO Cookie"
+            "value" : "会清除当前 MiMo Cookie"
           }
         }
       }
@@ -4884,13 +5028,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Will import MiMO cookie"
+            "value" : "Will import MiMo cookie"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "会导入 MiMO Cookie"
+            "value" : "会导入 MiMo Cookie"
           }
         }
       }
@@ -4900,13 +5044,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "No MiMO credential included"
+            "value" : "No MiMo credential included"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未包含 MiMO 凭证"
+            "value" : "未包含 MiMo 凭证"
           }
         }
       }
@@ -4916,13 +5060,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Will replace the current MiMO cookie"
+            "value" : "Will replace the current MiMo cookie"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "会替换当前 MiMO Cookie"
+            "value" : "会替换当前 MiMo Cookie"
           }
         }
       }
@@ -5222,6 +5366,22 @@
         }
       }
     },
+    "login_mimo_platform" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Login to MiMo Platform"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录 MiMo 平台"
+          }
+        }
+      }
+    },
     "low_quota_alert" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5274,7 +5434,7 @@
     "Method: %@" : {
 
     },
-    "MiMO" : {
+    "MiMo" : {
 
     },
     "mimo_configure_hint" : {
@@ -5282,13 +5442,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Configure MiMO cookie in Settings"
+            "value" : "Configure MiMo cookie in Settings"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在设置中配置 MiMO Cookie"
+            "value" : "请在设置中配置 MiMo Cookie"
           }
         }
       }
@@ -5299,13 +5459,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "MiMO cookie expired, refresh it from browser"
+            "value" : "MiMo cookie expired — refresh at platform.xiaomimimo.com"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "MiMO Cookie 已过期，请从浏览器重新获取"
+            "value" : "MiMo Cookie 已过期，请在 platform.xiaomimimo.com 重新登录"
           }
         }
       }
@@ -5332,13 +5492,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Invalid MiMO cookie"
+            "value" : "Invalid MiMo cookie"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "MiMO Cookie 无效"
+            "value" : "MiMo Cookie 无效"
           }
         }
       }
@@ -5348,13 +5508,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use MiMO Cookie"
+            "value" : "Use MiMo Cookie"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "使用 MiMO Cookie"
+            "value" : "使用 MiMo Cookie"
           }
         }
       }
@@ -5380,13 +5540,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enter MiMO cookie"
+            "value" : "Enter MiMo cookie"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请输入 MiMO Cookie"
+            "value" : "请输入 MiMo Cookie"
           }
         }
       }
@@ -5420,6 +5580,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "有效期至 %@"
+          }
+        }
+      }
+    },
+    "mimo_rate_limited" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo rate limited, please try again later"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo 请求过于频繁，请稍后再试"
+          }
+        }
+      }
+    },
+    "mimo_server_error" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo service temporarily unavailable, please try again later"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo 服务暂时不可用，请稍后再试"
           }
         }
       }
@@ -6077,9 +6271,6 @@
       }
     },
     "Pin" : {
-
-    },
-    "Pretty Print" : {
 
     },
     "Provider" : {
@@ -6984,6 +7175,9 @@
         }
       }
     },
+    "wechat_cwd_agent_access_denied" : {
+
+    },
     "wechat_cwd_choose" : {
       "localizations" : {
         "en" : {
@@ -7717,7 +7911,10 @@
     "正在读取迁移配置..." : {
 
     },
-    "添加远程可用目录" : {
+    "添加可切换目录" : {
+
+    },
+    "添加目录时会同时验证 DevBar 和外部 CLI 子进程访问权限。若目录位于文稿、桌面、下载或 iCloud，系统授权会在这里完成，避免远程首次访问才弹窗。" : {
 
     },
     "生成一个 5 分钟内有效的二维码，在 iPhone 上扫码导入当前配置。" : {
@@ -7726,10 +7923,7 @@
     "迁移到 iPhone" : {
 
     },
-    "这些目录是微信远程 /cwd 可切换范围。每个 Agent 的当前工作目录需位于这里或默认安全目录下。" : {
-
-    },
-    "远程可用目录" : {
+    "远程可切换目录" : {
 
     },
     "选择当前工作目录，所选目录会加入远程可用目录" : {

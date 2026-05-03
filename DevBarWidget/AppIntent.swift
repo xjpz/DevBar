@@ -18,7 +18,7 @@ enum WidgetProviderSelection: String, AppEnum {
         [
             .glm: DisplayRepresentation(title: "GLM"),
             .openai: DisplayRepresentation(title: "OpenAI"),
-            .mimo: DisplayRepresentation(title: "MiMO")
+            .mimo: DisplayRepresentation(title: "MiMo")
         ]
     }
 
@@ -26,7 +26,7 @@ enum WidgetProviderSelection: String, AppEnum {
         switch self {
         case .glm: return "GLM"
         case .openai: return "OpenAI"
-        case .mimo: return "MiMO"
+        case .mimo: return "MiMo"
         }
     }
 }

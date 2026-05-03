@@ -290,6 +290,14 @@ struct SettingsAccounts: View {
 
     private var mimoCredentialsEditor: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Button(action: openMiMoLoginWindow) {
+                Text("browser_login")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isValidatingMimo)
+
             fieldBlock(title: "serviceToken") {
                 HStack(spacing: 10) {
                     Group {
@@ -524,8 +532,16 @@ struct SettingsAccounts: View {
 
         let controller = LoginWindowController(
             loginURL: Constants.API.loginURL,
-            onCookiesExtracted: { credentials in
+            windowTitle: String(localized: "login_bigmodel"),
+            targetCookieName: "bigmodel_token_production",
+            onTokenExtracted: { token, cookies in
                 Task { @MainActor in
+                    let cookieString = cookies
+                        .filter { ["bigmodel.cn", ".bigmodel.cn"].contains($0.domain) }
+                        .map { "\($0.name)=\($0.value)" }
+                        .joined(separator: "; ")
+                    let credentials = AuthCredentials(token: token, cookieString: cookieString)
+
                     let isValid = await validateGLMCookie(credentials.cookieString)
                     if isValid {
                         appViewModel.handleLoginSuccess(credentials)
@@ -661,6 +677,54 @@ struct SettingsAccounts: View {
                 mimoImportError = error.localizedDescription
             }
         }
+    }
+
+    private func openMiMoLoginWindow() {
+        mimoImportError = nil
+
+        let controller = LoginWindowController(
+            loginURL: DevBarCoreConstants.MiMO.dashboardURL,
+            windowTitle: String(localized: "login_mimo_platform"),
+            targetCookieName: "api-platform_serviceToken",
+            onTokenExtracted: { token, cookies in
+                let cookieString = MimoAPIClient.platformCookieString(from: cookies)
+                let storedValue = cookieString.isEmpty ? token : cookieString
+
+                Task { @MainActor in
+                    do {
+                        print("[MiMo:WebViewLogin:Settings] cookie string prefix: \(storedValue.prefix(60))...")
+                        _ = try await appViewModel.mimoQuotaViewModel.fetchUsage(
+                            serviceToken: storedValue,
+                            silent: true
+                        )
+                        print("[MiMo:WebViewLogin:Settings] fetchUsage succeeded")
+                        await appViewModel.mimoQuotaViewModel.fetchPlanDetailIfNeeded(
+                            serviceToken: storedValue,
+                            force: true
+                        )
+                        print("[MiMo:WebViewLogin:Settings] fetchPlanDetail succeeded")
+                        KeychainService.shared.save(
+                            key: DevBarCoreConstants.Keychain.mimoServiceTokenKey,
+                            value: storedValue
+                        )
+                        mimoCookieInput = storedValue
+                        originalMimoCookieInput = storedValue
+                        editingProviders.remove(.mimo)
+                        appViewModel.updateAccountConfig(provider: .mimo, isEnabled: true)
+                        appViewModel.refreshAuthenticationState()
+                        print("[MiMo:WebViewLogin:Settings] auth state refreshed")
+                    } catch let error as APIError {
+                        print("[MiMo:WebViewLogin:Settings] APIError: \(error)")
+                        mimoImportError = error.errorDescription
+                    } catch {
+                        print("[MiMo:WebViewLogin:Settings] error: \(error)")
+                        mimoImportError = error.localizedDescription
+                    }
+                }
+            }
+        )
+
+        controller.show()
     }
 
     private func validateGLMCookie(_ cookieString: String) async -> Bool {

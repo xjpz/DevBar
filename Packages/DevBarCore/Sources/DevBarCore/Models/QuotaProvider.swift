@@ -10,7 +10,7 @@ public enum QuotaProvider: String, CaseIterable, Codable, Sendable {
         switch self {
         case .glm: return "GLM"
         case .openai: return "OpenAI"
-        case .mimo: return "MiMO"
+        case .mimo: return "MiMo"
         }
     }
 

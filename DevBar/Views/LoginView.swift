@@ -150,6 +150,14 @@ private extension LoginView {
 
     var mimoLoginCard: some View {
         VStack(spacing: 12) {
+            Button(action: openMiMoLoginWindow) {
+                Text("browser_login")
+            }
+            .buttonStyle(DevBarButtonStyle(isPrimary: mimoCookie.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
+            .disabled(isValidating)
+
+            separatorView
+
             mimoCookieSection
         }
         .padding(16)
@@ -417,6 +425,55 @@ private extension LoginView {
         }
     }
 
+    func openMiMoLoginWindow() {
+        loginError = nil
+
+        let controller = LoginWindowController(
+            loginURL: DevBarCoreConstants.MiMO.dashboardURL,
+            windowTitle: String(localized: "login_mimo_platform"),
+            targetCookieName: "api-platform_serviceToken",
+            onTokenExtracted: { token, cookies in
+                isValidating = true
+                let cookieString = MimoAPIClient.platformCookieString(from: cookies)
+                let storedValue = cookieString.isEmpty ? token : cookieString
+
+                Task { @MainActor in
+                    defer { isValidating = false }
+
+                    do {
+                        print("[MiMo:WebViewLogin] cookie string prefix: \(storedValue.prefix(60))...")
+                        _ = try await appViewModel.mimoQuotaViewModel.fetchUsage(
+                            serviceToken: storedValue,
+                            silent: true
+                        )
+                        print("[MiMo:WebViewLogin] fetchUsage succeeded")
+                        await appViewModel.mimoQuotaViewModel.fetchPlanDetailIfNeeded(
+                            serviceToken: storedValue,
+                            force: true
+                        )
+                        print("[MiMo:WebViewLogin] fetchPlanDetail succeeded")
+                        KeychainService.shared.save(
+                            key: DevBarCoreConstants.Keychain.mimoServiceTokenKey,
+                            value: storedValue
+                        )
+                        mimoCookie = storedValue
+                        appViewModel.updateAccountConfig(provider: .mimo, isEnabled: true)
+                        appViewModel.refreshAuthenticationState()
+                        print("[MiMo:WebViewLogin] auth state refreshed")
+                    } catch let error as APIError {
+                        print("[MiMo:WebViewLogin] APIError: \(error)")
+                        loginError = error.errorDescription
+                    } catch {
+                        print("[MiMo:WebViewLogin] error: \(error)")
+                        loginError = error.localizedDescription
+                    }
+                }
+            }
+        )
+
+        controller.show()
+    }
+
     func loadOpenAITokenFromCodexConfig() {
         loginError = nil
 
@@ -437,10 +494,18 @@ private extension LoginView {
 
         let controller = LoginWindowController(
             loginURL: Constants.API.loginURL,
-            onCookiesExtracted: { credentials in
+            windowTitle: String(localized: "login_bigmodel"),
+            targetCookieName: "bigmodel_token_production",
+            onTokenExtracted: { token, cookies in
                 isValidating = true
 
                 Task { @MainActor in
+                    let cookieString = cookies
+                        .filter { ["bigmodel.cn", ".bigmodel.cn"].contains($0.domain) }
+                        .map { "\($0.name)=\($0.value)" }
+                        .joined(separator: "; ")
+                    let credentials = AuthCredentials(token: token, cookieString: cookieString)
+
                     let isValid = await validateGLMCookie(credentials.cookieString)
                     isValidating = false
 
@@ -508,13 +573,23 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
     private var window: NSWindow?
     private var webView: WKWebView?
     private var pollTimer: Timer?
+    private var didExtract = false
 
     private let loginURL: String
-    private let onCookiesExtracted: (AuthCredentials) -> Void
+    private let windowTitle: String
+    private let targetCookieName: String
+    private let onTokenExtracted: (_ token: String, _ cookies: [HTTPCookie]) -> Void
 
-    init(loginURL: String, onCookiesExtracted: @escaping (AuthCredentials) -> Void) {
+    init(
+        loginURL: String,
+        windowTitle: String,
+        targetCookieName: String,
+        onTokenExtracted: @escaping (_ token: String, _ cookies: [HTTPCookie]) -> Void
+    ) {
         self.loginURL = loginURL
-        self.onCookiesExtracted = onCookiesExtracted
+        self.windowTitle = windowTitle
+        self.targetCookieName = targetCookieName
+        self.onTokenExtracted = onTokenExtracted
         super.init()
     }
 
@@ -523,12 +598,13 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         config.websiteDataStore = .default()
 
         let contentController = WKUserContentController()
+        let cookieName = targetCookieName
         let script = WKUserScript(
             source: """
             (function() {
                 function checkCookie() {
                     var cookies = document.cookie;
-                    if (cookies.indexOf('bigmodel_token_production=') !== -1) {
+                    if (cookies.indexOf('\(cookieName)=') !== -1) {
                         window.webkit.messageHandlers.loginDetector.postMessage('found');
                     }
                 }
@@ -558,10 +634,11 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         )
 
         win.contentView = hostingView
-        win.title = String(localized: "login_bigmodel")
+        win.title = windowTitle
         win.center()
         win.level = .floating
         win.isReleasedWhenClosed = false
+        win.delegate = self
         win.makeKeyAndOrderFront(nil)
 
         NSApp.activate(ignoringOtherApps: true)
@@ -572,13 +649,14 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
             webView.load(URLRequest(url: url))
         }
 
+        let cookieTarget = targetCookieName
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, let webView = self.webView else { return }
+                guard let self, !self.didExtract else { return }
 
                 let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
 
-                if let token = cookies.first(where: { $0.name == "bigmodel_token_production" }),
+                if let token = cookies.first(where: { $0.name == cookieTarget }),
                    !token.value.isEmpty {
                     self.handleLoginSuccess(token: token.value, cookies: cookies)
                 }
@@ -587,13 +665,17 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
     }
 
     func close() {
+        guard !didExtract else { return }
+        didExtract = true
+
         pollTimer?.invalidate()
         pollTimer = nil
 
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: loginScriptMessageHandler)
         webView?.configuration.userContentController.removeAllUserScripts()
         webView?.stopLoading()
 
-        window?.orderOut(nil)
+        window?.close()
         window = nil
         webView = nil
     }
@@ -602,11 +684,11 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         guard message.name == loginScriptMessageHandler else { return }
 
         Task { @MainActor [weak self] in
-            guard let self, let webView = self.webView else { return }
+            guard let self, !self.didExtract, let webView = self.webView else { return }
 
             let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
 
-            if let token = cookies.first(where: { $0.name == "bigmodel_token_production" }),
+            if let token = cookies.first(where: { $0.name == self.targetCookieName }),
                !token.value.isEmpty {
                 self.handleLoginSuccess(token: token.value, cookies: cookies)
             }
@@ -614,18 +696,36 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
     }
 
     private func handleLoginSuccess(token: String, cookies: [HTTPCookie]) {
+        guard !didExtract else { return }
+        close()
+        onTokenExtracted(token, cookies)
+    }
+}
+
+extension LoginWindowController: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
         pollTimer?.invalidate()
         pollTimer = nil
+    }
+}
 
-        let cookieString = cookies
-            .filter { ["bigmodel.cn", ".bigmodel.cn"].contains($0.domain) }
-            .map { "\($0.name)=\($0.value)" }
-            .joined(separator: "; ")
+extension LoginWindowController {
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        guard !didExtract else { return }
 
-        let credentials = AuthCredentials(token: token, cookieString: cookieString)
+        Task { @MainActor in
+            let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
 
-        close()
-        onCookiesExtracted(credentials)
+            #if DEBUG
+            let names = cookies.map { "\($0.name)=\($0.value.prefix(16))..." }
+            print("[LoginWindowController] cookies after navigation: \(names)")
+            #endif
+
+            if let token = cookies.first(where: { $0.name == self.targetCookieName }),
+               !token.value.isEmpty {
+                self.handleLoginSuccess(token: token.value, cookies: cookies)
+            }
+        }
     }
 }
 

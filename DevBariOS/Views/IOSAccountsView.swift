@@ -16,6 +16,7 @@ struct IOSAccountsView: View {
     @State private var isSavingOpenAI = false
     @State private var isSavingMimo = false
     @State private var isShowingScanner = false
+    @State private var showMiMoWebViewLogin = false
     @State private var isResolvingTransfer = false
     @State private var pendingImportPreview: TransferImportPreview?
     @State private var pendingRelayTransferURL: URL?
@@ -82,6 +83,33 @@ struct IOSAccountsView: View {
         .sheet(item: $pendingImportPreview) { preview in
             IOSTransferImportPreviewSheet(preview: preview) {
                 await importPayload(preview.payload)
+            }
+        }
+        .sheet(isPresented: $showMiMoWebViewLogin) {
+            if let url = URL(string: DevBarCoreConstants.MiMO.dashboardURL) {
+                IOSWebViewLoginSheet(
+                    loginURL: url,
+                    targetCookieName: "api-platform_serviceToken",
+                    onTokenExtracted: { token, cookies in
+                        let cookieString = MimoAPIClient.platformCookieString(from: cookies)
+                        let storedValue = cookieString.isEmpty ? token : cookieString
+                        showMiMoWebViewLogin = false
+                        isSavingMimo = true
+                        Task { @MainActor in
+                            defer { isSavingMimo = false }
+                            do {
+                                try await appViewModel.saveMimoCookie(storedValue)
+                                mimoCookieInput = storedValue
+                                mimoError = nil
+                            } catch {
+                                mimoError = error.localizedDescription
+                            }
+                        }
+                    },
+                    onCancelled: {
+                        showMiMoWebViewLogin = false
+                    }
+                )
             }
         }
         .alert("ios_accounts_import_failed", isPresented: Binding(
@@ -343,6 +371,15 @@ struct IOSAccountsView: View {
             }
         case .mimo:
             VStack(alignment: .leading, spacing: 12) {
+                Button {
+                    showMiMoWebViewLogin = true
+                } label: {
+                    Text("browser_login")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isSavingMimo)
+
                 inputField(title: "serviceToken") {
                     SecureField("mimo_cookie_placeholder", text: $mimoCookieInput)
                         .textInputAutocapitalization(.never)
