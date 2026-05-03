@@ -25,6 +25,7 @@ struct IOSQRCodeView: View {
         .navigationTitle("ios_tools_qr_code")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .iosToolNavigationChrome(theme)
     }
 
     // MARK: - Input

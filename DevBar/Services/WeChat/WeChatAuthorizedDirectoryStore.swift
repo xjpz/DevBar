@@ -25,7 +25,7 @@ final class WeChatAuthorizedDirectoryStore: ObservableObject {
             case .accessDenied(let message):
                 return message
             case .notAuthorized(let path):
-                return "该目录未在 Mac 端授权，远程无法完成 macOS 文件夹授权。请先在 DevBar 设置中添加授权工作目录。\n\(path)"
+                return "该目录未加入远程可切换范围。请先在 DevBar 设置中添加该目录，受 macOS 保护的目录仍可能需要外部 CLI 在 Mac 端完成首次系统授权。\n\(path)"
             case .bookmarkStale(let path):
                 return "授权目录需要重新授权：\(path)"
             case .accessStartFailed(let path):
@@ -68,6 +68,11 @@ final class WeChatAuthorizedDirectoryStore: ObservableObject {
         let access = WeChatWorkingDirectoryPolicy.validateAccess(for: normalizedPath)
         guard access.isAccessible else {
             throw DirectoryError.accessDenied(access.message ?? String(localized: "wechat_cwd_access_denied"))
+        }
+
+        let externalAccess = WeChatWorkingDirectoryPolicy.validateExternalProcessAccess(for: normalizedPath)
+        guard externalAccess.isAccessible else {
+            throw DirectoryError.accessDenied(externalAccess.message ?? String(localized: "wechat_cwd_agent_access_denied"))
         }
 
         let bookmarkData = try url.bookmarkData(
@@ -148,12 +153,12 @@ final class WeChatAuthorizedDirectoryStore: ObservableObject {
 
     func unauthorizedRemoteMessage(for path: String) -> String {
         let normalizedPath = WeChatWorkingDirectoryPolicy.normalizedPath(path)
-        return "该目录未在 Mac 端授权，远程无法完成 macOS 文件夹授权。请先在 DevBar 设置中添加授权工作目录。\n\(normalizedPath)"
+        return "该目录未加入远程可切换范围。请先在 DevBar 设置中添加该目录，受 macOS 保护的目录仍可能需要外部 CLI 在 Mac 端完成首次系统授权。\n\(normalizedPath)"
     }
 
     func remoteListText(currentAgent: WeChatAgentRouter.AgentConfig? = nil) -> String {
         var lines = [
-            "[DevBar] 可用工作目录:",
+            "[DevBar] 远程可切换工作目录:",
             "默认: \(WeChatWorkingDirectoryPolicy.ensureDefaultDirectory())",
         ]
 
@@ -162,14 +167,15 @@ final class WeChatAuthorizedDirectoryStore: ObservableObject {
         }
 
         if directories.isEmpty {
-            lines.append("远程可用: 未添加")
+            lines.append("额外目录: 未添加")
         } else {
-            lines.append("远程可用:")
+            lines.append("额外目录:")
             for (index, directory) in directories.enumerated() {
                 let suffix = directory.isStale ? " (需重新授权)" : ""
                 lines.append("  \(index + 1). \(directory.path)\(suffix)")
             }
         }
+        lines.append("说明: 这里表示 /cwd 允许切换；若目录位于文稿、桌面、下载或 iCloud，外部 CLI 第一次访问仍可能触发 macOS 系统授权。")
         return lines.joined(separator: "\n")
     }
 

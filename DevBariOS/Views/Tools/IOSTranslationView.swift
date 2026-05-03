@@ -29,6 +29,7 @@ struct IOSTranslationView: View {
         .navigationTitle("ios_tools_translate")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .iosToolNavigationChrome(theme)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

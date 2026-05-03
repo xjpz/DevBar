@@ -230,7 +230,7 @@ struct SettingsWeChat: View {
                 }
 
                 Section {
-                    Text("这些目录是微信远程 /cwd 可切换范围。每个 Agent 的当前工作目录需位于这里或默认安全目录下。")
+                    Text("添加目录时会同时验证 DevBar 和外部 CLI 子进程访问权限。若目录位于文稿、桌面、下载或 iCloud，系统授权会在这里完成，避免远程首次访问才弹窗。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -283,10 +283,10 @@ struct SettingsWeChat: View {
                     Button {
                         addAuthorizedDirectory()
                     } label: {
-                        Label("添加远程可用目录", systemImage: "folder.badge.plus")
+                        Label("添加可切换目录", systemImage: "folder.badge.plus")
                     }
                 } header: {
-                    Text("远程可用目录")
+                    Text("远程可切换目录")
                 }
 
                 if !approvalCoordinator.pendingRequests.isEmpty {

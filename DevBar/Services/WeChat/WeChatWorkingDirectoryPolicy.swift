@@ -153,6 +153,59 @@ enum WeChatWorkingDirectoryPolicy {
         }
     }
 
+    nonisolated static func validateExternalProcessAccess(for path: String) -> DirectoryAccessResult {
+        let normalized = normalizedPath(path)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: normalized, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return DirectoryAccessResult(
+                path: normalized,
+                isAccessible: false,
+                message: String(localized: "wechat_cwd_missing")
+            )
+        }
+
+        let probeName = ".devbar-agent-access-check-\(UUID().uuidString)"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [
+            "-c",
+            "printf 'DevBar agent access check' > \"$DEVBAR_PROBE_NAME\" && rm -f \"$DEVBAR_PROBE_NAME\"",
+        ]
+        process.currentDirectoryURL = URL(fileURLWithPath: normalized, isDirectory: true)
+        process.environment = ["DEVBAR_PROBE_NAME": probeName]
+
+        let stderrPipe = Pipe()
+        process.standardOutput = Pipe()
+        process.standardError = stderrPipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            try? FileManager.default.removeItem(atPath: "\(normalized)/\(probeName)")
+
+            guard process.terminationStatus == 0 else {
+                let data = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                let stderr = String(data: data, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let detail = stderr?.isEmpty == false ? stderr! : "exit \(process.terminationStatus)"
+                return DirectoryAccessResult(
+                    path: normalized,
+                    isAccessible: false,
+                    message: "\(String(localized: "wechat_cwd_agent_access_denied")) \(detail)"
+                )
+            }
+
+            return DirectoryAccessResult(path: normalized, isAccessible: true, message: nil)
+        } catch {
+            try? FileManager.default.removeItem(atPath: "\(normalized)/\(probeName)")
+            return DirectoryAccessResult(
+                path: normalized,
+                isAccessible: false,
+                message: "\(String(localized: "wechat_cwd_agent_access_denied")) \(error.localizedDescription)"
+            )
+        }
+    }
+
     nonisolated static func normalizedPath(_ path: String) -> String {
         let expanded = (path as NSString).expandingTildeInPath
         return URL(fileURLWithPath: expanded).standardizedFileURL.path
@@ -164,7 +217,12 @@ enum WeChatWorkingDirectoryPolicy {
         return candidatePath == rootPath || candidatePath.hasPrefix(rootPath + "/")
     }
 
-    nonisolated private static func protectedDirectoryKind(for path: String) -> ProtectedDirectory? {
+    nonisolated static func externalProcessPrivacyNotice(for path: String) -> String? {
+        guard let protected = protectedDirectoryKind(for: path) else { return nil }
+        return "位于 macOS 受保护的\(protected.displayName)目录；DevBar 可允许远程切换，但外部 CLI 首次读写时仍可能需要在 Mac 端完成系统隐私授权。"
+    }
+
+    nonisolated static func protectedDirectoryKind(for path: String) -> ProtectedDirectory? {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         let protectedRoots: [(String, ProtectedDirectory)] = [
             ("\(home)/Documents", .documents),

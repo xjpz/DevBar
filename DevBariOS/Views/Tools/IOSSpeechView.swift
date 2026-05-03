@@ -165,6 +165,7 @@ struct IOSSpeechToTextView: View {
         .navigationTitle("ios_tools_speech")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .iosToolNavigationChrome(theme)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

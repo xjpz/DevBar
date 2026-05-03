@@ -136,6 +136,7 @@ struct IOSAPIClientView: View {
         .navigationTitle(apiClientNavigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .iosToolNavigationChrome(theme)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -368,6 +369,7 @@ struct IOSToolsAPIRecordsView: View {
         .navigationTitle("API Records")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .iosToolNavigationChrome(theme)
         .navigationDestination(item: $selectedRecord) { record in
             IOSAPIClientView(record: record)
         }

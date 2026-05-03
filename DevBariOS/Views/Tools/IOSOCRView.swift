@@ -32,6 +32,7 @@ struct IOSOCRView: View {
         .navigationTitle("ios_tools_ocr")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .iosToolNavigationChrome(theme)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

@@ -199,6 +199,14 @@ struct IOSToolCard: View {
     }
 }
 
+extension View {
+    func iosToolNavigationChrome(_ theme: IOSThemeTokens) -> some View {
+        self
+            .toolbarBackground(theme.backgroundSecondary, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+
 struct IOSAPIRecordsListView: View {
     let records: [IOSAPIRecord]
     let openRecord: (IOSAPIRecord) -> Void

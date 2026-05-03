@@ -31,6 +31,7 @@ struct IOSBase64View: View {
         .navigationTitle("Base64")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .iosToolNavigationChrome(theme)
     }
 
     private func editor(title: String, text: Binding<String>) -> some View {
