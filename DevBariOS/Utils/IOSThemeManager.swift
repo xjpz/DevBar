@@ -33,6 +33,12 @@ final class IOSThemeManager: ObservableObject {
         }
     }
 
+    @Published var timeFormat: IOSTimeFormat {
+        didSet {
+            UserDefaults.standard.set(timeFormat.rawValue, forKey: "app_time_format")
+        }
+    }
+
     @Published var systemColorScheme: ColorScheme = .light
 
     static let defaultGreeting = "Hello, Developer!\nReady to ship some code today?\n>_"
@@ -59,12 +65,23 @@ final class IOSThemeManager: ObservableObject {
         }
     }
 
+    func formatTime(date: Date, dateStyle: Date.FormatStyle.DateStyle = .omitted) -> String {
+        if timeFormat == .hour12 {
+            return date.formatted(Date.FormatStyle(date: dateStyle, time: .shortened))
+        }
+        return date.formatted(
+            Date.FormatStyle(date: dateStyle, time: .shortened)
+                .hour(.defaultDigits(amPM: .omitted))
+        )
+    }
+
     init() {
         let saved = UserDefaults.standard.string(forKey: "app_theme_mode") ?? IOSThemeMode.system.rawValue
         selectedMode = IOSThemeMode(rawValue: saved) ?? .system
         let savedFont = UserDefaults.standard.string(forKey: "app_font_choice") ?? IOSAppFont.system.rawValue
         selectedFont = IOSAppFont(rawValue: savedFont) ?? .system
         developerGreeting = UserDefaults.standard.string(forKey: "app_developer_greeting") ?? Self.defaultGreeting
+        timeFormat = IOSTimeFormat(rawValue: UserDefaults.standard.string(forKey: "app_time_format") ?? "") ?? .hour24
     }
 
     func updateBarAppearance() {
@@ -88,7 +105,6 @@ final class IOSThemeManager: ObservableObject {
 
         let scrollEdgeAppearance = UINavigationBarAppearance()
         scrollEdgeAppearance.configureWithTransparentBackground()
-        scrollEdgeAppearance.backgroundColor = .clear
         scrollEdgeAppearance.shadowColor = .clear
         scrollEdgeAppearance.shadowImage = UIImage()
         scrollEdgeAppearance.titleTextAttributes = [

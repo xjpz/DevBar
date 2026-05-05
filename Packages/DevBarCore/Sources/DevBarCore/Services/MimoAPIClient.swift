@@ -21,9 +21,19 @@ public final class MimoAPIClient: Sendable {
             throw APIError.invalidResponse
         }
 
-        let response: MimoUsageResponse = try await fetch(url: url, serviceToken: serviceToken)
-        try validatePlatformResponse(code: response.code, message: response.message, dataExists: response.data != nil)
-        return response
+        let result: (MimoUsageResponse, String?) = try await fetchWithCookies(url: url, serviceToken: serviceToken)
+        try validatePlatformResponse(code: result.0.code, message: result.0.message, dataExists: result.0.data != nil)
+        return result.0
+    }
+
+    public func fetchUsageWithUpdate(serviceToken: String) async throws -> (MimoUsageResponse, String?) {
+        guard let url = URL(string: DevBarCoreConstants.MiMO.platformUsageURL) else {
+            throw APIError.invalidResponse
+        }
+
+        let result: (MimoUsageResponse, String?) = try await fetchWithCookies(url: url, serviceToken: serviceToken)
+        try validatePlatformResponse(code: result.0.code, message: result.0.message, dataExists: result.0.data != nil)
+        return result
     }
 
     public func fetchPlanDetail(serviceToken: String) async throws -> MimoPlanDetailResponse {
@@ -31,9 +41,9 @@ public final class MimoAPIClient: Sendable {
             throw APIError.invalidResponse
         }
 
-        let response: MimoPlanDetailResponse = try await fetch(url: url, serviceToken: serviceToken)
-        try validatePlatformResponse(code: response.code, message: response.message, dataExists: response.data != nil)
-        return response
+        let result: (MimoPlanDetailResponse, String?) = try await fetchWithCookies(url: url, serviceToken: serviceToken)
+        try validatePlatformResponse(code: result.0.code, message: result.0.message, dataExists: result.0.data != nil)
+        return result.0
     }
 
     /// Build a cookie string from platform cookies for Keychain storage.
@@ -44,14 +54,22 @@ public final class MimoAPIClient: Sendable {
             "\(platformCookiePrefix)ph",
             "userId",
             "passToken",
+            "serviceToken",
         ]
-        return cookies
+        var result = cookies
             .filter { targetNames.contains($0.name) }
             .map { cookie in
                 let value = stripQuotes(cookie.value)
                 return "\(cookie.name)=\"\(value)\""
             }
-            .joined(separator: "; ")
+
+        // If api-platform_serviceToken is missing, fall back to serviceToken
+        let hasPlatformToken = cookies.contains { $0.name == "\(platformCookiePrefix)serviceToken" }
+        if !hasPlatformToken, let fallback = cookies.first(where: { $0.name == "serviceToken" }) {
+            result.insert("api-platform_serviceToken=\"\(stripQuotes(fallback.value))\"", at: 0)
+        }
+
+        return result.joined(separator: "; ")
     }
 
     public static func normalizedServiceToken(from rawValue: String) -> String {
@@ -92,7 +110,7 @@ public final class MimoAPIClient: Sendable {
         return "\(cookieName)=\"\(normalizedServiceToken(from: rawValue))\""
     }
 
-    private func fetch<Response: Decodable>(url: URL, serviceToken: String) async throws -> Response {
+    private func fetchWithCookies<Response: Decodable>(url: URL, serviceToken: String) async throws -> (Response, String?) {
         let normalizedToken = Self.normalizedServiceToken(from: serviceToken)
         guard !normalizedToken.isEmpty else {
             throw APIError.providerMessage(CoreL10n.text("mimo_cookie_required"))
@@ -104,6 +122,10 @@ public final class MimoAPIClient: Sendable {
         request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("en", forHTTPHeaderField: "Accept-Language")
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://platform.xiaomimimo.com/console/plan-manage", forHTTPHeaderField: "Referer")
+        request.setValue("Asia/Shanghai", forHTTPHeaderField: "X-Timezone")
+        request.setValue("u=1, i", forHTTPHeaderField: "Priority")
 
         #if DEBUG
         print("[MimoAPIClient] GET \(url.absoluteString)")
@@ -134,8 +156,18 @@ public final class MimoAPIClient: Sendable {
             throw mimoHTTPError(httpResponse.statusCode)
         }
 
+        let setCookieHeaders: [String] = httpResponse.allHeaderFields
+            .compactMap { key, value -> String? in
+                guard (key as? String)?.lowercased() == "set-cookie",
+                      let val = value as? String else { return nil }
+                return val
+            }
+
+        let updatedCookie = mergeSetCookies(serviceToken, setCookieHeaders: setCookieHeaders)
+
         do {
-            return try decoder.decode(Response.self, from: data)
+            let decoded = try decoder.decode(Response.self, from: data)
+            return (decoded, updatedCookie)
         } catch {
             throw APIError.decodingError(error)
         }
@@ -151,6 +183,43 @@ public final class MimoAPIClient: Sendable {
         guard dataExists else {
             throw APIError.invalidResponse
         }
+    }
+
+    private static let targetCookieNames: Set<String> = [
+        "\(platformCookiePrefix)serviceToken",
+        "\(platformCookiePrefix)slh",
+        "\(platformCookiePrefix)ph",
+        "serviceToken",
+        "userId",
+        "passToken",
+    ]
+
+    private func mergeSetCookies(_ currentCookie: String, setCookieHeaders: [String]) -> String? {
+        var merged = Self.cookiePairs(from: currentCookie)
+
+        for header in setCookieHeaders {
+            let pair = header.components(separatedBy: ";").first?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard let eqIndex = pair.firstIndex(of: "=") else { continue }
+            let name = String(pair[..<eqIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let value = String(pair[pair.index(after: eqIndex)...])
+
+            guard Self.targetCookieNames.contains(name), !value.isEmpty else { continue }
+
+            if let idx = merged.firstIndex(where: { $0.name == name }) {
+                merged[idx] = (name, Self.stripQuotes(value), false)
+            } else {
+                merged.append((name, Self.stripQuotes(value), false))
+            }
+        }
+
+        guard !merged.isEmpty else { return nil }
+
+        let newCookie = merged
+            .map { $0.wasQuoted ? "\($0.name)=\"\($0.value)\"" : "\($0.name)=\($0.value)" }
+            .joined(separator: "; ")
+
+        return newCookie == currentCookie.trimmingCharacters(in: .whitespacesAndNewlines) ? nil : newCookie
     }
 
     private func mimoHTTPError(_ statusCode: Int) -> APIError {

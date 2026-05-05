@@ -161,7 +161,8 @@ struct IOSSpeechToTextView: View {
             resultSection
         }
         .padding(16)
-        .background(theme.backgroundSecondary.ignoresSafeArea())
+        .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_speech")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

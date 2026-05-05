@@ -962,6 +962,16 @@
         }
       }
     },
+    "auto_detect" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动检测"
+          }
+        }
+      }
+    },
     "auto_refresh_interval" : {
       "localizations" : {
         "en" : {
@@ -1048,11 +1058,41 @@
         }
       }
     },
+    "choose" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择"
+          }
+        }
+      }
+    },
     "Choose the Provider shown by this widget." : {
 
     },
+    "choose_file" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择..."
+          }
+        }
+      }
+    },
     "CLI" : {
 
+    },
+    "cli_path" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "路径"
+          }
+        }
+      }
     },
     "close" : {
       "localizations" : {
@@ -1072,6 +1112,46 @@
     },
     "Close" : {
 
+    },
+    "codex_cli" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex CLI"
+          }
+        }
+      }
+    },
+    "codex_not_executable" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件不可执行"
+          }
+        }
+      }
+    },
+    "codex_test_fail %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试失败: %1$@"
+          }
+        }
+      }
+    },
+    "codex_test_ok" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连接成功"
+          }
+        }
+      }
     },
     "Convert to Date" : {
 
@@ -3119,6 +3199,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "跟随系统"
+          }
+        }
+      }
+    },
+    "ios_settings_time_format" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Time Format"
           }
         }
       }
@@ -5683,6 +5774,22 @@
         }
       }
     },
+    "minutes_15" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "15 min"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "15 分钟"
+          }
+        }
+      }
+    },
     "minutes_30" : {
       "localizations" : {
         "en" : {
@@ -5844,6 +5951,16 @@
     },
     "None" : {
 
+    },
+    "not_detected" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未检测到"
+          }
+        }
+      }
     },
     "not_logged_in" : {
       "extractionState" : "stale",
@@ -6633,6 +6750,26 @@
         }
       }
     },
+    "test_connection" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试"
+          }
+        }
+      }
+    },
+    "testing" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "测试中..."
+          }
+        }
+      }
+    },
     "threshold" : {
       "localizations" : {
         "en" : {
@@ -6645,6 +6782,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "阈值"
+          }
+        }
+      }
+    },
+    "time_format_12h" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "12-Hour"
+          }
+        }
+      }
+    },
+    "time_format_24h" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "24-Hour"
           }
         }
       }

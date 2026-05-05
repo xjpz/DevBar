@@ -652,13 +652,28 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         let cookieTarget = targetCookieName
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self, !self.didExtract else { return }
+                guard let self, !self.didExtract, let webView = self.webView else { return }
 
                 let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
 
                 if let token = cookies.first(where: { $0.name == cookieTarget }),
                    !token.value.isEmpty {
                     self.handleLoginSuccess(token: token.value, cookies: cookies)
+                    return
+                }
+
+                if let jsToken = await self.extractCookieViaJS(webView: webView, name: cookieTarget) {
+                    var enriched = cookies
+                    if enriched.allSatisfy({ $0.name != cookieTarget }),
+                       let synth = HTTPCookie(properties: [
+                           .name: cookieTarget,
+                           .value: jsToken,
+                           .domain: "platform.xiaomimimo.com",
+                           .path: "/",
+                       ]) {
+                        enriched.append(synth)
+                    }
+                    self.handleLoginSuccess(token: jsToken, cookies: enriched)
                 }
             }
         }
@@ -691,6 +706,21 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
             if let token = cookies.first(where: { $0.name == self.targetCookieName }),
                !token.value.isEmpty {
                 self.handleLoginSuccess(token: token.value, cookies: cookies)
+                return
+            }
+
+            if let jsToken = await self.extractCookieViaJS(webView: webView, name: self.targetCookieName) {
+                var enriched = cookies
+                if enriched.allSatisfy({ $0.name != self.targetCookieName }),
+                   let synth = HTTPCookie(properties: [
+                       .name: self.targetCookieName,
+                       .value: jsToken,
+                       .domain: "platform.xiaomimimo.com",
+                       .path: "/",
+                   ]) {
+                    enriched.append(synth)
+                }
+                self.handleLoginSuccess(token: jsToken, cookies: enriched)
             }
         }
     }
@@ -699,6 +729,33 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         guard !didExtract else { return }
         close()
         onTokenExtracted(token, cookies)
+    }
+
+    @MainActor
+    private func extractCookieViaJS(webView: WKWebView, name: String) async -> String? {
+        let js = """
+        (function() {
+            var pairs = document.cookie.split(';');
+            for (var i = 0; i < pairs.length; i++) {
+                var p = pairs[i].split('=');
+                if (p[0].trim() === '\(name)') {
+                    return p.slice(1).join('=').trim();
+                }
+            }
+            return '';
+        })();
+        """
+        guard let value = try? await webView.evaluateJavaScript(js) as? String,
+              !value.isEmpty else {
+            #if DEBUG
+            print("[MiMo:Login] JS extract \(name) failed or empty")
+            #endif
+            return nil
+        }
+        #if DEBUG
+        print("[MiMo:Login] JS extract \(name) = \(value.prefix(40))...")
+        #endif
+        return value
     }
 }
 

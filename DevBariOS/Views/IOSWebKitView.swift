@@ -8,6 +8,7 @@ import WebKit
 @available(iOS 18.0, *)
 struct IOSWebKitView: View {
     @Environment(\.themeTokens) private var theme
+    @EnvironmentObject private var themeManager: IOSThemeManager
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \IOSAPIRecord.lastOpenedAt, order: .reverse) private var savedRecords: [IOSAPIRecord]
     @Query(sort: \IOSWebHistoryRecord.visitedAt, order: .reverse) private var historyRecords: [IOSWebHistoryRecord]
@@ -707,7 +708,8 @@ private struct IOSTabsSheet: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(theme.backgroundSecondary)
+            .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationTitle("Tabs")
             .toolbar(.hidden, for: .tabBar)
             .toolbar {
@@ -735,6 +737,7 @@ private struct IOSAPIRecordsSheet: View {
             }
             .scrollContentBackground(.hidden)
             .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationTitle("API Records")
             .toolbar(.hidden, for: .tabBar)
         }
@@ -748,6 +751,7 @@ private struct IOSHistoryRecordsView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.themeTokens) private var theme
+    @EnvironmentObject private var themeManager: IOSThemeManager
 
     var body: some View {
         List {
@@ -773,7 +777,7 @@ private struct IOSHistoryRecordsView: View {
                                 .font(.caption)
                                 .foregroundStyle(theme.textSecondary)
                                 .lineLimit(1)
-                            Text(record.visitedAt.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).hour(.defaultDigits(amPM: .omitted))))
+                            Text(themeManager.formatTime(date: record.visitedAt, dateStyle: .abbreviated))
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(theme.brandPrimary)
                         }
@@ -789,7 +793,8 @@ private struct IOSHistoryRecordsView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(theme.backgroundSecondary)
+        .background(Color.clear)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("History")
         .toolbar(.hidden, for: .tabBar)
     }

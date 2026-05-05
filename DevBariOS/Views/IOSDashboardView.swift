@@ -164,11 +164,7 @@ struct IOSDashboardView: View {
 
         return String(
             format: localized("ios_dashboard_last_updated"),
-            date.formatted(
-                Date.FormatStyle(date: .omitted, time: .shortened)
-                    .hour(.defaultDigits(amPM: .omitted))
-                    .locale(languageManager.currentLocale)
-            )
+            themeManager.formatTime(date: date)
         )
     }
 
@@ -415,11 +411,7 @@ struct IOSDashboardView: View {
     }
 
     private func formattedDateTime(from timestamp: TimeInterval) -> String {
-        Date(timeIntervalSince1970: timestamp).formatted(
-            Date.FormatStyle(date: .numeric, time: .shortened)
-                .hour(.defaultDigits(amPM: .omitted))
-                .locale(languageManager.currentLocale)
-        )
+        themeManager.formatTime(date: Date(timeIntervalSince1970: timestamp), dateStyle: .numeric)
     }
 }
 

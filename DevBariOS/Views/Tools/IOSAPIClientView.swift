@@ -132,7 +132,8 @@ struct IOSAPIClientView: View {
             }
             .padding(16)
         }
-        .background(theme.backgroundSecondary.ignoresSafeArea())
+        .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle(apiClientNavigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

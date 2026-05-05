@@ -49,6 +49,9 @@ enum Constants {
         static let lowQuotaActiveItemsKey = "low_quota_active_items"
         static let exhaustedActiveItemsKey = "exhausted_active_items"
 
+        // Codex CLI
+        static let codexPathKey = "codex_cli_path"
+
         // Account configs
         static let accountConfigsKey = DevBarCoreConstants.Defaults.accountConfigsKey
     }

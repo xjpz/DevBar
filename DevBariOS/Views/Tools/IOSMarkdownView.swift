@@ -105,7 +105,8 @@ struct IOSMarkdownView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: isScrolledDown)
-        .background(theme.backgroundSecondary.ignoresSafeArea())
+        .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle(currentDocument.title.isEmpty ? String(localized: "ios_tools_md_untitled") : currentDocument.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

@@ -7,6 +7,7 @@ struct IOSTransferImportPreviewSheet: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.themeTokens) private var theme
+    @EnvironmentObject private var themeManager: IOSThemeManager
     @State private var isImporting = false
 
     var body: some View {
@@ -14,7 +15,7 @@ struct IOSTransferImportPreviewSheet: View {
             List {
                 Section("ios_transfer_source_section") {
                     LabeledContent("ios_transfer_device_label", value: preview.payload.deviceName ?? String(localized: "ios_transfer_unknown_mac"))
-                    LabeledContent("ios_transfer_expires_label", value: preview.payload.expiresAt.formatted(Date.FormatStyle(date: .omitted, time: .shortened).hour(.defaultDigits(amPM: .omitted))))
+                    LabeledContent("ios_transfer_expires_label", value: themeManager.formatTime(date: preview.payload.expiresAt))
                 }
 
                 if preview.hasConflicts {

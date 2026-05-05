@@ -36,7 +36,8 @@ struct IOSTimestampView: View {
             }
             .padding(16)
         }
-        .background(theme.backgroundSecondary.ignoresSafeArea())
+        .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_timestamp")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

@@ -40,6 +40,13 @@ struct IOSSettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("ios.settings.font")
+
+                Picker(String(localized: "ios_settings_time_format", defaultValue: "Time Format"), selection: $themeManager.timeFormat) {
+                    ForEach(IOSTimeFormat.allCases) { format in
+                        Text(format.displayName).tag(format)
+                    }
+                }
+                .accessibilityIdentifier("ios.settings.timeFormat")
             }
 
             Section("ios_settings_greeting_section") {
@@ -88,6 +95,9 @@ struct IOSSettingsView: View {
                 LabeledContent("ios_settings_version_label", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_settings_title")
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)

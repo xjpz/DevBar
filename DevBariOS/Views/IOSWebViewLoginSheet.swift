@@ -91,6 +91,21 @@ struct IOSWebViewLoginSheet: UIViewControllerRepresentable {
                     if let token = cookies.first(where: { $0.name == cookieTarget }),
                        !token.value.isEmpty {
                         self.handleLoginSuccess(token: token.value, cookies: cookies)
+                        return
+                    }
+
+                    if let jsToken = await self.extractCookieViaJS(webView: webView, name: cookieTarget) {
+                        var enriched = cookies
+                        if enriched.allSatisfy({ $0.name != cookieTarget }),
+                           let synth = HTTPCookie(properties: [
+                               .name: cookieTarget,
+                               .value: jsToken,
+                               .domain: "platform.xiaomimimo.com",
+                               .path: "/",
+                           ]) {
+                            enriched.append(synth)
+                        }
+                        self.handleLoginSuccess(token: jsToken, cookies: enriched)
                     }
                 }
             }
@@ -113,6 +128,21 @@ struct IOSWebViewLoginSheet: UIViewControllerRepresentable {
                 if let token = cookies.first(where: { $0.name == self.parent.targetCookieName }),
                    !token.value.isEmpty {
                     self.handleLoginSuccess(token: token.value, cookies: cookies)
+                    return
+                }
+
+                if let jsToken = await self.extractCookieViaJS(webView: webView, name: self.parent.targetCookieName) {
+                    var enriched = cookies
+                    if enriched.allSatisfy({ $0.name != self.parent.targetCookieName }),
+                       let synth = HTTPCookie(properties: [
+                           .name: self.parent.targetCookieName,
+                           .value: jsToken,
+                           .domain: "platform.xiaomimimo.com",
+                           .path: "/",
+                       ]) {
+                        enriched.append(synth)
+                    }
+                    self.handleLoginSuccess(token: jsToken, cookies: enriched)
                 }
             }
         }
@@ -123,6 +153,25 @@ struct IOSWebViewLoginSheet: UIViewControllerRepresentable {
             webView?.configuration.userContentController.removeAllUserScripts()
             webView?.stopLoading()
             parent.onTokenExtracted(token, cookies)
+        }
+
+        @MainActor
+        private func extractCookieViaJS(webView: WKWebView, name: String) async -> String? {
+            let js = """
+            (function() {
+                var pairs = document.cookie.split(';');
+                for (var i = 0; i < pairs.length; i++) {
+                    var p = pairs[i].split('=');
+                    if (p[0].trim() === '\(name)') {
+                        return p.slice(1).join('=').trim();
+                    }
+                }
+                return '';
+            })();
+            """
+            guard let value = try? await webView.evaluateJavaScript(js) as? String,
+                  !value.isEmpty else { return nil }
+            return value
         }
     }
 }

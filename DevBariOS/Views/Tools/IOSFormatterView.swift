@@ -93,7 +93,8 @@ struct IOSFormatterView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(theme.backgroundSecondary.ignoresSafeArea())
+        .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_formatter")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)

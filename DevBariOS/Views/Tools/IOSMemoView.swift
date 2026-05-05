@@ -108,7 +108,8 @@ struct IOSMemoListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .background(theme.backgroundSecondary.ignoresSafeArea())
+        .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_memo")
         .toolbarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
@@ -290,7 +291,8 @@ struct IOSMemoEditView: View {
                 )
         }
         .padding(16)
-        .background(theme.backgroundSecondary.ignoresSafeArea())
+        .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .iosToolNavigationChrome(theme)
@@ -429,7 +431,8 @@ struct IOSMemoPasswordSheet: View {
                 Spacer()
             }
             .padding(20)
-            .background(theme.backgroundSecondary.ignoresSafeArea())
+            .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationTitle(mode == .setPassword ? "ios_tools_memo_set_password" : "ios_tools_memo_unlock")
             .navigationBarTitleDisplayMode(.inline)
             .iosToolNavigationChrome(theme)
@@ -607,7 +610,8 @@ struct IOSSecurityPickerSheet: View {
                 Spacer()
             }
             .padding(20)
-            .background(theme.backgroundSecondary.ignoresSafeArea())
+            .background(Color.clear)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationTitle("ios_memo_security_pick_title")
             .navigationBarTitleDisplayMode(.inline)
             .iosToolNavigationChrome(theme)

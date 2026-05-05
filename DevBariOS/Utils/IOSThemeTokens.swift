@@ -10,6 +10,20 @@ enum IOSThemeMode: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+enum IOSTimeFormat: String, CaseIterable, Identifiable {
+    case hour24 = "24h"
+    case hour12 = "12h"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .hour24: return String(localized: "time_format_24h", defaultValue: "24-Hour")
+        case .hour12: return String(localized: "time_format_12h", defaultValue: "12-Hour")
+        }
+    }
+}
+
 enum IOSAppFont: String, CaseIterable, Identifiable {
     case system
     case geist

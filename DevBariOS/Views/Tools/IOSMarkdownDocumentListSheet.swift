@@ -101,6 +101,7 @@ struct IOSMarkdownDocumentListSheet: View {
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationTitle("ios_tools_md_docs_title")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
