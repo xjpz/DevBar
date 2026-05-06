@@ -101,6 +101,14 @@ actor ACPClient {
     let variant: ACPProtocolVariant
     private let workingDirectory: String?
     private let environment: [String: String]?
+    private let agentName: String
+    private var permissionHandler: (any ACPPermissionHandling)?
+    private var permissionUserID = ""
+    private var permissionMessage = ""
+    private var turnApprovalPolicy = "never"
+    private var codexSandbox = WeChatAgentRouter.AgentConfig.CodexSandbox.readOnly
+    private var writableRoot: String?
+    private let onTermination: (@Sendable () async -> Void)?
 
     private var process: Process?
     private var stdinPipe: Pipe?
@@ -120,13 +128,40 @@ actor ACPClient {
 
     // MARK: - Init
 
-    init(executable: String, arguments: [String] = [], variant: ACPProtocolVariant,
-         workingDirectory: String? = nil, environment: [String: String]? = nil) {
+    init(
+        executable: String,
+        arguments: [String] = [],
+        variant: ACPProtocolVariant,
+        workingDirectory: String? = nil,
+        environment: [String: String]? = nil,
+        permissionHandler: (any ACPPermissionHandling)? = nil,
+        agentName: String = "",
+        onTermination: (@Sendable () async -> Void)? = nil
+    ) {
         self.executable = executable
         self.arguments = arguments
         self.variant = variant
         self.workingDirectory = workingDirectory
         self.environment = environment
+        self.permissionHandler = permissionHandler
+        self.agentName = agentName
+        self.onTermination = onTermination
+    }
+
+    func updatePermissionContext(
+        userID: String,
+        message: String,
+        approvalPolicy: String,
+        codexSandbox: WeChatAgentRouter.AgentConfig.CodexSandbox,
+        writableRoot: String?,
+        handler: (any ACPPermissionHandling)?
+    ) {
+        permissionUserID = userID
+        permissionMessage = message
+        turnApprovalPolicy = approvalPolicy
+        self.codexSandbox = codexSandbox
+        self.writableRoot = writableRoot
+        permissionHandler = handler
     }
 
     // MARK: - Lifecycle
@@ -317,9 +352,10 @@ actor ACPClient {
 
         let params: [String: Any] = [
             "threadId": threadID,
-            "approvalPolicy": "never",
+            "approvalPolicy": turnApprovalPolicy,
+            "approvalsReviewer": "user",
             "input": [["type": "text", "text": message]],
-            "sandboxPolicy": ["type": "readOnly"],
+            "sandboxPolicy": codexSandboxPolicy(),
             "cwd": workingDirectory ?? FileManager.default.currentDirectoryPath,
         ]
 
@@ -448,7 +484,7 @@ actor ACPClient {
         case "session/update":
             handleSessionUpdate(params)
         case "session/request_permission":
-            handlePermissionRequest(obj)
+            Task { await handlePermissionRequest(obj) }
         // Codex events
         case "codex/event/agent_message_delta":
             handleCodexDelta(params)
@@ -459,7 +495,13 @@ actor ACPClient {
         case "turn/started", "turn/completed":
             handleCodexTurnEvent(method, params: params)
         case "turn/approval/request":
-            handlePermissionRequest(obj)
+            Task { await handlePermissionRequest(obj) }
+        case "item/commandExecution/requestApproval",
+             "item/fileChange/requestApproval",
+             "item/permissions/requestApproval",
+             "execCommandApproval",
+             "applyPatchApproval":
+            Task { await handlePermissionRequest(obj) }
         default:
             break
         }
@@ -476,24 +518,142 @@ actor ACPClient {
         cont?.yield(AnyJSON(update))
     }
 
-    private func handlePermissionRequest(_ rawObj: [String: Any]) {
-        guard let id = rawObj["id"],
-              let params = rawObj["params"] as? [String: Any],
-              let options = params["options"] as? [[String: Any]] else { return }
+    private func handlePermissionRequest(_ rawObj: [String: Any]) async {
+        guard let id = rawObj["id"] else { return }
 
-        let preferred = options.first { $0["kind"] as? String == "deny" }
-            ?? options.first { ($0["optionId"] as? String)?.localizedCaseInsensitiveContains("deny") == true }
-            ?? options.first
-        let optionID = preferred?["optionId"] as? String ?? "deny"
+        let request = ACPPermissionRequest.parse(
+            rawObject: rawObj,
+            agentName: agentName.isEmpty ? executable : agentName,
+            userID: permissionUserID,
+            message: permissionMessage,
+            cwd: workingDirectory
+        )
 
-        let response: [String: Any] = [
-            "jsonrpc": "2.0",
-            "id": id,
-            "result": ["outcome": ["outcome": "selected", "optionId": optionID]],
-        ]
+        let decision: ACPPermissionDecision
+        if let permissionHandler, let request {
+            decision = await permissionHandler.handlePermissionRequest(request)
+        } else {
+            decision = .deny
+        }
+
+        let optionID: String
+        switch decision {
+        case .selected(let selectedOptionID):
+            optionID = selectedOptionID
+        case .deny:
+            optionID = request?.denyOptionID ?? "deny"
+        }
+
+        let method = rawObj["method"] as? String
+        let params = rawObj["params"] as? [String: Any]
+        sendPermissionResponse(id: id, method: method, optionID: optionID, params: params)
+    }
+
+    private func sendPermissionResponse(
+        id: Any,
+        method: String?,
+        optionID: String,
+        params: [String: Any]?
+    ) {
+        let result: [String: Any]
+        switch method {
+        case "item/commandExecution/requestApproval", "item/fileChange/requestApproval":
+            result = ["decision": optionID == "accept" ? "accept" : "decline"]
+        case "execCommandApproval", "applyPatchApproval":
+            result = ["decision": optionID == "accept" ? "approved" : "denied"]
+        case "item/permissions/requestApproval":
+            result = permissionsApprovalResult(optionID: optionID, params: params)
+        default:
+            result = ["outcome": ["outcome": "selected", "optionId": optionID]]
+        }
+
+        let response: [String: Any] = ["jsonrpc": "2.0", "id": id, "result": result]
 
         guard let data = try? JSONSerialization.data(withJSONObject: response) else { return }
         try? writeToStdin(data)
+    }
+
+    private func permissionsApprovalResult(optionID: String, params: [String: Any]?) -> [String: Any] {
+        guard optionID == "accept" else {
+            return [
+                "permissions": [
+                    "fileSystem": ["entries": []],
+                    "network": ["enabled": false],
+                ],
+                "scope": "turn",
+            ]
+        }
+        if let permissions = params?["permissions"] as? [String: Any] {
+            return ["permissions": permissions, "scope": "turn"]
+        }
+        return [
+            "permissions": [
+                "fileSystem": ["entries": []],
+                "network": ["enabled": false],
+            ],
+            "scope": "turn",
+        ]
+    }
+
+    private func codexSandboxPolicy() -> [String: Any] {
+        switch codexSandbox {
+        case .readOnly:
+            return ["type": "readOnly"]
+        case .workspaceWrite:
+            var policy: [String: Any] = [
+                "type": "workspaceWrite",
+                "networkAccess": false,
+            ]
+            if let writableRoot, !writableRoot.isEmpty {
+                policy["writableRoots"] = writableRootsIncludingGitMetadata(for: writableRoot)
+            }
+            return policy
+        }
+    }
+
+    private func writableRootsIncludingGitMetadata(for root: String) -> [String] {
+        var roots = [root]
+        if let gitDirectory = gitMetadataDirectory(for: root),
+           !roots.contains(gitDirectory) {
+            roots.append(gitDirectory)
+        }
+        return roots
+    }
+
+    private func gitMetadataDirectory(for root: String) -> String? {
+        var directory = URL(fileURLWithPath: root).standardizedFileURL
+        while true {
+            let gitPath = directory.appendingPathComponent(".git").path
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: gitPath, isDirectory: &isDirectory) {
+                if isDirectory.boolValue {
+                    return gitPath
+                }
+
+                guard let data = try? Data(contentsOf: URL(fileURLWithPath: gitPath)),
+                      let content = String(data: data, encoding: .utf8) else {
+                    return nil
+                }
+                let prefix = "gitdir:"
+                guard content.lowercased().hasPrefix(prefix) else {
+                    return nil
+                }
+                let rawGitDir = content.dropFirst(prefix.count).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !rawGitDir.isEmpty else {
+                    return nil
+                }
+                if rawGitDir.hasPrefix("/") {
+                    return rawGitDir
+                }
+                return directory.appendingPathComponent(rawGitDir).standardizedFileURL.path
+            }
+
+            let parent = directory.deletingLastPathComponent()
+            if parent.path == directory.path {
+                return nil
+            }
+            directory = parent
+        }
     }
 
     // MARK: - Codex Event Handlers
@@ -621,6 +781,9 @@ actor ACPClient {
         for (_, cont) in turnChannels { cont.finish() }
         turnChannels.removeAll()
         isInitialized = false
+        if let onTermination {
+            Task { await onTermination() }
+        }
     }
 
 }

@@ -47,19 +47,37 @@ enum CodexCLIResolver: Sendable {
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
-        process.arguments = ["exec", "echo hello"]
+        process.arguments = ["exec", "--skip-git-repo-check", "echo hello"]
 
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
+        // 构建 PATH：codex 所在目录（通常是 nvm bin）+ 系统 PATH + shell PATH
+        let codexDir = (path as NSString).deletingLastPathComponent
+        let systemPath = "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        let shellPath = shellEnvPath()
+        let mergedPath = "\(codexDir):\(shellPath ?? systemPath):\(systemPath)"
+
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = mergedPath
+        process.environment = env
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
 
         do {
             try process.run()
             process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8)?
+            let outData = outPipe.fileHandleForReading.readDataToEndOfFile()
+            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: outData, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            return (process.terminationStatus == 0, output)
+            let errOutput = String(data: errData, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if process.terminationStatus == 0 {
+                return (true, output.isEmpty ? "OK" : output)
+            } else {
+                return (false, errOutput.isEmpty ? output : errOutput)
+            }
         } catch {
             return (false, error.localizedDescription)
         }
@@ -102,5 +120,27 @@ enum CodexCLIResolver: Sendable {
         }
 
         return nil
+    }
+
+    private static func shellEnvPath() -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-lc", "echo $PATH"]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let path = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return path?.isEmpty == false ? path : nil
+        } catch {
+            return nil
+        }
     }
 }

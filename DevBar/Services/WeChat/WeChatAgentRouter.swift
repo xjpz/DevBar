@@ -89,6 +89,7 @@ final class WeChatAgentRouter: ObservableObject {
         let approvalTimeoutSeconds: Int?
         let allowWechatConfirmForLowRisk: Bool?
         let allowWechatConfirmForHighRisk: Bool?
+        let codexSandbox: CodexSandbox?
 
         enum AgentType: String, Codable, Sendable {
             case acp, cli, http
@@ -112,6 +113,20 @@ final class WeChatAgentRouter: ObservableObject {
             }
         }
 
+        enum CodexSandbox: String, Codable, Sendable, CaseIterable, Identifiable {
+            case readOnly
+            case workspaceWrite
+
+            var id: String { rawValue }
+
+            var displayName: String {
+                switch self {
+                case .readOnly: return "只读"
+                case .workspaceWrite: return "工作区写入"
+                }
+            }
+        }
+
         var effectiveApprovalPolicy: ApprovalPolicy {
             approvalPolicy ?? .macConfirm
         }
@@ -126,6 +141,10 @@ final class WeChatAgentRouter: ObservableObject {
 
         var canWechatApproveHighRisk: Bool {
             allowWechatConfirmForHighRisk ?? false
+        }
+
+        var effectiveCodexSandbox: CodexSandbox {
+            codexSandbox ?? .readOnly
         }
 
         func allowsWechatApproval(for risk: WeChatApprovalRequest.Risk) -> Bool {
@@ -148,6 +167,7 @@ final class WeChatAgentRouter: ObservableObject {
 
     private var acpClients: [String: ACPClient] = [:]
     private var acpDirectoryAccess: [String: WeChatAuthorizedDirectoryAccess] = [:]
+    private var activeACPTurns: Set<String> = []
 
     // MARK: - Config I/O
 
@@ -169,7 +189,8 @@ final class WeChatAgentRouter: ObservableObject {
             aliases: nil, endpoint: endpoint, apiKey: apiKey,
             headers: nil, maxHistory: nil,
             approvalPolicy: nil, approvalTimeoutSeconds: nil,
-            allowWechatConfirmForLowRisk: nil, allowWechatConfirmForHighRisk: nil
+            allowWechatConfirmForLowRisk: nil, allowWechatConfirmForHighRisk: nil,
+            codexSandbox: nil
         )
         agents.append(agent)
         if defaultAgent.isEmpty { defaultAgent = name }
@@ -224,6 +245,19 @@ final class WeChatAgentRouter: ObservableObject {
         saveToWeClawConfig()
     }
 
+    func updateAgentCodexSandbox(_ agent: AgentConfig, sandbox: AgentConfig.CodexSandbox) {
+        guard let index = agents.firstIndex(where: { $0.name == agent.name }) else { return }
+        agents[index] = agent.updating(codexSandbox: sandbox)
+        if let client = acpClients.removeValue(forKey: agent.name) {
+            let directoryAccess = acpDirectoryAccess.removeValue(forKey: agent.name)
+            Task {
+                await client.stop()
+                directoryAccess?.stop()
+            }
+        }
+        saveToWeClawConfig()
+    }
+
     func saveToWeClawConfig() {
         let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".weclaw")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -272,7 +306,7 @@ final class WeChatAgentRouter: ObservableObject {
         case .cli:
             return try await callCLIAgent(agent, userID: userID, message: trimmedMessage, approvalNotifier: approvalNotifier)
         case .acp:
-            return try await callACPAgent(agent, userID: userID, message: trimmedMessage)
+            return try await callACPAgent(agent, userID: userID, message: trimmedMessage, approvalNotifier: approvalNotifier)
         }
     }
 
@@ -694,8 +728,22 @@ final class WeChatAgentRouter: ObservableObject {
 
     // MARK: - ACP Agent
 
-    private func callACPAgent(_ agent: AgentConfig, userID: String, message: String) async throws -> String {
+    private func callACPAgent(
+        _ agent: AgentConfig,
+        userID: String,
+        message: String,
+        approvalNotifier: ((String) async -> Void)?
+    ) async throws -> String {
         let clientKey = agent.name
+        let turnKey = clientKey
+
+        guard !activeACPTurns.contains(turnKey) else {
+            return "\(agent.name) 上一条任务仍在执行或等待授权，请稍后再试。"
+        }
+        activeACPTurns.insert(turnKey)
+        defer {
+            activeACPTurns.remove(turnKey)
+        }
 
         // Get or create ACP client
         if acpClients[clientKey] == nil {
@@ -711,7 +759,11 @@ final class WeChatAgentRouter: ObservableObject {
                 arguments: agent.args ?? [],
                 variant: variant,
                 workingDirectory: Self.effectiveWorkingDirectory(for: agent),
-                environment: agent.env
+                environment: agent.env,
+                agentName: agent.name,
+                onTermination: { [weak self] in
+                    await self?.approvalCoordinator.cancelPending(agentName: agent.name)
+                }
             )
             let directoryAccess = try authorizedDirectoryStore.accessHandle(for: Self.effectiveWorkingDirectory(for: agent))
             do {
@@ -725,6 +777,19 @@ final class WeChatAgentRouter: ObservableObject {
         }
 
         let client = acpClients[clientKey]!
+        let permissionBridge = ACPPermissionBridge(
+            agent: agent,
+            approvalCoordinator: approvalCoordinator,
+            approvalNotifier: approvalNotifier
+        )
+        await client.updatePermissionContext(
+            userID: userID,
+            message: message,
+            approvalPolicy: Self.codexAppApprovalPolicy(for: agent),
+            codexSandbox: agent.effectiveCodexSandbox,
+            writableRoot: Self.effectiveWorkingDirectory(for: agent),
+            handler: permissionBridge
+        )
 
         // Get or create session
         let session = await conversationStore.getOrCreateSession(userID: userID, agentName: agent.name)
@@ -927,7 +992,8 @@ private extension WeChatAgentRouter.AgentConfig {
             approvalPolicy: approvalPolicy,
             approvalTimeoutSeconds: approvalTimeoutSeconds,
             allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk,
-            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk
+            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk,
+            codexSandbox: codexSandbox
         )
     }
 
@@ -949,7 +1015,8 @@ private extension WeChatAgentRouter.AgentConfig {
             approvalPolicy: approvalPolicy,
             approvalTimeoutSeconds: approvalTimeoutSeconds,
             allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk,
-            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk
+            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk,
+            codexSandbox: codexSandbox
         )
     }
 
@@ -971,7 +1038,31 @@ private extension WeChatAgentRouter.AgentConfig {
             approvalPolicy: approvalPolicy,
             approvalTimeoutSeconds: approvalTimeoutSeconds,
             allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk,
-            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk
+            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk,
+            codexSandbox: codexSandbox
+        )
+    }
+
+    func updating(codexSandbox: CodexSandbox) -> Self {
+        .init(
+            name: name,
+            type: type,
+            command: command,
+            args: args,
+            cwd: cwd,
+            env: env,
+            model: model,
+            systemPrompt: systemPrompt,
+            aliases: aliases,
+            endpoint: endpoint,
+            apiKey: apiKey,
+            headers: headers,
+            maxHistory: maxHistory,
+            approvalPolicy: approvalPolicy,
+            approvalTimeoutSeconds: approvalTimeoutSeconds,
+            allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk,
+            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk,
+            codexSandbox: codexSandbox
         )
     }
 }
@@ -979,5 +1070,16 @@ private extension WeChatAgentRouter.AgentConfig {
 private extension WeChatAgentRouter {
     nonisolated static func effectiveWorkingDirectory(for agent: AgentConfig) -> String {
         WeChatWorkingDirectoryPolicy.effectiveDirectory(for: agent.cwd)
+    }
+
+    static func codexAppApprovalPolicy(for agent: AgentConfig) -> String {
+        switch agent.effectiveApprovalPolicy {
+        case .never:
+            return "never"
+        case .trusted:
+            return "never"
+        case .macConfirm, .wechatConfirm:
+            return "untrusted"
+        }
     }
 }

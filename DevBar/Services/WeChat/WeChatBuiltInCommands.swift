@@ -4,7 +4,7 @@
 import Foundation
 
 struct WeChatBuiltInCommands {
-    static let commandNames: Set<String> = ["/new", "/clear", "/help", "/info", "/cwd", "/default"]
+    static let commandNames: Set<String> = ["/new", "/clear", "/help", "/info", "/cwd", "/default", "/pending", "/cancel"]
 
     static func isBuiltIn(_ text: String) -> Bool {
         let word = text.split(separator: " ").first.map(String.init) ?? ""
@@ -47,6 +47,16 @@ struct WeChatBuiltInCommands {
                 return "[DevBar] 未找到 agent: \(name)。使用 /info 查看可用 agent"
             }
             return "[DevBar] 当前默认 agent: \(agentRouter.defaultAgent.isEmpty ? "未设置" : agentRouter.defaultAgent)\n用法: /default <agent_name>"
+
+        case "/pending":
+            return agentRouter.approvalCoordinator.pendingSummary(userID: userID)
+
+        case "/cancel":
+            guard parts.count > 1 else {
+                return "[DevBar] 用法: /cancel <授权ID>"
+            }
+            let id = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return agentRouter.approvalCoordinator.cancelPending(id: id, userID: userID)
 
         case "/cwd":
             if parts.count > 1 {
@@ -104,6 +114,8 @@ struct WeChatBuiltInCommands {
             "  /help     - 显示此帮助",
             "  /info     - 显示 agent 信息",
             "  /default  - 查看/切换默认 agent",
+            "  /pending  - 查看待授权请求",
+            "  /cancel <id> - 取消待授权请求",
             "  /cwd [path] - 查看/设置工作目录",
             "  /cwd list - 查看远程可用目录",
             "",

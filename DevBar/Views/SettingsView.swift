@@ -30,6 +30,8 @@ struct SettingsView: View {
                 SettingsGeneral()
             case .notifications:
                 SettingsNotifications()
+            case .finder:
+                SettingsFinder()
             case .accounts:
                 SettingsAccounts()
             case .weChat:
@@ -38,6 +40,6 @@ struct SettingsView: View {
                 SettingsAbout()
             }
         }
-        .frame(width: 340, height: 420)
+        .frame(width: 340, height: 480)
     }
 }

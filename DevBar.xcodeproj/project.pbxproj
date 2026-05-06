@@ -10,6 +10,7 @@
 		86A450BD2F95172C00748112 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 86A450BC2F95172C00748112 /* WidgetKit.framework */; };
 		86A450BF2F95172C00748112 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 86A450BE2F95172C00748112 /* SwiftUI.framework */; };
 		86A450CE2F95172E00748112 /* DevBarWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		86B85FA92FAA3DE6003AB1E8 /* DevBarFinderSync.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 86B85FA22FAA3DE6003AB1E8 /* DevBarFinderSync.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		90D001042D00000100000001 /* DevBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 90D001022D00000100000001 /* DevBarCore */; };
 		90D001052D00000100000001 /* DevBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 90D001032D00000100000001 /* DevBarCore */; };
 		90D001082D00000100000001 /* DevBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 90D001072D00000100000001 /* DevBarCore */; };
@@ -23,6 +24,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 86A450B92F95172C00748112;
 			remoteInfo = DevBarWidgetExtension;
+		};
+		86B85FA72FAA3DE6003AB1E8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 86C289782F8D19D100A3610C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 86B85FA12FAA3DE6003AB1E8;
+			remoteInfo = DevBarFinderSync;
 		};
 		86C2898E2F8D19D300A3610C /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -62,6 +70,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				86A450CE2F95172E00748112 /* DevBarWidgetExtension.appex in Embed Foundation Extensions */,
+				86B85FA92FAA3DE6003AB1E8 /* DevBarFinderSync.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -84,6 +93,7 @@
 		86A450BC2F95172C00748112 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		86A450BE2F95172C00748112 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		86A450E12F9518A000748112 /* DevBarWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = DevBarWidgetExtension.entitlements; sourceTree = "<group>"; };
+		86B85FA22FAA3DE6003AB1E8 /* DevBarFinderSync.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DevBarFinderSync.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		86C289802F8D19D100A3610C /* DevBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DevBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		86C2898D2F8D19D300A3610C /* DevBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DevBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		86C289972F8D19D300A3610C /* DevBarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DevBarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -127,6 +137,13 @@
 			);
 			target = 90D0010D2D00000100000001 /* DevBariOS */;
 		};
+		86B85FF82FAA4684003AB1E8 /* Exceptions for "DevBarFinderSync" folder in "DevBarFinderSync" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 86B85FA12FAA3DE6003AB1E8 /* DevBarFinderSync */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -137,6 +154,14 @@
 				86A450CF2F95172E00748112 /* Exceptions for "DevBarWidget" folder in "DevBarWidgetExtension" target */,
 			);
 			path = DevBarWidget;
+			sourceTree = "<group>";
+		};
+		86B85FED2FAA4683003AB1E8 /* DevBarFinderSync */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				86B85FF82FAA4684003AB1E8 /* Exceptions for "DevBarFinderSync" folder in "DevBarFinderSync" target */,
+			);
+			path = DevBarFinderSync;
 			sourceTree = "<group>";
 		};
 		86C289822F8D19D100A3610C /* DevBar */ = {
@@ -181,6 +206,13 @@
 				90D001052D00000100000001 /* DevBarCore in Frameworks */,
 				86A450BF2F95172C00748112 /* SwiftUI.framework in Frameworks */,
 				86A450BD2F95172C00748112 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		86B85F9F2FAA3DE6003AB1E8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,6 +275,7 @@
 				86C289902F8D19D300A3610C /* DevBarTests */,
 				86C2899A2F8D19D300A3610C /* DevBarUITests */,
 				86A450C02F95172C00748112 /* DevBarWidget */,
+				86B85FED2FAA4683003AB1E8 /* DevBarFinderSync */,
 				86A450BB2F95172C00748112 /* Frameworks */,
 				86C289812F8D19D100A3610C /* Products */,
 			);
@@ -257,6 +290,7 @@
 				86C2898D2F8D19D300A3610C /* DevBarTests.xctest */,
 				86C289972F8D19D300A3610C /* DevBarUITests.xctest */,
 				86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */,
+				86B85FA22FAA3DE6003AB1E8 /* DevBarFinderSync.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -287,6 +321,28 @@
 			productReference = 86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		86B85FA12FAA3DE6003AB1E8 /* DevBarFinderSync */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 86B85FAA2FAA3DE6003AB1E8 /* Build configuration list for PBXNativeTarget "DevBarFinderSync" */;
+			buildPhases = (
+				86B85F9E2FAA3DE6003AB1E8 /* Sources */,
+				86B85F9F2FAA3DE6003AB1E8 /* Frameworks */,
+				86B85FA02FAA3DE6003AB1E8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				86B85FED2FAA4683003AB1E8 /* DevBarFinderSync */,
+			);
+			name = DevBarFinderSync;
+			packageProductDependencies = (
+			);
+			productName = DevBarFinderSync;
+			productReference = 86B85FA22FAA3DE6003AB1E8 /* DevBarFinderSync.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		86C2897F2F8D19D100A3610C /* DevBar */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 86C289A12F8D19D300A3610C /* Build configuration list for PBXNativeTarget "DevBar" */;
@@ -300,6 +356,7 @@
 			);
 			dependencies = (
 				86A450CD2F95172E00748112 /* PBXTargetDependency */,
+				86B85FA82FAA3DE6003AB1E8 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				86C289822F8D19D100A3610C /* DevBar */,
@@ -419,6 +476,9 @@
 					86A450B92F95172C00748112 = {
 						CreatedOnToolsVersion = 26.4.1;
 					};
+					86B85FA12FAA3DE6003AB1E8 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
 					86C2897F2F8D19D100A3610C = {
 						CreatedOnToolsVersion = 26.4;
 					};
@@ -463,12 +523,20 @@
 				86C2898C2F8D19D300A3610C /* DevBarTests */,
 				86C289962F8D19D300A3610C /* DevBarUITests */,
 				86A450B92F95172C00748112 /* DevBarWidgetExtension */,
+				86B85FA12FAA3DE6003AB1E8 /* DevBarFinderSync */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		86A450B82F95172C00748112 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		86B85FA02FAA3DE6003AB1E8 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -520,6 +588,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		86B85F9E2FAA3DE6003AB1E8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		86C2897C2F8D19D100A3610C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -562,6 +637,11 @@
 			isa = PBXTargetDependency;
 			target = 86A450B92F95172C00748112 /* DevBarWidgetExtension */;
 			targetProxy = 86A450CC2F95172E00748112 /* PBXContainerItemProxy */;
+		};
+		86B85FA82FAA3DE6003AB1E8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 86B85FA12FAA3DE6003AB1E8 /* DevBarFinderSync */;
+			targetProxy = 86B85FA72FAA3DE6003AB1E8 /* PBXContainerItemProxy */;
 		};
 		86C2898F2F8D19D300A3610C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -657,6 +737,74 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		86B85FAB2FAA3DE6003AB1E8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DevBarFinderSync/FinderSyncExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevBarFinderSync/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DevBarFinderSync;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.2.1;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar.DevBarFinderSync;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		86B85FAC2FAA3DE6003AB1E8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = DevBarFinderSync/FinderSyncExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevBarFinderSync/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = DevBarFinderSync;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.6;
+				MARKETING_VERSION = 1.2.1;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar.DevBarFinderSync;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -1050,6 +1198,15 @@
 			buildConfigurations = (
 				86A450D12F95172E00748112 /* Debug */,
 				86A450D22F95172E00748112 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		86B85FAA2FAA3DE6003AB1E8 /* Build configuration list for PBXNativeTarget "DevBarFinderSync" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				86B85FAB2FAA3DE6003AB1E8 /* Debug */,
+				86B85FAC2FAA3DE6003AB1E8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

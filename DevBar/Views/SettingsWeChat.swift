@@ -145,6 +145,11 @@ struct SettingsWeChat: View {
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
                                         .background(agent.type == .acp ? Color.purple.opacity(0.15) : Color.secondary.opacity(0.15), in: RoundedRectangle(cornerRadius: 4))
+                                    if isCodexAppServer(agent) {
+                                        Text("推荐")
+                                            .font(.caption2)
+                                            .foregroundStyle(.purple)
+                                    }
                                     Button {
                                         viewModel.agentRouter.deleteAgent(agent)
                                     } label: {
@@ -193,7 +198,17 @@ struct SettingsWeChat: View {
                                     }
                                     .font(.caption2)
 
-                                    if agent.type == .cli && agent.effectiveApprovalPolicy == .wechatConfirm {
+                                    if isCodexAppServer(agent) {
+                                        Picker("沙盒", selection: codexSandboxBinding(for: agent)) {
+                                            ForEach(WeChatAgentRouter.AgentConfig.CodexSandbox.allCases) { sandbox in
+                                                Text(sandbox.displayName).tag(sandbox)
+                                            }
+                                        }
+                                        .font(.caption2)
+                                        .help(Text("只读适合远程问答；工作区写入允许 Codex 修改当前工作目录下文件，仍会走授权确认。"))
+                                    }
+
+                                    if (agent.type == .cli || agent.type == .acp) && agent.effectiveApprovalPolicy == .wechatConfirm {
                                         Toggle(isOn: highRiskWechatApprovalBinding(for: agent)) {
                                             Text("高风险也允许微信确认")
                                         }
@@ -308,6 +323,23 @@ struct SettingsWeChat: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(2)
 
+                                if request.source != nil || request.toolName != nil || request.operationSummary != nil {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        if let source = request.source {
+                                            Text("来源：\(source)")
+                                        }
+                                        if let toolName = request.toolName {
+                                            Text("工具：\(toolName)")
+                                        }
+                                        if let operationSummary = request.operationSummary {
+                                            Text("操作：\(operationSummary)")
+                                                .lineLimit(2)
+                                        }
+                                    }
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                }
+
                                 Text(request.cwd ?? "未设置工作目录")
                                     .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.secondary)
@@ -337,6 +369,32 @@ struct SettingsWeChat: View {
                         }
                     } header: {
                         Text("待授权")
+                    }
+                }
+
+                if !approvalCoordinator.recentRequests.isEmpty {
+                    Section {
+                        ForEach(approvalCoordinator.recentRequests.prefix(5)) { request in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("\(request.agentName) · \(request.status.rawValue)")
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                    Spacer()
+                                    Text(request.id)
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                }
+                                if let operationSummary = request.operationSummary {
+                                    Text(operationSummary)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("最近授权")
                     }
                 }
 
@@ -527,6 +585,17 @@ struct SettingsWeChat: View {
             get: { agent.canWechatApproveHighRisk },
             set: { viewModel.agentRouter.updateAgentHighRiskWechatApproval(agent, isAllowed: $0) }
         )
+    }
+
+    private func codexSandboxBinding(for agent: WeChatAgentRouter.AgentConfig) -> Binding<WeChatAgentRouter.AgentConfig.CodexSandbox> {
+        Binding(
+            get: { agent.effectiveCodexSandbox },
+            set: { viewModel.agentRouter.updateAgentCodexSandbox(agent, sandbox: $0) }
+        )
+    }
+
+    private func isCodexAppServer(_ agent: WeChatAgentRouter.AgentConfig) -> Bool {
+        agent.type == .acp && (agent.name == "codex" || agent.args?.contains("app-server") == true)
     }
 }
 

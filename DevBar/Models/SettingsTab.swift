@@ -6,6 +6,7 @@ import Foundation
 enum SettingsTab: String, CaseIterable {
     case general
     case notifications
+    case finder
     case accounts
     case weChat
     case about
@@ -14,6 +15,7 @@ enum SettingsTab: String, CaseIterable {
         switch self {
         case .general: return String(localized: "tab_general")
         case .notifications: return String(localized: "tab_notifications")
+        case .finder: return String(localized: "tab_finder")
         case .accounts: return String(localized: "tab_accounts")
         case .weChat: return String(localized: "tab_wechat")
         case .about: return String(localized: "tab_about")
@@ -24,6 +26,7 @@ enum SettingsTab: String, CaseIterable {
         switch self {
         case .general: return "gear"
         case .notifications: return "bell"
+        case .finder: return "folder"
         case .accounts: return "person.2"
         case .weChat: return "message.fill"
         case .about: return "info.circle"
