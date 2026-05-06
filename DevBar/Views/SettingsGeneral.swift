@@ -12,9 +12,6 @@ struct SettingsGeneral: View {
     @State private var selectedInterval: TimeInterval
     @State private var selectedIcon: String
     @State private var showRestartAlert = false
-    @State private var codexPath: String
-    @State private var codexTestResult: String?
-    @State private var isTestingCodex = false
 
     private let intervals: [(String, TimeInterval)] = [
         (String(localized: "minutes_3"), 180),
@@ -35,14 +32,6 @@ struct SettingsGeneral: View {
         _selectedIcon = State(
             initialValue: savedIcon ?? Constants.Defaults.defaultMenuBarIcon
         )
-        _codexPath = State(
-            initialValue: UserDefaults.standard.string(forKey: Constants.Defaults.codexPathKey) ?? ""
-        )
-    }
-
-    private var pathLabelColor: Color {
-        guard !codexPath.isEmpty else { return .secondary }
-        return FileManager.default.isExecutableFile(atPath: codexPath) ? .green : .red
     }
 
     var body: some View {
@@ -97,43 +86,6 @@ struct SettingsGeneral: View {
                 Toggle("hide_from_dock", isOn: $appViewModel.isHiddenFromDock)
             }
 
-            Section("codex_cli") {
-                HStack {
-                    Text("cli_path")
-                    Text(codexPath.isEmpty ? String(localized: "not_detected") : codexPath)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .foregroundStyle(pathLabelColor)
-                }
-
-                HStack {
-                    Button(String(localized: "auto_detect")) {
-                        codexTestResult = nil
-                        CodexCLIResolver.autoDetect()
-                        codexPath = UserDefaults.standard.string(forKey: Constants.Defaults.codexPathKey) ?? ""
-                    }
-                    .disabled(isTestingCodex)
-
-                    Spacer()
-
-                    Button(String(localized: "choose_file")) {
-                        chooseCodexBinary()
-                    }
-                    .disabled(isTestingCodex)
-
-                    Button(String(localized: "test_connection")) {
-                        testCodexConnection()
-                    }
-                    .disabled(isTestingCodex || codexPath.isEmpty)
-                }
-
-                if let result = codexTestResult {
-                    Text(result)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             if let lastUpdated = quotaViewModel.lastUpdated {
                 Section("status") {
                     Text("last_updated \(lastUpdated.formatted(.dateTime.hour().minute().second()))")
@@ -166,41 +118,6 @@ struct SettingsGeneral: View {
     private func iconView(for iconName: String) -> some View {
         Image(systemName: iconName)
             .font(.system(size: 20))
-    }
-
-    private func chooseCodexBinary() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = String(localized: "choose")
-
-        if !codexPath.isEmpty {
-            let dir = (codexPath as NSString).deletingLastPathComponent
-            if FileManager.default.fileExists(atPath: dir) {
-                panel.directoryURL = URL(fileURLWithPath: dir)
-            }
-        }
-
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        codexPath = url.path
-        UserDefaults.standard.set(url.path, forKey: Constants.Defaults.codexPathKey)
-        codexTestResult = nil
-    }
-
-    private func testCodexConnection() {
-        guard !codexPath.isEmpty else { return }
-        isTestingCodex = true
-        codexTestResult = String(localized: "testing")
-        Task { @MainActor in
-            let result = await CodexCLIResolver.testCodex(at: codexPath)
-            isTestingCodex = false
-            if result.success {
-                codexTestResult = String(localized: "codex_test_ok")
-            } else {
-                codexTestResult = String(localized: "codex_test_fail \(result.output)")
-            }
-        }
     }
 }
 

@@ -963,6 +963,7 @@
       }
     },
     "auto_detect" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1059,6 +1060,7 @@
       }
     },
     "choose" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1072,6 +1074,7 @@
 
     },
     "choose_file" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1085,6 +1088,7 @@
 
     },
     "cli_path" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1114,6 +1118,7 @@
 
     },
     "codex_cli" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1124,6 +1129,7 @@
       }
     },
     "codex_not_executable" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1134,6 +1140,7 @@
       }
     },
     "codex_test_fail %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -1144,6 +1151,7 @@
       }
     },
     "codex_test_ok" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -5959,6 +5967,7 @@
 
     },
     "not_detected" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6779,6 +6788,7 @@
       }
     },
     "test_connection" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
@@ -6789,6 +6799,7 @@
       }
     },
     "testing" : {
+      "extractionState" : "stale",
       "localizations" : {
         "zh-Hans" : {
           "stringUnit" : {
