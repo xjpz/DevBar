@@ -61,6 +61,25 @@ private struct RPCNotification {
     }
 }
 
+private final class ACPTextAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var parts: [String] = []
+
+    func append(_ text: String) {
+        guard !text.isEmpty else { return }
+        lock.lock()
+        parts.append(text)
+        lock.unlock()
+    }
+
+    var combinedText: String {
+        lock.lock()
+        let text = parts.joined()
+        lock.unlock()
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
 /// Type-erased JSON wrapper for dynamic request/response handling.
 struct AnyJSON: @unchecked Sendable {
     nonisolated(unsafe) let value: Any
@@ -287,60 +306,37 @@ actor ACPClient {
         // Register notification channel
         let (stream, cont) = AsyncStream<AnyJSON>.makeStream()
         notifyChannels[sessionID] = cont
-        defer { notifyChannels.removeValue(forKey: sessionID) }
+        let textAccumulator = ACPTextAccumulator()
+        let notificationTask = Task {
+            for await update in stream {
+                if Task.isCancelled { break }
+                if let text = extractChunkText(update) {
+                    textAccumulator.append(text)
+                }
+            }
+        }
+        defer {
+            notificationTask.cancel()
+            notifyChannels.removeValue(forKey: sessionID)
+        }
 
         let params = AnyJSON.dictionary([
             "sessionId": sessionID,
             "prompt": [["type": "text", "text": message]],
         ])
 
-        // Send prompt asynchronously
-        let (streamResult, streamContinuation) = AsyncStream<Result<AnyJSON?, Error>>.makeStream()
-        Task {
-            let result: Result<AnyJSON?, Error>
-            do {
-                let value = try await sendRequest(method: "session/prompt", params: params)
-                result = .success(value)
-            } catch {
-                result = .failure(error)
-            }
-            streamContinuation.yield(result)
-            streamContinuation.finish()
+        let reply = try await sendRequest(method: "session/prompt", params: params)
+
+        // Claude ACP sends the actual answer as session/update notifications. Give the
+        // notification reader a brief chance to drain lines that arrived before prompt return.
+        try? await Task.sleep(nanoseconds: 300_000_000)
+
+        var combined = textAccumulator.combinedText
+        if combined.isEmpty, let text = extractPromptResultText(reply) {
+            combined = text
         }
-
-        // Collect text chunks from notifications
-        var textParts: [String] = []
-
-        var promptDone = false
-        var promptResult: Result<AnyJSON?, Error>?
-
-        for await awaitable in mergePromptsAndNotifications(
-            promptStream: streamResult,
-            notifyStream: stream
-        ) {
-            switch awaitable {
-            case .promptResult(let result):
-                promptDone = true
-                promptResult = result
-            case .notification(let update):
-                if let text = extractChunkText(update) {
-                    textParts.append(text)
-                }
-            }
-
-            if promptDone { break }
-        }
-
-        if let result = promptResult {
-            let reply = try result.get()
-            var combined = textParts.joined().trimmingCharacters(in: .whitespacesAndNewlines)
-            if combined.isEmpty, let text = extractPromptResultText(reply) {
-                combined = text
-            }
-            if combined.isEmpty { throw ACPError.emptyResponse }
-            return combined
-        }
-        throw ACPError.responseTimeout
+        if combined.isEmpty { throw ACPError.emptyResponse }
+        return combined
     }
 
     // MARK: - Codex App-Server Prompt
@@ -718,19 +714,42 @@ actor ACPClient {
 
     // MARK: - Helpers
 
-    private func extractChunkText(_ update: AnyJSON) -> String? {
+    nonisolated private func extractChunkText(_ update: AnyJSON) -> String? {
         guard let dict = update.dictValue else { return nil }
         if dict["sessionUpdate"] as? String == "agent_message_chunk" {
-            return dict["text"] as? String
+            if let text = dict["text"] as? String {
+                return text
+            }
+            return extractTextContent(dict["content"])
         }
         return nil
     }
 
-    private func extractPromptResultText(_ result: AnyJSON?) -> String? {
+    nonisolated private func extractPromptResultText(_ result: AnyJSON?) -> String? {
         guard let dict = result?.dictValue,
               let content = dict["content"] as? [[String: Any]] else { return nil }
         return content.compactMap { $0["type"] as? String == "text" ? $0["text"] as? String : nil }
             .joined()
+    }
+
+    nonisolated private func extractTextContent(_ value: Any?) -> String? {
+        if let text = value as? String {
+            return text
+        }
+        if let dict = value as? [String: Any] {
+            if dict["type"] as? String == "text", let text = dict["text"] as? String {
+                return text
+            }
+            if let text = dict["text"] as? String {
+                return text
+            }
+            return extractTextContent(dict["content"])
+        }
+        if let array = value as? [Any] {
+            let text = array.compactMap { extractTextContent($0) }.joined()
+            return text.isEmpty ? nil : text
+        }
+        return nil
     }
 
     private enum PromptOrNotification {

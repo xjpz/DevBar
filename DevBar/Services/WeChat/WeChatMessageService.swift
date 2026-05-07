@@ -227,8 +227,13 @@ final class WeChatMessageService: ObservableObject {
             addLog("Reply: \(reply.prefix(60))")
             await sendReply(reply, client: client, from: botID, to: fromID, token: msg.contextToken)
         } catch {
-            addLog("Agent error: \(error.localizedDescription)")
+            let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+            let reply = message.isEmpty
+                ? "[DevBar] Agent 执行失败，请稍后重试。"
+                : "[DevBar] Agent 执行失败：\(message)"
+            addLog("Agent error: \(message.isEmpty ? String(describing: error) : message)")
             print("[WeChat:Msg] agent error: \(error)")
+            await sendReply(reply, client: client, from: botID, to: fromID, token: msg.contextToken)
         }
     }
 
