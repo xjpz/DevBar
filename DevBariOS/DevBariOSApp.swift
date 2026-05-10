@@ -3,10 +3,12 @@ import SwiftData
 
 @main
 struct DevBariOSApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var appViewModel = IOSAppViewModel()
     @StateObject private var languageManager = IOSLanguageManager()
     @StateObject private var themeManager = IOSThemeManager()
+    @StateObject private var shortcutStore = ShortcutStore.shared
 
     var body: some Scene {
         WindowGroup {
@@ -14,6 +16,7 @@ struct DevBariOSApp: App {
                 .environmentObject(appViewModel)
                 .environmentObject(languageManager)
                 .environmentObject(themeManager)
+                .environmentObject(shortcutStore)
                 .environment(\.locale, languageManager.currentLocale)
                 .environment(\.themeTokens, themeManager.resolvedTokens)
                 .font(themeManager.resolvedTokens.bodyFont)
