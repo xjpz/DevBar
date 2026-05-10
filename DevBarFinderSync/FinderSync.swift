@@ -79,7 +79,7 @@ class FinderSync: FIFinderSync {
             menu.addItem(fileItem)
         }
 
-        menu.addItem(NSMenuItem(title: "在此打开终端", action: #selector(openTerminal(_:)), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "打开终端", action: #selector(openTerminal(_:)), keyEquivalent: ""))
         if CmuxLauncher.isInstalled {
             menu.addItem(NSMenuItem(title: "在此处打开 cmux", action: #selector(openCmux(_:)), keyEquivalent: ""))
         }

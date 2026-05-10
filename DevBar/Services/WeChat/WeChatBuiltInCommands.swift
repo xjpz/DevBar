@@ -4,7 +4,7 @@
 import Foundation
 
 struct WeChatBuiltInCommands {
-    static let commandNames: Set<String> = ["/new", "/clear", "/help", "/info", "/cwd", "/default", "/pending", "/cancel"]
+    static let commandNames: Set<String> = ["/new", "/clear", "/help", "/info", "/status", "/model", "/cwd", "/default", "/pending", "/cancel"]
 
     static func isBuiltIn(_ text: String) -> Bool {
         let word = text.split(separator: " ").first.map(String.init) ?? ""
@@ -34,6 +34,12 @@ struct WeChatBuiltInCommands {
 
         case "/info":
             return infoText(agents: agentRouter.agents, defaultAgent: agentRouter.defaultAgent)
+
+        case "/status":
+            return statusText(agentRouter: agentRouter)
+
+        case "/model":
+            return await handleModelCommand(parts: parts, userID: userID, agentRouter: agentRouter, conversationStore: conversationStore)
 
         case "/default":
             if parts.count > 1 {
@@ -113,6 +119,8 @@ struct WeChatBuiltInCommands {
             "  /clear    - 清除对话历史",
             "  /help     - 显示此帮助",
             "  /info     - 显示 agent 信息",
+            "  /status   - 显示当前 agent 状态",
+            "  /model [name] - 查看/切换当前 agent model",
             "  /default  - 查看/切换默认 agent",
             "  /pending  - 查看待授权请求",
             "  /cancel <id> - 取消待授权请求",
@@ -122,7 +130,9 @@ struct WeChatBuiltInCommands {
             "调用 agent:",
             "  @agent_name 消息   (指定 agent)",
             "  /agent_name 消息   (指定 agent)",
+            "  /agent_name /命令   (把 slash 命令发给指定 agent)",
             "  直接发消息         (使用默认 agent)",
+            "  未知 /命令         (发送给默认 agent)",
             "",
             "广播:",
             "  @a1 @a2 消息       (同时发给多个 agent)",
@@ -142,6 +152,62 @@ struct WeChatBuiltInCommands {
         lines.append("内置别名: cc→claude, cx→codex")
 
         return lines.joined(separator: "\n")
+    }
+
+    private static func statusText(agentRouter: WeChatAgentRouter) -> String {
+        let defaultName = agentRouter.defaultAgent
+        var lines: [String] = ["[DevBar] 状态:"]
+        lines.append("默认 agent: \(defaultName.isEmpty ? "未设置" : defaultName)")
+
+        if let agent = WeChatAgentRouter.AgentConfig.resolve(name: defaultName, in: agentRouter.agents) {
+            lines.append("当前 agent: \(agent.name) (\(agent.type.rawValue))")
+            if let model = agent.model, !model.isEmpty {
+                lines.append("model: \(model)")
+            } else {
+                lines.append("model: 默认")
+            }
+            lines.append("cwd: \(WeChatWorkingDirectoryPolicy.effectiveDirectory(for: agent.cwd))")
+            lines.append("授权: \(agent.effectiveApprovalPolicy.displayName)")
+            if agent.type == .acp {
+                lines.append("沙盒: \(agent.effectiveCodexSandbox.displayName)")
+            }
+        } else if !defaultName.isEmpty {
+            lines.append("当前 agent: 未找到 \(defaultName)")
+        }
+
+        lines.append("已配置 agent: \(agentRouter.agents.count)")
+        return lines.joined(separator: "\n")
+    }
+
+    private static func handleModelCommand(
+        parts: [Substring],
+        userID: String,
+        agentRouter: WeChatAgentRouter,
+        conversationStore: WeChatConversationStore
+    ) async -> String {
+        guard let agent = WeChatAgentRouter.AgentConfig.resolve(name: agentRouter.defaultAgent, in: agentRouter.agents) else {
+            return "[DevBar] 当前没有默认 agent，无法查看或设置 model。请先使用 /default <agent_name> 设置默认 agent。"
+        }
+
+        guard parts.count > 1 else {
+            let model = agent.model?.isEmpty == false ? agent.model! : "默认"
+            return "[DevBar] \(agent.name) 当前 model: \(model)\n用法: /model <model_name>"
+        }
+
+        let rawModel = String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if rawModel.lowercased() == "default" || rawModel.lowercased() == "reset" {
+            agentRouter.updateAgentModel(agent, model: nil)
+            await conversationStore.clearSession(userID: userID, agentName: agent.name)
+            return "[DevBar] \(agent.name) model 已恢复默认"
+        }
+
+        guard !rawModel.isEmpty else {
+            return "[DevBar] 用法: /model <model_name>"
+        }
+
+        agentRouter.updateAgentModel(agent, model: rawModel)
+        await conversationStore.clearSession(userID: userID, agentName: agent.name)
+        return "[DevBar] \(agent.name) model 已切换为: \(rawModel)"
     }
 
     private static func infoText(agents: [WeChatAgentRouter.AgentConfig], defaultAgent: String) -> String {

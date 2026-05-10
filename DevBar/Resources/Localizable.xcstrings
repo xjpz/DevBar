@@ -6408,6 +6408,86 @@
     "PowerPoint 演示 (.pptx)" : {
 
     },
+    "prevent_sleep" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prevent Sleep"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "防休眠"
+          }
+        }
+      }
+    },
+    "prevent_sleep_status_desktop_enabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prevent Sleep is on"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "防休眠已开启"
+          }
+        }
+      }
+    },
+    "prevent_sleep_status_disabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prevent Sleep is off"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "防休眠已关闭"
+          }
+        }
+      }
+    },
+    "prevent_sleep_status_portable_closed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lid is closed, sleep is currently allowed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已检测到合盖，当前允许休眠"
+          }
+        }
+      }
+    },
+    "prevent_sleep_status_portable_open" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prevent Sleep is on; closing the lid will allow sleep"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "防休眠已开启，合盖时会允许休眠"
+          }
+        }
+      }
+    },
     "Provider" : {
 
     },
@@ -8112,9 +8192,6 @@
     "待授权" : {
 
     },
-    "快捷操作" : {
-
-    },
     "拒绝" : {
 
     },
@@ -8158,9 +8235,6 @@
 
     },
     "生成一个 5 分钟内有效的二维码，在 iPhone 上扫码导入当前配置。" : {
-
-    },
-    "终端设置" : {
 
     },
     "迁移到 iPhone" : {

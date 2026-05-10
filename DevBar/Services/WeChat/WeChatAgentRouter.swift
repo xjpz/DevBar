@@ -65,6 +65,7 @@ private final class ProcessExitWaiter: @unchecked Sendable {
 final class WeChatAgentRouter: ObservableObject {
     @Published var agents: [AgentConfig] = []
     @Published var defaultAgent: String = ""
+    var shouldPersistConfig = true
 
     let conversationStore = WeChatConversationStore()
     let approvalCoordinator = WeChatApprovalCoordinator()
@@ -258,7 +259,15 @@ final class WeChatAgentRouter: ObservableObject {
         saveToWeClawConfig()
     }
 
+    func updateAgentModel(_ agent: AgentConfig, model: String?) {
+        guard let index = agents.firstIndex(where: { $0.name == agent.name }) else { return }
+        let trimmed = model?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        agents[index] = agent.updating(model: trimmed.isEmpty ? nil : trimmed)
+        saveToWeClawConfig()
+    }
+
     func saveToWeClawConfig() {
+        guard shouldPersistConfig else { return }
         let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".weclaw")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
@@ -787,6 +796,7 @@ final class WeChatAgentRouter: ObservableObject {
             message: message,
             approvalPolicy: Self.codexAppApprovalPolicy(for: agent),
             codexSandbox: agent.effectiveCodexSandbox,
+            model: agent.model,
             writableRoot: Self.effectiveWorkingDirectory(for: agent),
             handler: permissionBridge
         )
@@ -1044,6 +1054,29 @@ private extension WeChatAgentRouter.AgentConfig {
     }
 
     func updating(codexSandbox: CodexSandbox) -> Self {
+        .init(
+            name: name,
+            type: type,
+            command: command,
+            args: args,
+            cwd: cwd,
+            env: env,
+            model: model,
+            systemPrompt: systemPrompt,
+            aliases: aliases,
+            endpoint: endpoint,
+            apiKey: apiKey,
+            headers: headers,
+            maxHistory: maxHistory,
+            approvalPolicy: approvalPolicy,
+            approvalTimeoutSeconds: approvalTimeoutSeconds,
+            allowWechatConfirmForLowRisk: allowWechatConfirmForLowRisk,
+            allowWechatConfirmForHighRisk: allowWechatConfirmForHighRisk,
+            codexSandbox: codexSandbox
+        )
+    }
+
+    func updating(model: String?) -> Self {
         .init(
             name: name,
             type: type,

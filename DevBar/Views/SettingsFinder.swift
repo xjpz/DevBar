@@ -15,7 +15,7 @@ struct SettingsFinder: View {
 
     var body: some View {
         Form {
-            Section("终端设置") {
+            Section {
                 HStack {
                     Text("默认终端")
                     Spacer()
@@ -29,6 +29,11 @@ struct SettingsFinder: View {
                 .onChange(of: preferredTerminal) { _, newValue in
                     FinderSyncPreferences.shared.preferredTerminal = newValue
                 }
+
+                Toggle("拷贝文件路径", isOn: $enableCopyPath)
+                    .onChange(of: enableCopyPath) { _, newValue in
+                        FinderSyncPreferences.shared.enableCopyPath = newValue
+                    }
             }
 
             Section("文件类型") {
@@ -55,13 +60,6 @@ struct SettingsFinder: View {
                 Toggle("PowerPoint 演示 (.pptx)", isOn: $enablePptx)
                     .onChange(of: enablePptx) { _, newValue in
                         FinderSyncPreferences.shared.enablePptx = newValue
-                    }
-            }
-
-            Section("快捷操作") {
-                Toggle("拷贝文件路径", isOn: $enableCopyPath)
-                    .onChange(of: enableCopyPath) { _, newValue in
-                        FinderSyncPreferences.shared.enableCopyPath = newValue
                     }
             }
 

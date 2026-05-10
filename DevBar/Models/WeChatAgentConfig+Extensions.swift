@@ -48,5 +48,5 @@ extension WeChatAgentRouter.AgentConfig {
 
     // MARK: - Built-in Command Names
 
-    static let builtInCommandNames: Set<String> = ["/new", "/clear", "/help", "/info", "/cwd"]
+    static let builtInCommandNames: Set<String> = ["/new", "/clear", "/help", "/info", "/status", "/model", "/cwd"]
 }

@@ -26,7 +26,9 @@ final class AppViewModel: ObservableObject {
     let updateViewModel = UpdateViewModel()
     let notificationService = NotificationService()
     let weChatViewModel = WeChatViewModel()
+    let antiSleepService = AntiSleepService()
     private var statusTextUpdateTask: Task<Void, Never>?
+    private var antiSleepStatusCancellable: AnyCancellable?
     /// Prevents duplicate handleLoginSuccess calls
     private var isHandlingLogin = false
     private var settingsWindow: NSWindow?
@@ -108,6 +110,20 @@ final class AppViewModel: ObservableObject {
     // both the label and the popover content try to update simultaneously,
     // causing "entangle context after pre-commit" → EXC_BREAKPOINT.
     @Published var statusText: String = "DevBar"
+    @Published private(set) var antiSleepStatus: AntiSleepService.Status = .disabled
+
+    var antiSleepStatusText: String {
+        switch antiSleepStatus {
+        case .disabled:
+            String(localized: "prevent_sleep_status_disabled")
+        case .desktopHolding:
+            String(localized: "prevent_sleep_status_desktop_enabled")
+        case .portableOpenHolding:
+            String(localized: "prevent_sleep_status_portable_open")
+        case .portableClosedReleased:
+            String(localized: "prevent_sleep_status_portable_closed")
+        }
+    }
 
     func updateStatusText(after delay: Duration = .zero) {
         statusTextUpdateTask?.cancel()
@@ -151,6 +167,7 @@ final class AppViewModel: ObservableObject {
             ?? Constants.Defaults.defaultMenuBarIcon
         launchAtLogin = UserDefaults.standard.bool(forKey: Constants.Defaults.launchAtLoginKey)
         isHiddenFromDock = UserDefaults.standard.bool(forKey: Constants.Defaults.hideFromDockKey)
+        antiSleepEnabled = UserDefaults.standard.bool(forKey: Constants.Defaults.antiSleepEnabledKey)
         notificationLowQuotaEnabled = UserDefaults.standard.bool(forKey: Constants.Defaults.notificationLowQuotaEnabledKey)
         notificationLowQuotaThreshold = UserDefaults.standard.double(forKey: Constants.Defaults.notificationLowQuotaThresholdKey)
             .nonZero ?? Constants.Defaults.defaultLowQuotaThreshold
@@ -161,6 +178,15 @@ final class AppViewModel: ObservableObject {
             quotaViewModel.isLoading = true
         }
         syncAuthState()
+        antiSleepStatus = antiSleepService.status
+        antiSleepStatusCancellable = antiSleepService.$status
+            .receive(on: RunLoop.main)
+            .sink { [weak self] status in
+                Task { @MainActor [weak self] in
+                    self?.antiSleepStatus = status
+                }
+            }
+        antiSleepService.setEnabled(antiSleepEnabled)
 
         if hasAuthenticatedSession(for: .glm) {
             Task { @MainActor [weak self] in
@@ -390,6 +416,13 @@ final class AppViewModel: ObservableObject {
         didSet {
             UserDefaults.standard.set(isHiddenFromDock, forKey: Constants.Defaults.hideFromDockKey)
             NSApplication.shared.setActivationPolicy(isHiddenFromDock ? .accessory : .regular)
+        }
+    }
+
+    @Published var antiSleepEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(antiSleepEnabled, forKey: Constants.Defaults.antiSleepEnabledKey)
+            antiSleepService.setEnabled(antiSleepEnabled)
         }
     }
 

@@ -202,7 +202,7 @@ final class WeChatMessageService: ObservableObject {
         }
 
         // 2. Parse command
-        let (agentNames, message) = parseCommand(text)
+        let (agentNames, message) = parseCommand(text, agents: router.agents)
         let targetAgent = agentNames?.first ?? router.defaultAgent
         print("[WeChat:Msg] routing: target=\(targetAgent) names=\(agentNames?.description ?? "nil") msg=\(message.prefix(40))")
 
@@ -239,40 +239,12 @@ final class WeChatMessageService: ObservableObject {
 
     // MARK: - Command Parsing
 
-    /// Supports: `@agent msg`, `/agent msg`, `@a1 @a2 msg`, plain text
-    private func parseCommand(_ text: String) -> (agentNames: [String]?, message: String) {
-        // @agent @agent2 msg — multi-agent broadcast
-        if text.hasPrefix("@") {
-            let parts = text.split(separator: " ", omittingEmptySubsequences: true)
-            var agents: [String] = []
-            var messageStart = 0
-            for (i, part) in parts.enumerated() {
-                if part.hasPrefix("@") {
-                    agents.append(String(part.dropFirst()))
-                    messageStart = i + 1
-                } else {
-                    break
-                }
-            }
-            let message = parts[messageStart...].joined(separator: " ")
-            return (agents.isEmpty ? nil : agents, message.isEmpty ? text : message)
-        }
-
-        // /agent msg — single agent (exclude built-in commands)
-        if text.hasPrefix("/") {
-            let firstWord = text.split(separator: " ").first.map(String.init) ?? ""
-            let withoutSlash = String(firstWord.dropFirst())
-            if !WeChatAgentRouter.AgentConfig.builtInCommandNames.contains(firstWord) && !withoutSlash.isEmpty {
-                let parts = text.dropFirst().split(separator: " ", maxSplits: 1)
-                guard parts.count >= 1 else { return (nil, text) }
-                let agentName = String(parts[0])
-                let message = parts.count > 1 ? String(parts[1]) : ""
-                return ([agentName], message)
-            }
-        }
-
-        // Default agent
-        return (nil, text)
+    private func parseCommand(
+        _ text: String,
+        agents configuredAgents: [WeChatAgentRouter.AgentConfig]
+    ) -> (agentNames: [String]?, message: String) {
+        let parsed = WeChatCommandParser.parse(text, agents: configuredAgents)
+        return (parsed.agentNames, parsed.message)
     }
 
     // MARK: - Helpers

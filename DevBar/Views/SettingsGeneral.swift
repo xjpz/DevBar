@@ -84,6 +84,10 @@ struct SettingsGeneral: View {
             Section("general") {
                 Toggle("launch_at_login", isOn: $appViewModel.launchAtLogin)
                 Toggle("hide_from_dock", isOn: $appViewModel.isHiddenFromDock)
+                Toggle("prevent_sleep", isOn: $appViewModel.antiSleepEnabled)
+                Text(appViewModel.antiSleepStatusText)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if let lastUpdated = quotaViewModel.lastUpdated {

@@ -31,6 +31,7 @@ enum Constants {
         static let defaultMenuBarIcon = "sparkles"
         static let hideFromDockKey = "hide_from_dock"
         static let launchAtLoginKey = "launch_at_login"
+        static let antiSleepEnabledKey = "anti_sleep_enabled"
         static let lastUpdateCheckKey = "last_update_check"
         static let skippedVersionKey = "skipped_version"
 

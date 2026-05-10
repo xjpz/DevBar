@@ -15,12 +15,30 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $selectedTab) {
+            // Tab 图标栏
+            HStack(spacing: 0) {
                 ForEach(SettingsTab.allCases, id: \.self) { tab in
-                    Label(tab.localizedName, systemImage: tab.icon).tag(tab)
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: tab.icon)
+                                .font(.system(size: 15))
+                                .foregroundStyle(selectedTab == tab ? Color.accentColor : .secondary)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 28)
+                            Rectangle()
+                                .fill(Color.accentColor)
+                                .frame(width: 20, height: 2)
+                                .opacity(selectedTab == tab ? 1 : 0)
+                        }
+                        .contentShape(Rectangle())
+                        .help(tab.localizedName)
+                    }
+                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
                 }
             }
-            .pickerStyle(.segmented)
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 8)

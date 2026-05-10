@@ -126,6 +126,7 @@ actor ACPClient {
     private var permissionMessage = ""
     private var turnApprovalPolicy = "never"
     private var codexSandbox = WeChatAgentRouter.AgentConfig.CodexSandbox.readOnly
+    private var requestedModel: String?
     private var writableRoot: String?
     private let onTermination: (@Sendable () async -> Void)?
 
@@ -172,6 +173,7 @@ actor ACPClient {
         message: String,
         approvalPolicy: String,
         codexSandbox: WeChatAgentRouter.AgentConfig.CodexSandbox,
+        model: String?,
         writableRoot: String?,
         handler: (any ACPPermissionHandling)?
     ) {
@@ -179,6 +181,7 @@ actor ACPClient {
         permissionMessage = message
         turnApprovalPolicy = approvalPolicy
         self.codexSandbox = codexSandbox
+        requestedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.writableRoot = writableRoot
         permissionHandler = handler
     }
@@ -259,11 +262,14 @@ actor ACPClient {
         let params: AnyJSON
         switch variant {
         case .codexApp:
-            let dict: [String: Any] = [
+            var dict: [String: Any] = [
                 "approvalPolicy": "never",
                 "cwd": workingDirectory ?? FileManager.default.currentDirectoryPath,
                 "sandbox": "read-only",
             ]
+            if let requestedModel, !requestedModel.isEmpty {
+                dict["model"] = requestedModel
+            }
             params = .dictionary(dict)
             let result = try await sendRequest(method: "thread/start", params: params)
             if let dict = result?.dictValue,
@@ -272,17 +278,44 @@ actor ACPClient {
                 return id
             }
         case .legacyACP:
-            params = .dictionary([
+            var dict: [String: Any] = [
                 "cwd": workingDirectory ?? FileManager.default.currentDirectoryPath,
                 "mcpServers": [],
-            ])
+            ]
+            if let requestedModel, !requestedModel.isEmpty {
+                dict["_meta"] = [
+                    "claudeCode": [
+                        "options": [
+                            "model": requestedModel,
+                            "env": [
+                                "ANTHROPIC_MODEL": requestedModel,
+                            ],
+                        ],
+                    ],
+                ]
+            }
+            params = .dictionary(dict)
             let result = try await sendRequest(method: "session/new", params: params)
             if let dict = result?.dictValue,
                let id = dict["sessionId"] as? String {
+                if let requestedModel, !requestedModel.isEmpty {
+                    try await setLegacySessionModel(requestedModel, sessionID: id)
+                }
                 return id
             }
         }
         throw ACPError.sessionError("Failed to parse session/thread ID from response")
+    }
+
+    private func setLegacySessionModel(_ model: String, sessionID: String) async throws {
+        _ = try await sendRequest(
+            method: "session/set_config_option",
+            params: .dictionary([
+                "sessionId": sessionID,
+                "configId": "model",
+                "value": model,
+            ])
+        )
     }
 
     // MARK: - Chat
@@ -346,7 +379,7 @@ actor ACPClient {
         turnChannels[threadID] = turnCont
         defer { turnChannels.removeValue(forKey: threadID) }
 
-        let params: [String: Any] = [
+        var params: [String: Any] = [
             "threadId": threadID,
             "approvalPolicy": turnApprovalPolicy,
             "approvalsReviewer": "user",
@@ -354,6 +387,9 @@ actor ACPClient {
             "sandboxPolicy": codexSandboxPolicy(),
             "cwd": workingDirectory ?? FileManager.default.currentDirectoryPath,
         ]
+        if let requestedModel, !requestedModel.isEmpty {
+            params["model"] = requestedModel
+        }
 
         _ = try await sendRequest(method: "turn/start", params: .dictionary(params))
 
