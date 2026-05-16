@@ -433,9 +433,16 @@ private extension LoginView {
             windowTitle: String(localized: "login_mimo_platform"),
             targetCookieName: "api-platform_serviceToken",
             onTokenExtracted: { token, cookies in
-                isValidating = true
                 let cookieString = MimoAPIClient.platformCookieString(from: cookies)
                 let storedValue = cookieString.isEmpty ? token : cookieString
+                let savedValue = mimoCookie.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if MimoAPIClient.isSameRequiredCookie(storedValue, savedValue) {
+                    loginError = String(localized: "mimo_cookie_unchanged_from_browser")
+                    return false
+                }
+
+                isValidating = true
 
                 Task { @MainActor in
                     defer { isValidating = false }
@@ -468,6 +475,7 @@ private extension LoginView {
                         loginError = error.localizedDescription
                     }
                 }
+                return true
             }
         )
 
@@ -518,6 +526,7 @@ private extension LoginView {
                         loginError = String(localized: "token_invalid")
                     }
                 }
+                return true
             }
         )
 
@@ -578,13 +587,13 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
     private let loginURL: String
     private let windowTitle: String
     private let targetCookieName: String
-    private let onTokenExtracted: (_ token: String, _ cookies: [HTTPCookie]) -> Void
+    private let onTokenExtracted: (_ token: String, _ cookies: [HTTPCookie]) -> Bool
 
     init(
         loginURL: String,
         windowTitle: String,
         targetCookieName: String,
-        onTokenExtracted: @escaping (_ token: String, _ cookies: [HTTPCookie]) -> Void
+        onTokenExtracted: @escaping (_ token: String, _ cookies: [HTTPCookie]) -> Bool
     ) {
         self.loginURL = loginURL
         self.windowTitle = windowTitle
@@ -727,8 +736,9 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
 
     private func handleLoginSuccess(token: String, cookies: [HTTPCookie]) {
         guard !didExtract else { return }
-        close()
-        onTokenExtracted(token, cookies)
+        if onTokenExtracted(token, cookies) {
+            close()
+        }
     }
 
     @MainActor

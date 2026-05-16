@@ -50,6 +50,12 @@ struct SettingsAccounts: View {
         appViewModel.accountConfigs.sorted { $0.order < $1.order }
     }
 
+    private var savedMimoCookieValue: String {
+        [originalMimoCookieInput, appViewModel.credentials?.token ?? ""]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? ""
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -598,6 +604,7 @@ struct SettingsAccounts: View {
                         glmLoginError = String(localized: "token_invalid")
                     }
                 }
+                return true
             }
         )
 
@@ -737,6 +744,14 @@ struct SettingsAccounts: View {
             onTokenExtracted: { token, cookies in
                 let cookieString = MimoAPIClient.platformCookieString(from: cookies)
                 let storedValue = cookieString.isEmpty ? token : cookieString
+                let savedValue = savedMimoCookieValue
+
+                if MimoAPIClient.isSameRequiredCookie(storedValue, savedValue) {
+                    Task { @MainActor in
+                        mimoImportError = String(localized: "mimo_cookie_unchanged_from_browser")
+                    }
+                    return false
+                }
 
                 Task { @MainActor in
                     do {
@@ -769,6 +784,7 @@ struct SettingsAccounts: View {
                         mimoImportError = error.localizedDescription
                     }
                 }
+                return true
             }
         )
 

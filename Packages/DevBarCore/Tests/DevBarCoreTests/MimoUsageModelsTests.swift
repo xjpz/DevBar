@@ -130,3 +130,25 @@ func mimoCookieHeaderFiltersRequiredOnly() {
             == #"api-platform_serviceToken="yVHEDQlNiFT1sk9ziPPq8fX39z2idDPwg="; userId=3966; api-platform_slh="xeTjaz9uLpVZFo="; api-platform_ph="RD634SJBg==""#
     )
 }
+
+@Test
+func mimoRequiredCookieComparisonIgnoresOrderQuotesAndExtraCookies() {
+    let stored = """
+    api-platform_serviceToken="token"; userId=3966; api-platform_slh="slh"; api-platform_ph="ph"; serviceToken=legacy
+    """
+    let browser = """
+    api-platform_ph=ph; api-platform_slh=slh; userId=3966; api-platform_serviceToken=token
+    """
+
+    #expect(MimoAPIClient.isSameRequiredCookie(stored, browser))
+}
+
+@Test
+func mimoRequiredCookieComparisonRejectsDifferentOrIncompleteCookies() {
+    let stored = """
+    api-platform_serviceToken="token"; userId=3966; api-platform_slh="slh"; api-platform_ph="ph"
+    """
+
+    #expect(!MimoAPIClient.isSameRequiredCookie(stored, "plain-token"))
+    #expect(!MimoAPIClient.isSameRequiredCookie(stored, "api-platform_serviceToken=other; userId=3966; api-platform_slh=slh; api-platform_ph=ph"))
+}

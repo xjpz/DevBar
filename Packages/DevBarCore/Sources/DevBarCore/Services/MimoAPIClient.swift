@@ -80,6 +80,20 @@ public final class MimoAPIClient: Sendable {
             .joined(separator: "; ")
     }
 
+    public static func isSameRequiredCookie(_ lhs: String, _ rhs: String) -> Bool {
+        let lhsValues = requiredCookieValues(from: lhs)
+        let rhsValues = requiredCookieValues(from: rhs)
+        return !lhsValues.isEmpty && lhsValues == rhsValues
+    }
+
+    public static func requiredCookieValues(from rawValue: String) -> [String: String] {
+        var values: [String: String] = [:]
+        for pair in cookiePairs(from: rawValue) where requiredCookieNames.contains(pair.name) {
+            values[pair.name] = pair.value
+        }
+        return values
+    }
+
     private func fetchWithCookies<Response: Decodable>(url: URL, serviceToken: String) async throws -> (Response, String?) {
         let normalizedToken = Self.normalizedServiceToken(from: serviceToken)
         guard !normalizedToken.isEmpty else {
