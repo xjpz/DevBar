@@ -103,29 +103,30 @@ func mimoPlanDetailDailyRefreshDecision() throws {
 }
 
 @Test
-func mimoServiceTokenNormalizesFullCookie() {
-    let token = MimoAPIClient.normalizedServiceToken(
-        from: "foo=bar; serviceToken=\"abc123\"; another=value"
-    )
+func mimoServiceTokenRejectsIncompleteCookies() {
+    // Missing api-platform_serviceToken — should return empty
+    #expect(MimoAPIClient.normalizedServiceToken(
+        from: "foo=bar; userId=123; api-platform_slh=\"abc\""
+    ).isEmpty)
 
-    #expect(token == "abc123")
-    #expect(MimoAPIClient.normalizedServiceToken(from: " plain-token ") == "plain-token")
-    #expect(MimoAPIClient.normalizedServiceToken(from: "serviceToken=\"abc123") == "abc123")
-    #expect(MimoAPIClient.cookieHeaderValue(for: token) == "serviceToken=\"abc123\"")
+    // Missing all required — empty
+    #expect(MimoAPIClient.normalizedServiceToken(from: " plain-token ").isEmpty)
+    #expect(MimoAPIClient.normalizedServiceToken(from: "serviceToken=\"abc123\"").isEmpty)
 }
 
 @Test
-func mimoCookieHeaderPreservesBrowserCookie() {
+func mimoCookieHeaderFiltersRequiredOnly() {
     let cookie = """
     serviceToken="/vjQa88K2JeX+vuUvl6J6Mnsz549RsYr2ThHTVPKLhYGjQoYwDZ6pgn9YX7z1Va5GWMkgyGqoyCdKKw=="; api-platform_serviceToken="yVHEDQlNiFT1sk9ziPPq8fX39z2idDPwg="; userId=3966; api-platform_slh="xeTjaz9uLpVZFo="; api-platform_ph="RD634SJBg=="
     """
 
-    #expect(
-        MimoAPIClient.normalizedServiceToken(from: cookie)
-            == "/vjQa88K2JeX+vuUvl6J6Mnsz549RsYr2ThHTVPKLhYGjQoYwDZ6pgn9YX7z1Va5GWMkgyGqoyCdKKw=="
-    )
+    // normalizedServiceToken returns non-empty when all required cookies are present
+    let normalized = MimoAPIClient.normalizedServiceToken(from: cookie)
+    #expect(!normalized.isEmpty)
+
+    // cookieHeaderValue only includes the 4 required cookies, drops serviceToken
     #expect(
         MimoAPIClient.cookieHeaderValue(for: cookie)
-            == #"serviceToken="/vjQa88K2JeX+vuUvl6J6Mnsz549RsYr2ThHTVPKLhYGjQoYwDZ6pgn9YX7z1Va5GWMkgyGqoyCdKKw=="; api-platform_serviceToken="yVHEDQlNiFT1sk9ziPPq8fX39z2idDPwg="; userId=3966; api-platform_slh="xeTjaz9uLpVZFo="; api-platform_ph="RD634SJBg==""#
+            == #"api-platform_serviceToken="yVHEDQlNiFT1sk9ziPPq8fX39z2idDPwg="; userId=3966; api-platform_slh="xeTjaz9uLpVZFo="; api-platform_ph="RD634SJBg==""#
     )
 }

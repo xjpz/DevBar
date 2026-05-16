@@ -14,6 +14,7 @@ struct IOSMarkdownView: View {
     @State private var isEditing = true
     @State private var isScrolledDown = false
     @State private var previewScrollToTop = false
+    @State private var previewPullTriggered = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -74,6 +75,13 @@ struct IOSMarkdownView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .onPreferenceChange(PreviewScrollOffsetKey.self) { offset in
                             isScrolledDown = offset < -300
+                            if offset > 80 && !previewPullTriggered {
+                                previewPullTriggered = true
+                                showDocumentList = true
+                            }
+                            if offset <= 0 {
+                                previewPullTriggered = false
+                            }
                         }
                         .onChange(of: previewScrollToTop) { _, flag in
                             if flag {

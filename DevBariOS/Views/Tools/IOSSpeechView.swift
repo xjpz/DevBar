@@ -158,8 +158,13 @@ struct IOSSpeechToTextView: View {
                 )
             }
 
-            resultSection
+            if manager.isRecording || !manager.recognizedText.isEmpty || manager.errorMessage != nil {
+                resultSection
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.easeOut(duration: 0.25), value: manager.isRecording)
+        .animation(.easeOut(duration: 0.25), value: manager.recognizedText.isEmpty)
         .padding(16)
         .background(Color.clear)
             .toolbarBackground(.hidden, for: .navigationBar)

@@ -27,6 +27,24 @@ struct SettingsAccounts: View {
     @State private var transferSheetState: TransferSheetState?
     @State private var transferExportError: String?
     @State private var isGeneratingTransferQRCode = false
+    @State private var selectedInterval: TimeInterval
+
+    private let intervals: [(String, TimeInterval)] = [
+        (String(localized: "minutes_3"), 180),
+        (String(localized: "minutes_5"), 300),
+        (String(localized: "minutes_10"), 600),
+        (String(localized: "minutes_15"), 900),
+        (String(localized: "minutes_30"), 1800),
+        (String(localized: "minutes_60"), 3600),
+        (String(localized: "never"), 0),
+    ]
+
+    init() {
+        let savedInterval = UserDefaults.standard.double(forKey: Constants.Defaults.refreshIntervalKey)
+        _selectedInterval = State(
+            initialValue: savedInterval.nonZero ?? Constants.Defaults.defaultRefreshInterval
+        )
+    }
 
     private var sortedConfigs: [AccountConfig] {
         appViewModel.accountConfigs.sorted { $0.order < $1.order }
@@ -35,6 +53,8 @@ struct SettingsAccounts: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
+                refreshIntervalCard
+
                 introCard
 
                 ForEach(sortedConfigs) { config in
@@ -64,6 +84,34 @@ struct SettingsAccounts: View {
         .sheet(item: $transferSheetState) { state in
             TransferQRCodeSheet(payload: state.payload, url: state.url, mode: state.mode)
         }
+        .onChange(of: selectedInterval) { _, newValue in
+            appViewModel.refreshInterval = newValue
+            appViewModel.stopAutoRefresh()
+            appViewModel.startRefreshIfNeeded()
+        }
+    }
+
+    private var refreshIntervalCard: some View {
+        HStack {
+            Text("auto_refresh_interval")
+                .font(.subheadline)
+            Spacer()
+            Picker("", selection: $selectedInterval) {
+                ForEach(intervals, id: \.1) { label, value in
+                    Text(label).tag(value)
+                }
+            }
+            .pickerStyle(.menu)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 
     private var introCard: some View {
@@ -819,5 +867,11 @@ private struct AccountDropDelegate: DropDelegate {
 
     func dropExited(info: DropInfo) {
         guard info.location.x.isFinite else { return }
+    }
+}
+
+private extension Double {
+    var nonZero: Double? {
+        self > 0 ? self : nil
     }
 }

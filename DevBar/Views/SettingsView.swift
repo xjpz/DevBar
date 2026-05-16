@@ -54,8 +54,6 @@ struct SettingsView: View {
                 SettingsAccounts()
             case .weChat:
                 SettingsWeChat(viewModel: appViewModel.weChatViewModel)
-            case .about:
-                SettingsAbout()
             }
         }
         .frame(width: 340, height: 480)

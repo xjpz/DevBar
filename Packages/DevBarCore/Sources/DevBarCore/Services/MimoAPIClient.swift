@@ -1,8 +1,12 @@
 import Foundation
 
 public final class MimoAPIClient: Sendable {
-    private static let cookieName = "serviceToken"
-    private static let platformCookiePrefix = "api-platform_"
+    private static let requiredCookieNames: Set<String> = [
+        "userId",
+        "api-platform_slh",
+        "api-platform_ph",
+        "api-platform_serviceToken",
+    ]
 
     private let session: URLSession
     private let decoder = JSONDecoder()
@@ -48,66 +52,32 @@ public final class MimoAPIClient: Sendable {
 
     /// Build a cookie string from platform cookies for Keychain storage.
     public static func platformCookieString(from cookies: [HTTPCookie]) -> String {
-        let targetNames: Set<String> = [
-            "\(platformCookiePrefix)serviceToken",
-            "\(platformCookiePrefix)slh",
-            "\(platformCookiePrefix)ph",
-            "userId",
-            "passToken",
-            "serviceToken",
-        ]
-        var result = cookies
-            .filter { targetNames.contains($0.name) }
+        cookies
+            .filter { requiredCookieNames.contains($0.name) }
             .map { cookie in
                 let value = stripQuotes(cookie.value)
                 return "\(cookie.name)=\"\(value)\""
             }
-
-        // If api-platform_serviceToken is missing, fall back to serviceToken
-        let hasPlatformToken = cookies.contains { $0.name == "\(platformCookiePrefix)serviceToken" }
-        if !hasPlatformToken, let fallback = cookies.first(where: { $0.name == "serviceToken" }) {
-            result.insert("api-platform_serviceToken=\"\(stripQuotes(fallback.value))\"", at: 0)
-        }
-
-        return result.joined(separator: "; ")
+            .joined(separator: "; ")
     }
 
     public static func normalizedServiceToken(from rawValue: String) -> String {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "" }
 
-        for pair in cookiePairs(from: trimmed) {
-            if pair.name == cookieName || pair.name == "\(platformCookiePrefix)\(cookieName)" {
-                return pair.value
-            }
-        }
-
-        return stripQuotes(trimmed)
+        let pairs = cookiePairs(from: trimmed)
+        let present = Set(pairs.map(\.name))
+        return requiredCookieNames.isSubset(of: present) ? trimmed : ""
     }
 
     public static func cookieHeaderValue(for rawValue: String) -> String {
         let pairs = cookiePairs(from: rawValue)
-
-        // Input already contains api-platform_* cookies from WebView — send as-is
-        if pairs.contains(where: { $0.name.hasPrefix(platformCookiePrefix) }) {
-            return pairs
-                .map { pair in
-                    pair.wasQuoted ? "\(pair.name)=\"\(pair.value)\"" : "\(pair.name)=\(pair.value)"
-                }
-                .joined(separator: "; ")
-        }
-
-        // Legacy: user pasted serviceToken=... or raw value
-        if pairs.contains(where: { $0.name == cookieName }) {
-            return pairs
-                .map { pair in
-                    pair.wasQuoted ? "\(pair.name)=\"\(pair.value)\"" : "\(pair.name)=\(pair.value)"
-                }
-                .joined(separator: "; ")
-        }
-
-        // Raw token value — wrap as serviceToken="value"
-        return "\(cookieName)=\"\(normalizedServiceToken(from: rawValue))\""
+        return pairs
+            .filter { requiredCookieNames.contains($0.name) }
+            .map { pair in
+                pair.wasQuoted ? "\(pair.name)=\"\(pair.value)\"" : "\(pair.name)=\(pair.value)"
+            }
+            .joined(separator: "; ")
     }
 
     private func fetchWithCookies<Response: Decodable>(url: URL, serviceToken: String) async throws -> (Response, String?) {
@@ -120,12 +90,13 @@ public final class MimoAPIClient: Sendable {
         request.httpMethod = "GET"
         let cookieHeader = Self.cookieHeaderValue(for: serviceToken)
         request.setValue(cookieHeader, forHTTPHeaderField: "Cookie")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("en", forHTTPHeaderField: "Accept-Language")
-        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36", forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
+        request.setValue("https://platform.xiaomimimo.com", forHTTPHeaderField: "Origin")
         request.setValue("https://platform.xiaomimimo.com/console/plan-manage", forHTTPHeaderField: "Referer")
-        request.setValue("Asia/Shanghai", forHTTPHeaderField: "X-Timezone")
-        request.setValue("u=1, i", forHTTPHeaderField: "Priority")
+        request.setValue(
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+            forHTTPHeaderField: "User-Agent"
+        )
 
         #if DEBUG
         print("[MimoAPIClient] GET \(url.absoluteString)")
@@ -185,14 +156,7 @@ public final class MimoAPIClient: Sendable {
         }
     }
 
-    private static let targetCookieNames: Set<String> = [
-        "\(platformCookiePrefix)serviceToken",
-        "\(platformCookiePrefix)slh",
-        "\(platformCookiePrefix)ph",
-        "serviceToken",
-        "userId",
-        "passToken",
-    ]
+    private static let targetCookieNames: Set<String> = requiredCookieNames
 
     private func mergeSetCookies(_ currentCookie: String, setCookieHeaders: [String]) -> String? {
         var merged = Self.cookiePairs(from: currentCookie)

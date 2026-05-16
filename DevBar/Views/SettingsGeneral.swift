@@ -1,33 +1,19 @@
 // SettingsGeneral.swift
 // DevBar
 
+import AppKit
 import DevBarCore
 import SwiftUI
 
 struct SettingsGeneral: View {
     @EnvironmentObject private var appViewModel: AppViewModel
-    @EnvironmentObject private var quotaViewModel: QuotaViewModel
+    @EnvironmentObject private var updateViewModel: UpdateViewModel
     @EnvironmentObject private var languageManager: LanguageManager
 
-    @State private var selectedInterval: TimeInterval
     @State private var selectedIcon: String
     @State private var showRestartAlert = false
 
-    private let intervals: [(String, TimeInterval)] = [
-        (String(localized: "minutes_3"), 180),
-        (String(localized: "minutes_5"), 300),
-        (String(localized: "minutes_10"), 600),
-        (String(localized: "minutes_15"), 900),
-        (String(localized: "minutes_30"), 1800),
-        (String(localized: "minutes_60"), 3600),
-        (String(localized: "never"), 0),
-    ]
-
     init() {
-        let savedInterval = UserDefaults.standard.double(forKey: Constants.Defaults.refreshIntervalKey)
-        _selectedInterval = State(
-            initialValue: savedInterval.nonZero ?? Constants.Defaults.defaultRefreshInterval
-        )
         let savedIcon = UserDefaults.standard.string(forKey: Constants.Defaults.menuBarIconKey)
         _selectedIcon = State(
             initialValue: savedIcon ?? Constants.Defaults.defaultMenuBarIcon
@@ -68,19 +54,6 @@ struct SettingsGeneral: View {
                 }
             }
 
-            Section {
-                HStack {
-                    Text("auto_refresh_interval")
-                    Spacer()
-                    Picker("", selection: $selectedInterval) {
-                        ForEach(intervals, id: \.1) { label, value in
-                            Text(label).tag(value)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                }
-            }
-
             Section("general") {
                 Toggle("launch_at_login", isOn: $appViewModel.launchAtLogin)
                 Toggle("hide_from_dock", isOn: $appViewModel.isHiddenFromDock)
@@ -90,11 +63,41 @@ struct SettingsGeneral: View {
                     .foregroundStyle(.secondary)
             }
 
-            if let lastUpdated = quotaViewModel.lastUpdated {
-                Section("status") {
-                    Text("last_updated \(lastUpdated.formatted(.dateTime.hour().minute().second()))")
+            Section("about") {
+                HStack {
+                    Text("version")
+                    Spacer()
+                    Text(appVersion)
                         .foregroundStyle(.secondary)
                 }
+
+                Button {
+                    if let url = URL(string: "https://github.com/xjpz/DevBar") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    HStack {
+                        Text("GitHub")
+                        Spacer()
+                        Image("Github")
+                            .resizable()
+                            .frame(width: 16, height: 16)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    updateViewModel.checkForUpdates(silent: false)
+                } label: {
+                    HStack {
+                        Text("check_for_updates")
+                        Spacer()
+                        Image(systemName: updateViewModel.hasUpdateAvailable
+                              ? "arrow.up.circle.fill" : "arrow.up.circle")
+                        .tint(updateViewModel.hasUpdateAvailable ? .blue : .secondary)
+                    }
+                }
+                .buttonStyle(.plain)
             }
         }
         .formStyle(.grouped)
@@ -112,11 +115,10 @@ struct SettingsGeneral: View {
         } message: {
             Text("restart_to_apply_language")
         }
-        .onChange(of: selectedInterval) { _, newValue in
-            appViewModel.refreshInterval = newValue
-            appViewModel.stopAutoRefresh()
-            appViewModel.startRefreshIfNeeded()
-        }
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
     }
 
     private func iconView(for iconName: String) -> some View {

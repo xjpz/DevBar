@@ -67,38 +67,52 @@ struct IOSFormatterView: View {
     @State private var format: FormatterFormat = .json
     @State private var input = "{\"name\":\"DevBar\",\"version\":1,\"features\":[\"quota\",\"tools\"]}"
     @State private var output = ""
+    @State private var isKeyboardVisible = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            Picker("Format", selection: $format) {
-                ForEach(FormatterFormat.allCases) { fmt in
-                    Text(fmt.title).tag(fmt)
-                }
-            }
-            .pickerStyle(.segmented)
+        ScrollView {
+            VStack(spacing: 16) {
+                if !isKeyboardVisible {
+                    VStack(spacing: 16) {
+                        Picker("Format", selection: $format) {
+                            ForEach(FormatterFormat.allCases) { fmt in
+                                Text(fmt.title).tag(fmt)
+                            }
+                        }
+                        .pickerStyle(.segmented)
 
-            HStack {
-                ForEach(format.operations) { op in
-                    Button(op.title) {
-                        perform(op)
+                        HStack {
+                            ForEach(format.operations) { op in
+                                Button(op.title) {
+                                    perform(op)
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(input.isEmpty)
+                            }
+                        }
                     }
-                    .buttonStyle(.bordered)
-                    .disabled(input.isEmpty)
+                    .transition(.move(edge: .top).combined(with: .opacity))
                 }
+
+                formatterEditor(title: String(localized: "ios_tools_formatter_input"), text: $input)
+
+                outputEditor(title: String(localized: "ios_tools_formatter_output"), text: output)
             }
-
-            formatterEditor(title: String(localized: "ios_tools_formatter_input"), text: $input)
-
-            formatterEditor(title: String(localized: "ios_tools_formatter_output"), text: $output)
+            .padding(16)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .scrollDismissesKeyboard(.interactively)
         .background(Color.clear)
-            .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_formatter")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
         .iosToolNavigationChrome(theme)
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            withAnimation(.easeInOut(duration: 0.25)) { isKeyboardVisible = true }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            withAnimation(.easeInOut(duration: 0.25)) { isKeyboardVisible = false }
+        }
         .onChange(of: format) { _, newFormat in
             input = newFormat.sampleInput
             output = ""
@@ -115,6 +129,21 @@ struct IOSFormatterView: View {
                 .scrollContentBackground(.hidden)
                 .padding(12)
                 .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .foregroundStyle(theme.textPrimary)
+    }
+
+    private func outputEditor(title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            TextEditor(text: .constant(text))
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 180)
+                .scrollContentBackground(.hidden)
+                .padding(12)
+                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .disabled(true)
         }
         .foregroundStyle(theme.textPrimary)
     }

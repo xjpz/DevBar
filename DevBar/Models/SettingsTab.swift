@@ -9,7 +9,6 @@ enum SettingsTab: String, CaseIterable {
     case finder
     case accounts
     case weChat
-    case about
 
     var localizedName: String {
         switch self {
@@ -18,7 +17,6 @@ enum SettingsTab: String, CaseIterable {
         case .finder: return String(localized: "tab_finder")
         case .accounts: return String(localized: "tab_accounts")
         case .weChat: return String(localized: "tab_wechat")
-        case .about: return String(localized: "tab_about")
         }
     }
 
@@ -27,9 +25,8 @@ enum SettingsTab: String, CaseIterable {
         case .general: return "gear"
         case .notifications: return "bell"
         case .finder: return "folder"
-        case .accounts: return "person.2"
+        case .accounts: return "person.badge.key"
         case .weChat: return "message.fill"
-        case .about: return "info.circle"
         }
     }
 }

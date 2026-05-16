@@ -44,11 +44,30 @@
         }
       }
     },
+    "%lld" : {
+
+    },
     "%lld%%" : {
 
     },
     "•" : {
 
+    },
+    "about" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关于"
+          }
+        }
+      }
     },
     "accounts_count_format" : {
       "localizations" : {
@@ -1228,6 +1247,9 @@
     "DevBar %@" : {
 
     },
+    "DevBar Lock Screen Quota" : {
+
+    },
     "DevBar Quota" : {
 
     },
@@ -1436,6 +1458,9 @@
         }
       }
     },
+    "GitHub" : {
+
+    },
     "GLM" : {
 
     },
@@ -1574,6 +1599,9 @@
       }
     },
     "Headers: %lld" : {
+
+    },
+    "Hello" : {
 
     },
     "hide_from_dock" : {
@@ -5357,6 +5385,7 @@
       }
     },
     "last_updated %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6688,6 +6717,9 @@
     "Shell Script (.sh)" : {
 
     },
+    "Show short-period provider quota usage on the Lock Screen." : {
+
+    },
     "show_original" : {
       "localizations" : {
         "en" : {
@@ -6721,6 +6753,7 @@
       }
     },
     "status" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6753,6 +6786,7 @@
       }
     },
     "tab_about" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7095,6 +7129,22 @@
     },
     "Value" : {
 
+    },
+    "version" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "版本"
+          }
+        }
+      }
     },
     "view_details" : {
       "localizations" : {
