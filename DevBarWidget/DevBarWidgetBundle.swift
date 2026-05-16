@@ -10,5 +10,6 @@ import SwiftUI
 struct DevBarWidgetBundle: WidgetBundle {
     var body: some Widget {
         DevBarWidget()
+        DevBarLockScreenQuotaWidget()
     }
 }

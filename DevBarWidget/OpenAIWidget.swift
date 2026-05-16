@@ -77,11 +77,12 @@ struct OpenAIWidget: Widget {
         ) { entry in
             DevBarWidgetEntryView(entry: entry)
                 .containerBackground(for: .widget) {
-                    Color.clear
+                    DevBarWidgetBackground()
                 }
         }
         .configurationDisplayName("DevBar (OpenAI)")
         .description(String(localized: "widget_description_openai"))
         .supportedFamilies(supportedFamilies)
+        .containerBackgroundRemovable(true)
     }
 }

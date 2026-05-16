@@ -77,11 +77,12 @@ struct GLMWidget: Widget {
         ) { entry in
             DevBarWidgetEntryView(entry: entry)
                 .containerBackground(for: .widget) {
-                    Color.clear
+                    DevBarWidgetBackground()
                 }
         }
         .configurationDisplayName("DevBar (GLM)")
         .description(String(localized: "widget_description_glm"))
         .supportedFamilies(supportedFamilies)
+        .containerBackgroundRemovable(true)
     }
 }
