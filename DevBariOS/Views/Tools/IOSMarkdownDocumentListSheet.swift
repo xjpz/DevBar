@@ -32,7 +32,7 @@ struct IOSMarkdownDocumentListSheet: View {
                             .textInputAutocapitalization(.never)
                     }
                     .padding(10)
-                    .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .iosGlassContainer(theme, cornerRadius: 10)
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
@@ -74,7 +74,7 @@ struct IOSMarkdownDocumentListSheet: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .iosGlassContainer(theme, cornerRadius: 12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .stroke(theme.borderSubtle, lineWidth: 1)

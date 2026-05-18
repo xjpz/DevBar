@@ -128,7 +128,7 @@ struct IOSFormatterView: View {
                 .frame(minHeight: 180)
                 .scrollContentBackground(.hidden)
                 .padding(12)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
         }
         .foregroundStyle(theme.textPrimary)
     }
@@ -142,7 +142,7 @@ struct IOSFormatterView: View {
                 .frame(minHeight: 180)
                 .scrollContentBackground(.hidden)
                 .padding(12)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
                 .disabled(true)
         }
         .foregroundStyle(theme.textPrimary)

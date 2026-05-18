@@ -110,7 +110,7 @@ struct IOSOCRView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 140)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
             }
         }
     }
@@ -141,7 +141,7 @@ struct IOSOCRView: View {
                     .foregroundStyle(theme.textSecondary)
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .iosGlassContainer(theme, cornerRadius: 18)
             } else {
                 ScrollView {
                     Text(recognizedText)
@@ -152,7 +152,7 @@ struct IOSOCRView: View {
                         .padding(14)
                 }
                 .frame(minHeight: 120, alignment: .top)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(theme.borderSubtle, lineWidth: 1)

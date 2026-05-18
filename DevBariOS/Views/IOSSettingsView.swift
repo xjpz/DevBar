@@ -6,11 +6,13 @@ struct IOSSettingsView: View {
     @EnvironmentObject private var languageManager: IOSLanguageManager
     @EnvironmentObject private var themeManager: IOSThemeManager
     @Environment(\.themeTokens) private var theme
+    @State private var isGreetingEditorExpanded = false
 
     private let intervals: [(LocalizedStringKey, TimeInterval)] = [
         ("ios_settings_interval_3m", 180),
         ("ios_settings_interval_5m", 300),
         ("ios_settings_interval_10m", 600),
+        ("ios_settings_interval_15m", 900),
         ("ios_settings_interval_30m", 1800),
         ("ios_settings_interval_60m", 3600),
         ("ios_settings_interval_never", 0),
@@ -50,22 +52,50 @@ struct IOSSettingsView: View {
             }
 
             Section("ios_settings_greeting_section") {
-                TextEditor(text: $themeManager.developerGreeting)
-                    .font(.system(.body, design: .monospaced))
-                    .frame(minHeight: 100)
-                    .scrollContentBackground(.hidden)
-                    .padding(8)
-                    .background(theme.surfaceSecondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .strokeBorder(theme.borderSubtle, lineWidth: 1)
-                    )
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isGreetingEditorExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(greetingPreviewText)
+                                .font(.subheadline)
+                                .foregroundStyle(theme.textPrimary)
+                                .lineLimit(isGreetingEditorExpanded ? 2 : 1)
 
-                Button("ios_settings_greeting_reset") {
-                    themeManager.developerGreeting = IOSThemeManager.defaultGreeting
+                            Text(LocalizedStringKey(isGreetingEditorExpanded ? "ios_settings_greeting_tap_to_collapse" : "ios_settings_greeting_tap_to_edit"))
+                                .font(.caption)
+                                .foregroundStyle(theme.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Image(systemName: isGreetingEditorExpanded ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                    .contentShape(Rectangle())
                 }
-                .font(.caption)
-                .foregroundStyle(theme.textTertiary)
+                .buttonStyle(.plain)
+
+                if isGreetingEditorExpanded {
+                    TextEditor(text: $themeManager.developerGreeting)
+                        .font(.system(.body, design: .monospaced))
+                        .frame(minHeight: 76)
+                        .scrollContentBackground(.hidden)
+                        .padding(8)
+                        .background(theme.surfaceSecondary.opacity(theme.isGeek ? 0.42 : 1), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(theme.borderSubtle, lineWidth: 1)
+                        )
+
+                    Button("ios_settings_greeting_reset") {
+                        themeManager.developerGreeting = IOSThemeManager.defaultGreeting
+                    }
+                    .font(.caption)
+                    .foregroundStyle(theme.textTertiary)
+                }
             }
 
             Section("ios_settings_refresh_section") {
@@ -75,18 +105,11 @@ struct IOSSettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("ios.settings.refreshInterval")
-
-                Text("ios_settings_refresh_hint")
-                    .font(.caption)
-                    .foregroundStyle(theme.textSecondary)
-                    .accessibilityIdentifier("ios.settings.refreshHint")
             }
 
             Section("ios_settings_widget_section") {
-                Text("ios_settings_widget_intro")
-                    .foregroundStyle(theme.textSecondary)
-                Text("ios_settings_widget_hint")
-                    .font(.caption)
+                Label("ios_settings_widget_intro", systemImage: "square.grid.2x2")
+                    .font(.subheadline)
                     .foregroundStyle(theme.textSecondary)
             }
 
@@ -96,11 +119,26 @@ struct IOSSettingsView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.clear)
+        .iosGeekScreenBackground(theme)
         .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_settings_title")
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .accessibilityIdentifier("ios.settings.screen")
+    }
+
+    private var greetingPreviewText: String {
+        let firstLine = themeManager.developerGreeting
+            .split(whereSeparator: \.isNewline)
+            .first
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if let firstLine, !firstLine.isEmpty {
+            return firstLine
+        }
+        return IOSThemeManager.defaultGreeting
+            .split(whereSeparator: \.isNewline)
+            .first
+            .map(String.init) ?? IOSThemeManager.defaultGreeting
     }
 }

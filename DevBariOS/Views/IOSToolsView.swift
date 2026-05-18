@@ -147,7 +147,7 @@ struct IOSToolsView: View {
             }
             .padding(16)
         }
-        .background(theme.backgroundSecondary.ignoresSafeArea())
+        .iosGeekScreenBackground(theme)
         .navigationTitle("ios_tab_tools")
         .toolbarTitleDisplayMode(.inlineLarge)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -191,7 +191,7 @@ struct IOSToolCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 18)
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(theme.borderSubtle, lineWidth: 1)

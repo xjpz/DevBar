@@ -55,7 +55,7 @@ struct IOSBase64View: View {
                 .frame(minHeight: 180)
                 .scrollContentBackground(.hidden)
                 .padding(12)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
         }
     }
 
@@ -67,7 +67,7 @@ struct IOSBase64View: View {
                 .frame(minHeight: 180)
                 .scrollContentBackground(.hidden)
                 .padding(12)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
                 .disabled(true)
         }
     }

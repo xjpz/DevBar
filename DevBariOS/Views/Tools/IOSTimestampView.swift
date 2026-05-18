@@ -14,7 +14,7 @@ struct IOSTimestampView: View {
                     TextField("Seconds or milliseconds", text: $unixInput)
                         .keyboardType(.numbersAndPunctuation)
                         .padding(12)
-                        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .iosGlassContainer(theme, cornerRadius: 14)
 
                     Button("Convert to Date") {
                         convertUnix()
@@ -52,7 +52,7 @@ struct IOSTimestampView: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 18)
     }
 
     private func convertUnix() {

@@ -47,7 +47,7 @@ struct IOSAPIClientView: View {
                             .foregroundStyle(theme.brandPrimary)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 12)
-                            .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .iosGlassContainer(theme, cornerRadius: 14)
                             .fixedSize(horizontal: true, vertical: false)
                     }
 
@@ -57,7 +57,7 @@ struct IOSAPIClientView: View {
                         .keyboardType(.URL)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 12)
-                        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .iosGlassContainer(theme, cornerRadius: 14)
                         .frame(maxWidth: .infinity)
                         .layoutPriority(1)
                 }
@@ -127,7 +127,7 @@ struct IOSAPIClientView: View {
                             .padding(14)
                     }
                     .frame(minHeight: 260, alignment: .top)
-                    .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .iosGlassContainer(theme, cornerRadius: 18)
                 }
             }
             .padding(16)
@@ -185,7 +185,7 @@ struct IOSAPIClientView: View {
                     .frame(minHeight: 180)
                     .scrollContentBackground(.hidden)
                     .padding(10)
-                    .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .iosGlassContainer(theme, cornerRadius: 16)
             }
         }
     }
@@ -202,7 +202,7 @@ struct IOSAPIClientView: View {
                     TextField("Value", text: $row.value)
                 }
                 .padding(12)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 14)
             }
 
             Button {
@@ -224,7 +224,7 @@ struct IOSAPIClientView: View {
                 .foregroundStyle(theme.textPrimary)
         }
         .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 18)
     }
 
     private func enabledRows(_ rows: [KeyValueRow]) -> [KeyValueRow] {

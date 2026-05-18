@@ -68,7 +68,7 @@ struct IOSTranslationView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(theme.brandPrimary)
                     .frame(width: 36, height: 36)
-                    .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .iosGlassContainer(theme, cornerRadius: 10)
             }
 
             languagePicker("Target", selection: $targetLanguage)
@@ -100,7 +100,7 @@ struct IOSTranslationView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .iosGlassContainer(theme, cornerRadius: 12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(theme.borderSubtle, lineWidth: 1)
@@ -130,7 +130,7 @@ struct IOSTranslationView: View {
                     .frame(minHeight: 140)
                     .padding(10)
             }
-            .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .iosGlassContainer(theme, cornerRadius: 18)
             .overlay(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .stroke(theme.borderSubtle, lineWidth: 1)
@@ -191,7 +191,7 @@ struct IOSTranslationView: View {
                     .foregroundStyle(theme.textSecondary)
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .iosGlassContainer(theme, cornerRadius: 18)
             } else {
                 ScrollView {
                     Text(translatedText)
@@ -201,7 +201,7 @@ struct IOSTranslationView: View {
                         .padding(14)
                 }
                 .frame(minHeight: 100, alignment: .top)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(theme.borderSubtle, lineWidth: 1)

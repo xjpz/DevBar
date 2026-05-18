@@ -33,7 +33,7 @@ struct IOSWebKitView: View {
             }
             .padding(16)
         }
-        .background(theme.backgroundSecondary.ignoresSafeArea())
+        .iosGeekScreenBackground(theme)
         .navigationTitle("WebKit")
         .toolbarTitleDisplayMode(.inlineLarge)
         .toolbarBackground(.hidden, for: .navigationBar)
@@ -139,7 +139,7 @@ struct IOSWebKitView: View {
             .buttonStyle(.plain)
         }
         .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 20)
     }
 
     private var tabsSection: some View {
@@ -186,7 +186,7 @@ struct IOSWebKitView: View {
             }
         }
         .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 20)
     }
 
     private var recordsSection: some View {
@@ -228,7 +228,7 @@ struct IOSWebKitView: View {
             }
         }
         .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 20)
     }
 
     private var historySection: some View {
@@ -261,7 +261,7 @@ struct IOSWebKitView: View {
             }
         }
         .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 20)
     }
 
     private func sectionHeader(title: String, systemImage: String, action: @escaping () -> Void) -> some View {
@@ -605,7 +605,7 @@ private struct IOSBrowserView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 11)
-            .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .iosGlassContainer(theme, cornerRadius: 14)
     }
 
     private func loadAddress() {

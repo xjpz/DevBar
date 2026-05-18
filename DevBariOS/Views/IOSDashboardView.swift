@@ -10,8 +10,8 @@ struct IOSDashboardView: View {
 
     var body: some View {
         ZStack {
-            theme.backgroundPrimary
-                .ignoresSafeArea()
+            Color.clear
+                .iosGeekScreenBackground(theme)
 
             List {
                 Section {
@@ -77,13 +77,10 @@ struct IOSDashboardView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(
+        .iosGlassContainer(theme, cornerRadius: 18)
+        .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(theme.surfacePrimary)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(theme.isGeek ? theme.info.opacity(0.3) : Color.clear, lineWidth: 1)
-                )
+                .strokeBorder(theme.isGeek ? theme.info.opacity(0.3) : Color.clear, lineWidth: 1)
         )
         .accessibilityIdentifier("ios.dashboard.overviewCard")
     }
@@ -117,7 +114,7 @@ struct IOSDashboardView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 18)
     }
 
     @ViewBuilder

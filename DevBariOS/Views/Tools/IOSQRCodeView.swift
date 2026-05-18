@@ -42,7 +42,7 @@ struct IOSQRCodeView: View {
                 .frame(minHeight: 60)
                 .scrollContentBackground(.hidden)
                 .padding(10)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(theme.borderSubtle, lineWidth: 1)
@@ -56,7 +56,7 @@ struct IOSQRCodeView: View {
             correctionPicker
         }
         .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 18)
     }
 
     private func colorPicker(label: String, color: Binding<Color>) -> some View {

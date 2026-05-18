@@ -41,7 +41,7 @@ struct IOSMemoListView: View {
                         .textInputAutocapitalization(.never)
                 }
                 .padding(10)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 10)
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
@@ -203,9 +203,10 @@ struct IOSMemoListView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .iosGlassContainer(theme, cornerRadius: 16)
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(theme.borderSubtle, lineWidth: 1)
@@ -278,13 +279,13 @@ struct IOSMemoEditView: View {
             TextField("ios_tools_memo_title", text: $title)
                 .font(.headline)
                 .padding(12)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 14)
 
             TextEditor(text: $content)
                 .font(.system(.body, design: .monospaced))
                 .scrollContentBackground(.hidden)
                 .padding(12)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(theme.borderSubtle, lineWidth: 1)
@@ -375,7 +376,7 @@ struct IOSMemoPasswordSheet: View {
                 SecureField("ios_tools_memo_password_hint", text: $password)
                     .textInputAutocapitalization(.never)
                     .padding(14)
-                    .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .iosGlassContainer(theme, cornerRadius: 14)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .stroke(theme.borderSubtle, lineWidth: 1)
@@ -386,7 +387,7 @@ struct IOSMemoPasswordSheet: View {
                     SecureField("ios_tools_memo_confirm_password", text: $confirmPassword)
                         .textInputAutocapitalization(.never)
                         .padding(14)
-                        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .iosGlassContainer(theme, cornerRadius: 14)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(theme.borderSubtle, lineWidth: 1)
@@ -565,7 +566,7 @@ struct IOSSecurityPickerSheet: View {
                                 .foregroundStyle(theme.textSecondary)
                         }
                         .padding(14)
-                        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .iosGlassContainer(theme, cornerRadius: 14)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(theme.borderSubtle, lineWidth: 1)
@@ -593,7 +594,7 @@ struct IOSSecurityPickerSheet: View {
                                 .foregroundStyle(theme.textSecondary)
                         }
                         .padding(14)
-                        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .iosGlassContainer(theme, cornerRadius: 14)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14, style: .continuous)
                                 .stroke(theme.borderSubtle, lineWidth: 1)

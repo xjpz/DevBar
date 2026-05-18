@@ -151,7 +151,7 @@ struct IOSSpeechToTextView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(14)
                 }
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(theme.borderSubtle, lineWidth: 1)
@@ -225,7 +225,7 @@ struct IOSSpeechToTextView: View {
                     .foregroundStyle(theme.textSecondary)
                     .padding(14)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .iosGlassContainer(theme, cornerRadius: 18)
             } else {
                 ScrollView {
                     Text(manager.recognizedText)
@@ -236,7 +236,7 @@ struct IOSSpeechToTextView: View {
                         .padding(14)
                 }
                 .frame(maxHeight: 200, alignment: .top)
-                .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .iosGlassContainer(theme, cornerRadius: 18)
                 .overlay(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(theme.borderSubtle, lineWidth: 1)

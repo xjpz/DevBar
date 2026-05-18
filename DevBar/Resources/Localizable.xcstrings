@@ -2968,6 +2968,40 @@
         }
       }
     },
+    "ios_settings_greeting_tap_to_collapse" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to collapse"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击收起"
+          }
+        }
+      }
+    },
+    "ios_settings_greeting_tap_to_edit" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to edit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击编辑"
+          }
+        }
+      }
+    },
     "ios_settings_interval_3m" : {
       "localizations" : {
         "en" : {
@@ -3012,6 +3046,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "10 分钟"
+          }
+        }
+      }
+    },
+    "ios_settings_interval_15m" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "15 minutes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "15 分钟"
           }
         }
       }
