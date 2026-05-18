@@ -3163,6 +3163,103 @@
         }
       }
     },
+    "ios_settings_live_activity_enabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Dynamic Island"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开启灵动岛"
+          }
+        }
+      }
+    },
+    "ios_settings_live_activity_end" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束时间"
+          }
+        }
+      }
+    },
+    "ios_settings_live_activity_hint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shows enabled Provider quota on the Lock Screen and Dynamic Island during the selected time range."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在选定时间段内，在锁屏和灵动岛显示已启用 Provider 的额度状态。"
+          }
+        }
+      }
+    },
+    "ios_settings_live_activity_invalid_range" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End time must be later than start time."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束时间需要晚于开始时间。"
+          }
+        }
+      }
+    },
+    "ios_settings_live_activity_section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dynamic Island"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "灵动岛实时通知"
+          }
+        }
+      }
+    },
+    "ios_settings_live_activity_start" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始时间"
+          }
+        }
+      }
+    },
     "ios_settings_refresh_hint" : {
       "localizations" : {
         "en" : {
@@ -5479,6 +5576,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "登录时启动"
+          }
+        }
+      }
+    },
+    "live_activity_switch_provider" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "切换"
           }
         }
       }

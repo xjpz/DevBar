@@ -36,6 +36,7 @@ public enum DevBarCoreConstants {
     public enum AppGroup {
         public static let groupID = "group.cc.xjpz.DevBar"
         public static let sharedDataKey = "widget_shared_data"
+        public static let liveActivitySelectedProviderKey = "live_activity_selected_provider"
 
         public static func sharedDataKey(for provider: String) -> String {
             "widget_shared_data_\(provider)"
@@ -49,5 +50,6 @@ public enum DevBarCoreConstants {
         public static let glmQuotaCacheKey = "glm_quota_cache"
         public static let openAIQuotaCacheKey = "openai_quota_cache"
         public static let mimoQuotaCacheKey = "mimo_quota_cache"
+        public static let liveActivitySettingsKey = "live_activity_settings"
     }
 }

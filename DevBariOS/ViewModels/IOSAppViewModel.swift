@@ -22,6 +22,7 @@ final class IOSAppViewModel: ObservableObject {
     @Published var accountConfigs: [AccountConfig] {
         didSet {
             settingsStore.saveAccountConfigs(accountConfigs)
+            Task { await syncLiveActivity() }
         }
     }
     @Published var glmCredentials: AuthCredentials?
@@ -31,6 +32,12 @@ final class IOSAppViewModel: ObservableObject {
             UserDefaults.standard.set(refreshInterval, forKey: DevBarCoreConstants.Defaults.refreshIntervalKey)
         }
     }
+    @Published var liveActivitySettings: LiveActivitySettings {
+        didSet {
+            liveActivitySettingsStore.save(liveActivitySettings)
+            Task { await syncLiveActivity() }
+        }
+    }
 
     let quotaViewModel = QuotaViewModel()
     let openAIQuotaViewModel = OpenAIQuotaViewModel()
@@ -38,6 +45,7 @@ final class IOSAppViewModel: ObservableObject {
 
     private let authService = AuthService()
     private let settingsStore = UserDefaultsAccountSettingsStore()
+    private let liveActivitySettingsStore = LiveActivitySettingsStore()
     private var childObservers = Set<AnyCancellable>()
     private var hasRefreshedOnLaunch = false
     private var lastRefreshAttemptAt: Date?
@@ -48,6 +56,7 @@ final class IOSAppViewModel: ObservableObject {
         self.glmCredentials = authService.credentials
         self.refreshInterval = UserDefaults.standard.double(forKey: DevBarCoreConstants.Defaults.refreshIntervalKey)
             .nonZero ?? DevBarCoreConstants.Defaults.defaultRefreshInterval
+        self.liveActivitySettings = liveActivitySettingsStore.load()
         bindChildViewModels()
     }
 
@@ -140,11 +149,16 @@ final class IOSAppViewModel: ObservableObject {
         guard refreshInterval > 0 else { return }
         if Date().timeIntervalSince(lastRefresh) >= refreshInterval {
             await refreshAll(trigger: .foreground, silent: true)
+        } else {
+            await syncLiveActivity()
         }
     }
 
     func refreshAll(trigger: RefreshTrigger = .manual, silent: Bool = false) async {
-        guard shouldRefresh(for: trigger) else { return }
+        guard shouldRefresh(for: trigger) else {
+            await syncLiveActivity()
+            return
+        }
         lastRefreshAttemptAt = Date()
         lastRefreshTrigger = trigger
 
@@ -170,6 +184,16 @@ final class IOSAppViewModel: ObservableObject {
                 silent: silent
             )
         }
+
+        await syncLiveActivity()
+    }
+
+    func syncLiveActivity() async {
+        await IOSLiveActivityManager.shared.sync(
+            settings: liveActivitySettings,
+            configs: accountConfigs,
+            dataByProvider: liveActivityProviderData()
+        )
     }
 
     func saveGLMAPIKey(_ rawValue: String) async throws {
@@ -196,6 +220,7 @@ final class IOSAppViewModel: ObservableObject {
         glmCredentials = nil
         authService.logout()
         quotaViewModel.resetForLogout()
+        Task { await syncLiveActivity() }
     }
 
     func saveOpenAICredentials(accessToken: String, accountId: String) async throws {
@@ -222,6 +247,7 @@ final class IOSAppViewModel: ObservableObject {
         KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.openAIAccessTokenKey)
         settingsStore.saveOpenAIAccountId(nil)
         openAIQuotaViewModel.resetForLogout()
+        Task { await syncLiveActivity() }
     }
 
     func saveMimoCookie(_ rawValue: String) async throws {
@@ -243,6 +269,7 @@ final class IOSAppViewModel: ObservableObject {
     func clearMimoCredentials() {
         KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
         mimoQuotaViewModel.resetForLogout()
+        Task { await syncLiveActivity() }
     }
 
     func prepareTransferImport(from rawValue: String) async throws -> TransferPayload {
@@ -380,6 +407,16 @@ final class IOSAppViewModel: ObservableObject {
                 hasCredential: !mimoServiceToken.isEmpty
             ),
         ]
+    }
+
+    private func liveActivityProviderData() -> [WidgetProvider: WidgetSharedData] {
+        var result: [WidgetProvider: WidgetSharedData] = [:]
+        for provider in WidgetProvider.allCases {
+            if let data = WidgetDataManager.shared.loadSharedData(for: provider.rawValue) {
+                result[provider] = data
+            }
+        }
+        return result
     }
 
     private func shouldRefresh(for trigger: RefreshTrigger) -> Bool {

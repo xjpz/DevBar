@@ -1,6 +1,6 @@
 import Foundation
 
-public enum WidgetProvider: String, Codable, Sendable {
+public enum WidgetProvider: String, CaseIterable, Codable, Sendable {
     case glm
     case openai
     case mimo

@@ -17,6 +17,7 @@ struct IOSSettingsView: View {
         ("ios_settings_interval_60m", 3600),
         ("ios_settings_interval_never", 0),
     ]
+    private static let liveActivityTimeLocale = Locale(identifier: "en_GB")
 
     var body: some View {
         Form {
@@ -107,6 +108,34 @@ struct IOSSettingsView: View {
                 .accessibilityIdentifier("ios.settings.refreshInterval")
             }
 
+            Section("ios_settings_live_activity_section") {
+                Toggle("ios_settings_live_activity_enabled", isOn: $appViewModel.liveActivitySettings.isEnabled)
+                    .accessibilityIdentifier("ios.settings.liveActivity.enabled")
+
+                DatePicker(
+                    "ios_settings_live_activity_start",
+                    selection: liveActivityStartBinding,
+                    displayedComponents: .hourAndMinute
+                )
+                .environment(\.locale, Self.liveActivityTimeLocale)
+                .accessibilityIdentifier("ios.settings.liveActivity.start")
+
+                DatePicker(
+                    "ios_settings_live_activity_end",
+                    selection: liveActivityEndBinding,
+                    displayedComponents: .hourAndMinute
+                )
+                .environment(\.locale, Self.liveActivityTimeLocale)
+                .accessibilityIdentifier("ios.settings.liveActivity.end")
+
+                if !appViewModel.liveActivitySettings.isValidTimeRange {
+                    Text("ios_settings_live_activity_invalid_range")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .accessibilityIdentifier("ios.settings.liveActivity.hint")
+                }
+            }
+
             Section("ios_settings_widget_section") {
                 Label("ios_settings_widget_intro", systemImage: "square.grid.2x2")
                     .font(.subheadline)
@@ -140,5 +169,33 @@ struct IOSSettingsView: View {
             .split(whereSeparator: \.isNewline)
             .first
             .map(String.init) ?? IOSThemeManager.defaultGreeting
+    }
+
+    private var liveActivityStartBinding: Binding<Date> {
+        Binding {
+            date(hour: appViewModel.liveActivitySettings.startHour, minute: appViewModel.liveActivitySettings.startMinute)
+        } set: { newValue in
+            let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+            appViewModel.liveActivitySettings.startHour = components.hour ?? 9
+            appViewModel.liveActivitySettings.startMinute = components.minute ?? 0
+        }
+    }
+
+    private var liveActivityEndBinding: Binding<Date> {
+        Binding {
+            date(hour: appViewModel.liveActivitySettings.endHour, minute: appViewModel.liveActivitySettings.endMinute)
+        } set: { newValue in
+            let components = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+            appViewModel.liveActivitySettings.endHour = components.hour ?? 18
+            appViewModel.liveActivitySettings.endMinute = components.minute ?? 0
+        }
+    }
+
+    private func date(hour: Int, minute: Int) -> Date {
+        var components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        components.hour = hour
+        components.minute = minute
+        components.second = 0
+        return Calendar.current.date(from: components) ?? Date()
     }
 }
