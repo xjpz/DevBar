@@ -47,6 +47,8 @@ struct IOSRootView: View {
                 }
                 .tag(IOSAppViewModel.TabSelection.tools)
             }
+            .toolbarBackground(theme.backgroundPrimary, for: .tabBar)
+            .toolbarBackground(.visible, for: .tabBar)
         }
         .id("tabs.\(languageManager.selectedLanguage.rawValue)")
         .accessibilityIdentifier("ios.root.tabs")

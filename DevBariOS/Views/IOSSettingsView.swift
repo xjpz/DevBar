@@ -142,9 +142,17 @@ struct IOSSettingsView: View {
                     .foregroundStyle(theme.textSecondary)
             }
 
-            Section("ios_settings_about_section") {
+            Section {
                 LabeledContent("ios_settings_app_label", value: String(localized: "ios_settings_app_name"))
                 LabeledContent("ios_settings_version_label", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+            } header: {
+                Text("ios_settings_about_section")
+            } footer: {
+                Text("鄂ICP备2021013794号-4A")
+                    .font(.footnote)
+                    .foregroundStyle(theme.textTertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 12)
             }
         }
         .scrollContentBackground(.hidden)
