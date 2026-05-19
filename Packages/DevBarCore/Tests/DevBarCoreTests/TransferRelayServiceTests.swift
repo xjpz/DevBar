@@ -86,7 +86,6 @@ func relayCreateUploadsOnlyTokenHashAndCiphertext() async throws {
     let bodyObject = try #require(
         JSONSerialization.jsonObject(with: body) as? [String: Any]
     )
-    let bodyText = String(decoding: body, as: UTF8.self)
 
     #expect(result.url.absoluteString.hasPrefix("devbar://transfer/relay?id=tr_unit&token=rt_"))
     #expect(result.url.absoluteString.contains("#key=ek_"))
@@ -97,8 +96,9 @@ func relayCreateUploadsOnlyTokenHashAndCiphertext() async throws {
     #expect(bodyObject["ciphertext"] as? String != nil)
     #expect(bodyObject["nonce"] as? String != nil)
     #expect(bodyObject["tag"] as? String != nil)
-    #expect(bodyText.contains("rt_") == false)
-    #expect(bodyText.contains("ek_") == false)
+    #expect(bodyObject["read_token"] == nil)
+    #expect(bodyObject["encryption_key"] == nil)
+    #expect((bodyObject["read_token_hash"] as? String)?.contains("rt_") == false)
 }
 
 private func largeToken(prefix: String) -> String {

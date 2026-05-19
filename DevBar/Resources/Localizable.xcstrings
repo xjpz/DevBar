@@ -3261,6 +3261,7 @@
       }
     },
     "ios_settings_refresh_hint" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3433,6 +3434,7 @@
       }
     },
     "ios_settings_widget_hint" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5767,22 +5769,6 @@
         }
       }
     },
-    "mimo_cookie_unchanged_from_browser" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The browser still has the current MiMo cookie. Open another page and wait for token renewal, or sign in again."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "浏览器仍是当前 MiMo Cookie。请点击其他页面等待 Token 续签，或重新登录。"
-          }
-        }
-      }
-    },
     "mimo_cookie_hint" : {
       "localizations" : {
         "en" : {
@@ -5860,6 +5846,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请输入 MiMo Cookie"
+          }
+        }
+      }
+    },
+    "mimo_cookie_unchanged_from_browser" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The browser still has the current MiMo cookie. Open another page and wait for token renewal, or sign in again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浏览器仍是当前 MiMo Cookie。请点击其他页面等待 Token 续签，或重新登录。"
           }
         }
       }
