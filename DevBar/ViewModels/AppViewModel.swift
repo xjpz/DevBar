@@ -26,6 +26,7 @@ final class AppViewModel: ObservableObject {
     let updateViewModel = UpdateViewModel()
     let notificationService = NotificationService()
     let weChatViewModel = WeChatViewModel()
+    let deviceRelayManager = DeviceRelayManager()
     let antiSleepService = AntiSleepService()
     private var statusTextUpdateTask: Task<Void, Never>?
     private var antiSleepStatusCancellable: AnyCancellable?
@@ -35,6 +36,7 @@ final class AppViewModel: ObservableObject {
     private var previousGLMNotificationItems: [NotificationQuotaItem]?
     private var previousOpenAINotificationItems: [NotificationQuotaItem]?
     private var hasLaunched = false
+    private var handledRelayRequestIDs: Set<String> = []
     weak var languageManager: LanguageManager?
 
     // MARK: - Account Configs
@@ -178,6 +180,11 @@ final class AppViewModel: ObservableObject {
             quotaViewModel.isLoading = true
         }
         syncAuthState()
+        deviceRelayManager.messageHandler = { [weak self] message in
+            Task { @MainActor [weak self] in
+                await self?.handleRelayMessage(message)
+            }
+        }
         antiSleepStatus = antiSleepService.status
         antiSleepStatusCancellable = antiSleepService.$status
             .receive(on: RunLoop.main)
@@ -224,6 +231,231 @@ final class AppViewModel: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.weChatViewModel.setup()
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let relayEnabled = UserDefaults.standard.object(forKey: DevBarCoreConstants.Defaults.relayMacEnabledKey) == nil ||
+                UserDefaults.standard.bool(forKey: DevBarCoreConstants.Defaults.relayMacEnabledKey)
+            if relayEnabled {
+                await self.deviceRelayManager.setup(deviceType: .mac, deviceName: Self.currentDeviceName)
+            }
+        }
+    }
+
+    private static var currentDeviceName: String {
+        Host.current().localizedName ?? ProcessInfo.processInfo.hostName
+    }
+
+    private func handleRelayMessage(_ message: DeviceRelayMessage) async {
+        switch message.type {
+        case .agentCommand:
+            await handleRelayAgentCommand(message)
+        case .systemLockScreen:
+            await handleRelayLockScreenCommand(message)
+        case .systemWakeDisplay:
+            await handleRelaySystemCommand(message, commandType: "wakeDisplay") {
+                try MacSystemCommandExecutor.wakeDisplay()
+            }
+        case .systemDisplaySleep:
+            await handleRelaySystemCommand(message, commandType: "displaySleep") {
+                try MacSystemCommandExecutor.displaySleep()
+            }
+        case .systemStatusRequest:
+            await handleRelayStatusRequest(message)
+        default:
+            return
+        }
+    }
+
+    private func handleRelayAgentCommand(_ message: DeviceRelayMessage) async {
+        guard message.type == .agentCommand else { return }
+        guard let requestId = message.requestId, !handledRelayRequestIDs.contains(requestId) else { return }
+        guard let sourceDeviceId = message.fromDeviceId else { return }
+        let prompt = message.payload["prompt"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !prompt.isEmpty else {
+            await sendRelayAgentFailure(
+                requestId: requestId,
+                targetDeviceId: sourceDeviceId,
+                errorCode: "EMPTY_PROMPT",
+                message: "任务内容为空"
+            )
+            return
+        }
+
+        handledRelayRequestIDs.insert(requestId)
+        await sendRelayAgentProgress(
+            requestId: requestId,
+            targetDeviceId: sourceDeviceId,
+            message: "Mac 已收到任务"
+        )
+
+        do {
+            let agentName = message.payload["agent"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let reply = try await weChatViewModel.agentRouter.route(
+                agentName: agentName?.isEmpty == false ? agentName : nil,
+                userID: "relay:\(sourceDeviceId)",
+                message: prompt
+            )
+            try await deviceRelayManager.send(
+                DeviceRelayMessage(
+                    type: .agentDone,
+                    requestId: requestId,
+                    fromDeviceId: deviceRelayManager.localDeviceID,
+                    targetDeviceId: sourceDeviceId,
+                    payload: [
+                        "status": "done",
+                        "summary": reply,
+                    ]
+                )
+            )
+        } catch {
+            await sendRelayAgentFailure(
+                requestId: requestId,
+                targetDeviceId: sourceDeviceId,
+                errorCode: "AGENT_FAILED",
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private func sendRelayAgentProgress(requestId: String, targetDeviceId: String, message: String) async {
+        do {
+            try await deviceRelayManager.send(
+                DeviceRelayMessage(
+                    type: .agentProgress,
+                    requestId: requestId,
+                    fromDeviceId: deviceRelayManager.localDeviceID,
+                    targetDeviceId: targetDeviceId,
+                    payload: [
+                        "status": "running",
+                        "message": message,
+                    ]
+                )
+            )
+        } catch {
+            print("[DevBar:DeviceRelay] agent.progress send failed: \(error)")
+        }
+    }
+
+    private func sendRelayAgentFailure(
+        requestId: String,
+        targetDeviceId: String,
+        errorCode: String,
+        message: String
+    ) async {
+        do {
+            try await deviceRelayManager.send(
+                DeviceRelayMessage(
+                    type: .agentFailed,
+                    requestId: requestId,
+                    fromDeviceId: deviceRelayManager.localDeviceID,
+                    targetDeviceId: targetDeviceId,
+                    payload: [
+                        "errorCode": errorCode,
+                        "message": message,
+                    ]
+                )
+            )
+        } catch {
+            print("[DevBar:DeviceRelay] agent.failed send failed: \(error)")
+        }
+    }
+
+    private func handleRelayLockScreenCommand(_ message: DeviceRelayMessage) async {
+        if let targetDeviceId = message.targetDeviceId,
+           targetDeviceId != deviceRelayManager.localDeviceID {
+            return
+        }
+        guard let requestId = message.requestId,
+              !handledRelayRequestIDs.contains(requestId) else {
+            return
+        }
+
+        handledRelayRequestIDs.insert(requestId)
+        print("[DevBar:DeviceRelay] lock screen requested from=\(message.fromDeviceId ?? "-") requestId=\(requestId)")
+
+        do {
+            try MacSystemCommandExecutor.lockScreen()
+            if let sourceDeviceId = message.fromDeviceId {
+                await sendRelaySystemStatus(
+                    requestId: requestId,
+                    targetDeviceId: sourceDeviceId
+                )
+            }
+        } catch {
+            print("[DevBar:DeviceRelay] lock screen failed: \(error)")
+            if let sourceDeviceId = message.fromDeviceId {
+                await sendRelayAgentFailure(
+                    requestId: requestId,
+                    targetDeviceId: sourceDeviceId,
+                    errorCode: "LOCK_SCREEN_FAILED",
+                    message: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private func handleRelaySystemCommand(
+        _ message: DeviceRelayMessage,
+        commandType: String,
+        execute: () throws -> Void
+    ) async {
+        if let targetDeviceId = message.targetDeviceId,
+           targetDeviceId != deviceRelayManager.localDeviceID {
+            return
+        }
+        guard let requestId = message.requestId,
+              !handledRelayRequestIDs.contains(requestId) else {
+            return
+        }
+
+        handledRelayRequestIDs.insert(requestId)
+        print("[DevBar:DeviceRelay] \(commandType) requested from=\(message.fromDeviceId ?? "-") requestId=\(requestId)")
+
+        do {
+            try execute()
+            if let sourceDeviceId = message.fromDeviceId {
+                await sendRelaySystemStatus(
+                    requestId: requestId,
+                    targetDeviceId: sourceDeviceId
+                )
+            }
+        } catch {
+            print("[DevBar:DeviceRelay] \(commandType) failed: \(error)")
+            if let sourceDeviceId = message.fromDeviceId {
+                await sendRelayAgentFailure(
+                    requestId: requestId,
+                    targetDeviceId: sourceDeviceId,
+                    errorCode: "\(commandType.uppercased())_FAILED",
+                    message: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private func handleRelayStatusRequest(_ message: DeviceRelayMessage) async {
+        if let targetDeviceId = message.targetDeviceId,
+           targetDeviceId != deviceRelayManager.localDeviceID {
+            return
+        }
+        guard let sourceDeviceId = message.fromDeviceId else { return }
+        await sendRelaySystemStatus(
+            requestId: message.requestId,
+            targetDeviceId: sourceDeviceId
+        )
+    }
+
+    private func sendRelaySystemStatus(requestId: String?, targetDeviceId: String) async {
+        do {
+            try await deviceRelayManager.sendSystemStatus(
+                targetDeviceId: targetDeviceId,
+                requestId: requestId,
+                screenLocked: MacScreenLockStateProvider.isScreenLocked(),
+                deviceName: Self.currentDeviceName
+            )
+        } catch {
+            print("[DevBar:DeviceRelay] system.status send failed: \(error)")
         }
     }
 

@@ -7,6 +7,11 @@ struct IOSDashboardView: View {
     @EnvironmentObject private var themeManager: IOSThemeManager
     @Environment(\.themeTokens) private var theme
     @State private var isShowingAccounts = false
+    @State private var isShowingScanner = false
+    @State private var isResolvingScan = false
+    @State private var pendingImportPreview: TransferImportPreview?
+    @State private var pendingRelayTransferURL: URL?
+    @State private var scanError: String?
 
     var body: some View {
         ZStack {
@@ -40,6 +45,14 @@ struct IOSDashboardView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                Button {
+                    isShowingScanner = true
+                } label: {
+                    Label("扫一扫", systemImage: "qrcode.viewfinder")
+                        .labelStyle(.iconOnly)
+                }
+                .accessibilityIdentifier("ios.dashboard.scan")
+
                 NavigationLink {
                     IOSAccountsView()
                 } label: {
@@ -62,6 +75,44 @@ struct IOSDashboardView: View {
         .accessibilityIdentifier("ios.dashboard.screen")
         .navigationDestination(isPresented: $isShowingAccounts) {
             IOSAccountsView()
+        }
+        .sheet(isPresented: $isShowingScanner) {
+            NavigationStack {
+                IOSQRScannerView { code in
+                    isShowingScanner = false
+                    Task {
+                        await handleScannedCode(code)
+                    }
+                }
+                .ignoresSafeArea()
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("ios_common_cancel") {
+                            isShowingScanner = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(item: $pendingImportPreview) { preview in
+            IOSTransferImportPreviewSheet(preview: preview) {
+                await importPayload(preview.payload)
+            }
+        }
+        .alert("ios_accounts_import_failed", isPresented: Binding(
+            get: { scanError != nil },
+            set: { if !$0 { scanError = nil } }
+        )) {
+            Button("ios_common_ok", role: .cancel) {}
+        } message: {
+            Text(scanError ?? "")
+        }
+        .overlay {
+            if isResolvingScan {
+                ProgressView("正在读取二维码...")
+                    .padding(18)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
         }
         .refreshable {
             await appViewModel.refreshAll()
@@ -409,6 +460,39 @@ struct IOSDashboardView: View {
 
     private func formattedDateTime(from timestamp: TimeInterval) -> String {
         themeManager.formatTime(date: Date(timeIntervalSince1970: timestamp), dateStyle: .numeric)
+    }
+
+    @MainActor
+    private func handleScannedCode(_ code: String) async {
+        scanError = nil
+        isResolvingScan = true
+        defer { isResolvingScan = false }
+
+        do {
+            switch try await appViewModel.resolveScannedCode(code) {
+            case .macPaired:
+                pendingRelayTransferURL = nil
+            case let .providerTransfer(preview, relayURL):
+                pendingRelayTransferURL = relayURL
+                pendingImportPreview = preview
+            }
+        } catch {
+            pendingRelayTransferURL = nil
+            scanError = error.localizedDescription
+        }
+    }
+
+    private func importPayload(_ payload: TransferPayload) async {
+        do {
+            try await appViewModel.importTransferPayload(payload)
+            pendingImportPreview = nil
+            if let pendingRelayTransferURL {
+                try? await TransferRelayService.shared.deleteRelayTransfer(from: pendingRelayTransferURL)
+                self.pendingRelayTransferURL = nil
+            }
+        } catch {
+            scanError = error.localizedDescription
+        }
     }
 }
 

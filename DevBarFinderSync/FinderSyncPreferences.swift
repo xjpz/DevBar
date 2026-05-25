@@ -66,4 +66,5 @@ final class FinderSyncPreferences {
         get { defaults.object(forKey: "finder_enableCopyPath") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "finder_enableCopyPath") }
     }
+
 }

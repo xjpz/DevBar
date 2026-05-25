@@ -14,6 +14,12 @@
 	<string>Record audio for speech-to-text conversion.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock encrypted memos.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>DevBar uses the local network to connect your iPhone directly to your paired Mac when both devices are on the same Wi-Fi.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_devbar-relay._tcp</string>
+	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>UIAppFonts</key>
@@ -28,41 +34,6 @@
 		<string>JetBrainsMono-Regular.ttf</string>
 		<string>JetBrainsMono-Medium.ttf</string>
 		<string>JetBrainsMono-Bold.ttf</string>
-	</array>
-	<key>UIApplicationShortcutItems</key>
-	<array>
-		<dict>
-			<key>UIApplicationShortcutItemTitle</key>
-			<string>备忘录</string>
-			<key>UIApplicationShortcutItemType</key>
-			<string>com.xjpz.DevBar.memo</string>
-			<key>UIApplicationShortcutItemIconSymbolName</key>
-			<string>note.text</string>
-		</dict>
-		<dict>
-			<key>UIApplicationShortcutItemTitle</key>
-			<string>扫码导入</string>
-			<key>UIApplicationShortcutItemType</key>
-			<string>com.xjpz.DevBar.qr-scan</string>
-			<key>UIApplicationShortcutItemIconSymbolName</key>
-			<string>qrcode.viewfinder</string>
-		</dict>
-		<dict>
-			<key>UIApplicationShortcutItemTitle</key>
-			<string>API 调试</string>
-			<key>UIApplicationShortcutItemType</key>
-			<string>com.xjpz.DevBar.api-client</string>
-			<key>UIApplicationShortcutItemIconSymbolName</key>
-			<string>globe</string>
-		</dict>
-		<dict>
-			<key>UIApplicationShortcutItemTitle</key>
-			<string>OCR 识别</string>
-			<key>UIApplicationShortcutItemType</key>
-			<string>com.xjpz.DevBar.ocr</string>
-			<key>UIApplicationShortcutItemIconSymbolName</key>
-			<string>text.viewfinder</string>
-		</dict>
 	</array>
 </dict>
 </plist>

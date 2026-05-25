@@ -108,6 +108,34 @@ struct IOSSettingsView: View {
                 .accessibilityIdentifier("ios.settings.refreshInterval")
             }
 
+            Section("ios_settings_relay_section") {
+                TextField("ios_settings_relay_device_name", text: $appViewModel.relayDeviceName)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("ios.settings.relayDeviceName")
+
+                Text("ios_settings_relay_device_name_hint")
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+            }
+
+            Section {
+                ForEach(appViewModel.availableHomeScreenShortcutActions, id: \.self) { action in
+                    Toggle(isOn: homeScreenShortcutBinding(for: action)) {
+                        Label {
+                            Text(LocalizedStringKey(IOSHomeScreenShortcutController.titleKey(for: action)))
+                        } icon: {
+                            Image(systemName: homeScreenShortcutIcon(for: action))
+                        }
+                    }
+                    .disabled(!appViewModel.canEnableHomeScreenShortcutAction(action))
+                }
+            } header: {
+                Text("ios_settings_home_shortcuts_section")
+            } footer: {
+                Text("ios_settings_home_shortcuts_footer")
+            }
+
             Section("ios_settings_live_activity_section") {
                 Toggle("ios_settings_live_activity_enabled", isOn: $appViewModel.liveActivitySettings.isEnabled)
                     .accessibilityIdentifier("ios.settings.liveActivity.enabled")
@@ -205,5 +233,25 @@ struct IOSSettingsView: View {
         components.minute = minute
         components.second = 0
         return Calendar.current.date(from: components) ?? Date()
+    }
+
+    private func homeScreenShortcutBinding(for action: DeviceRelayHomeScreenShortcutAction) -> Binding<Bool> {
+        Binding {
+            appViewModel.selectedHomeScreenShortcutActions.contains(action)
+        } set: { enabled in
+            appViewModel.setHomeScreenShortcutAction(action, enabled: enabled)
+        }
+    }
+
+    private func homeScreenShortcutIcon(for action: DeviceRelayHomeScreenShortcutAction) -> String {
+        switch action {
+        case .memo: return "note.text"
+        case .qrScan: return "qrcode.viewfinder"
+        case .ocr: return "text.viewfinder"
+        case .apiClient: return "globe"
+        case .lockMac: return "lock.fill"
+        case .wakeMacDisplay: return "sun.max.fill"
+        case .sleepMacDisplay: return "display"
+        }
     }
 }

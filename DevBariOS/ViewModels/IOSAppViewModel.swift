@@ -2,6 +2,12 @@ import Combine
 import DevBarCore
 import Foundation
 import SwiftUI
+import UIKit
+
+enum IOSScannedCodeResolution {
+    case macPaired
+    case providerTransfer(preview: TransferImportPreview, relayURL: URL?)
+}
 
 @MainActor
 final class IOSAppViewModel: ObservableObject {
@@ -38,10 +44,26 @@ final class IOSAppViewModel: ObservableObject {
             Task { await syncLiveActivity() }
         }
     }
+    @Published var relayDeviceName: String {
+        didSet {
+            let normalized = Self.normalizedRelayDeviceName(relayDeviceName)
+            UserDefaults.standard.set(normalized, forKey: DevBarCoreConstants.Defaults.relayIPhoneDeviceNameKey)
+            if relayDeviceName != normalized {
+                relayDeviceName = normalized
+            } else {
+                Task {
+                    await deviceRelayManager.resumeConnectivity(deviceType: .iPhone, deviceName: normalized)
+                }
+            }
+        }
+    }
+    @Published private(set) var availableHomeScreenShortcutActions: [DeviceRelayHomeScreenShortcutAction]
+    @Published private(set) var selectedHomeScreenShortcutActions: [DeviceRelayHomeScreenShortcutAction]
 
     let quotaViewModel = QuotaViewModel()
     let openAIQuotaViewModel = OpenAIQuotaViewModel()
     let mimoQuotaViewModel = MimoQuotaViewModel()
+    let deviceRelayManager = DeviceRelayManager()
 
     private let authService = AuthService()
     private let settingsStore = UserDefaultsAccountSettingsStore()
@@ -50,6 +72,8 @@ final class IOSAppViewModel: ObservableObject {
     private var hasRefreshedOnLaunch = false
     private var lastRefreshAttemptAt: Date?
     private let automaticRefreshCooldown: TimeInterval = 20
+    private var usesDefaultHomeScreenShortcutSelection: Bool
+    private var hasPairedMacForShortcuts = false
 
     init() {
         self.accountConfigs = settingsStore.loadAccountConfigs()
@@ -57,7 +81,18 @@ final class IOSAppViewModel: ObservableObject {
         self.refreshInterval = UserDefaults.standard.double(forKey: DevBarCoreConstants.Defaults.refreshIntervalKey)
             .nonZero ?? DevBarCoreConstants.Defaults.defaultRefreshInterval
         self.liveActivitySettings = liveActivitySettingsStore.load()
+        self.relayDeviceName = Self.loadRelayDeviceName()
+        let storedShortcutActions = IOSHomeScreenShortcutPreferences.loadSelectedActions()
+        self.usesDefaultHomeScreenShortcutSelection = storedShortcutActions == nil
+        self.selectedHomeScreenShortcutActions = storedShortcutActions
+            ?? DeviceRelayHomeScreenShortcutPolicy.defaultSelection(hasPairedMac: false)
+        self.availableHomeScreenShortcutActions = DeviceRelayHomeScreenShortcutPolicy.availableActions(hasPairedMac: false)
         bindChildViewModels()
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.deviceRelayManager.setup(deviceType: .iPhone, deviceName: self.relayDeviceName)
+            await self.refreshHomeScreenShortcuts()
+        }
     }
 
     var enabledProviders: [QuotaProvider] {
@@ -139,9 +174,13 @@ final class IOSAppViewModel: ObservableObject {
         guard !hasRefreshedOnLaunch else { return }
         hasRefreshedOnLaunch = true
         await refreshAll(trigger: .launch, silent: true)
+        await refreshHomeScreenShortcuts()
     }
 
     func refreshOnForeground() async {
+        await deviceRelayManager.resumeConnectivity(deviceType: .iPhone, deviceName: relayDeviceName)
+        await refreshHomeScreenShortcuts()
+
         guard let lastRefresh = latestRefreshDate else {
             await refreshAll(trigger: .foreground, silent: true)
             return
@@ -276,6 +315,105 @@ final class IOSAppViewModel: ObservableObject {
         try await TransferPayloadCodec.decodeResolvingRelay(from: rawValue)
     }
 
+    func pairMacDevice(from rawValue: String) async throws {
+        try await deviceRelayManager.confirmPairing(from: rawValue, deviceName: relayDeviceName)
+        await refreshHomeScreenShortcuts()
+    }
+
+    func resolveScannedCode(_ rawValue: String) async throws -> IOSScannedCodeResolution {
+        if DeviceRelayPairQRCodeCodec.canDecode(rawValue) {
+            try await pairMacDevice(from: rawValue)
+            return .macPaired
+        }
+
+        let payload = try await prepareTransferImport(from: rawValue)
+        let relayURL = TransferPayloadCodec.isRelayTransferURL(rawValue) ? URL(string: rawValue) : nil
+        return .providerTransfer(
+            preview: makeTransferImportPreview(for: payload),
+            relayURL: relayURL
+        )
+    }
+
+    private static func loadRelayDeviceName() -> String {
+        let stored = UserDefaults.standard.string(forKey: DevBarCoreConstants.Defaults.relayIPhoneDeviceNameKey)
+        return normalizedRelayDeviceName(stored ?? UIDevice.current.name)
+    }
+
+    private static func normalizedRelayDeviceName(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "iPhone" : trimmed
+    }
+
+    private func refreshHomeScreenShortcuts() async {
+        let hasPairedMac = await hasPairedMacForHomeScreenShortcut()
+        hasPairedMacForShortcuts = hasPairedMac
+        availableHomeScreenShortcutActions = DeviceRelayHomeScreenShortcutPolicy.availableActions(hasPairedMac: hasPairedMac)
+        if usesDefaultHomeScreenShortcutSelection {
+            selectedHomeScreenShortcutActions = DeviceRelayHomeScreenShortcutPolicy.defaultSelection(hasPairedMac: hasPairedMac)
+        }
+        IOSHomeScreenShortcutController.apply(
+            selectedActions: selectedHomeScreenShortcutActions,
+            hasPairedMac: hasPairedMac
+        )
+    }
+
+    func refreshHomeScreenShortcutsForCurrentState() async {
+        await refreshHomeScreenShortcuts()
+    }
+
+    func setHomeScreenShortcutAction(_ action: DeviceRelayHomeScreenShortcutAction, enabled: Bool) {
+        var next = DeviceRelayHomeScreenShortcutPolicy.normalizedSelection(
+            selectedHomeScreenShortcutActions,
+            hasPairedMac: hasPairedMacForShortcuts
+        )
+
+        if enabled {
+            guard !next.contains(action), next.count < DeviceRelayHomeScreenShortcutPolicy.maxSelectedActions else {
+                return
+            }
+            next.append(action)
+        } else {
+            next.removeAll { $0 == action }
+        }
+
+        usesDefaultHomeScreenShortcutSelection = false
+        selectedHomeScreenShortcutActions = next
+        IOSHomeScreenShortcutPreferences.saveSelectedActions(next)
+        IOSHomeScreenShortcutController.apply(
+            selectedActions: selectedHomeScreenShortcutActions,
+            hasPairedMac: hasPairedMacForShortcuts
+        )
+    }
+
+    func canEnableHomeScreenShortcutAction(_ action: DeviceRelayHomeScreenShortcutAction) -> Bool {
+        if selectedHomeScreenShortcutActions.contains(action) {
+            return true
+        }
+        let activeSelection = DeviceRelayHomeScreenShortcutPolicy.normalizedSelection(
+            selectedHomeScreenShortcutActions,
+            hasPairedMac: hasPairedMacForShortcuts
+        )
+        return activeSelection.count < DeviceRelayHomeScreenShortcutPolicy.maxSelectedActions
+    }
+
+    private func hasPairedMacForHomeScreenShortcut() async -> Bool {
+        if deviceRelayManager.peers.contains(where: { $0.deviceType == .mac }) {
+            return true
+        }
+
+        let store = DeviceRelayStore()
+        guard let token = store.loadDeviceToken(), !token.isEmpty else {
+            return false
+        }
+
+        do {
+            let peers = try await DeviceRelayService.shared.fetchPeers(deviceToken: token)
+            return peers.contains { $0.deviceType == .mac }
+        } catch {
+            return false
+        }
+    }
+
     func makeTransferImportPreview(for payload: TransferPayload) -> TransferImportPreview {
         TransferImportPlanner.makePreview(
             payload: payload,
@@ -376,6 +514,12 @@ final class IOSAppViewModel: ObservableObject {
             .store(in: &childObservers)
 
         mimoQuotaViewModel.objectWillChange
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &childObservers)
+
+        deviceRelayManager.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }

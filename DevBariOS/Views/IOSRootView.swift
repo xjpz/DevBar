@@ -1,3 +1,4 @@
+import DevBarCore
 import SwiftUI
 
 enum ShortcutDestination: String, Identifiable {
@@ -11,6 +12,7 @@ struct IOSRootView: View {
     @EnvironmentObject private var shortcutStore: ShortcutStore
     @Environment(\.themeTokens) private var theme
     @State private var shortcutDestination: ShortcutDestination?
+    @State private var shortcutMessage: String?
 
     var body: some View {
         ZStack {
@@ -76,6 +78,14 @@ struct IOSRootView: View {
             executeShortcut(action)
             shortcutStore.consume()
         }
+        .alert("DevBar", isPresented: Binding(
+            get: { shortcutMessage != nil },
+            set: { if !$0 { shortcutMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { shortcutMessage = nil }
+        } message: {
+            Text(shortcutMessage ?? "")
+        }
     }
 
     /// 冷启动时 pendingAction 在视图创建前已设置，onChange 不会触发。
@@ -98,6 +108,18 @@ struct IOSRootView: View {
             shortcutDestination = .accounts
         case .apiClient:
             shortcutDestination = .apiClient
+        case .lockMac:
+            Task {
+                shortcutMessage = await MacControlIntentRunner.run(.lockScreen, selectedMac: nil)
+            }
+        case .wakeMacDisplay:
+            Task {
+                shortcutMessage = await MacControlIntentRunner.run(.wakeDisplay, selectedMac: nil)
+            }
+        case .sleepMacDisplay:
+            Task {
+                shortcutMessage = await MacControlIntentRunner.run(.displaySleep, selectedMac: nil)
+            }
         case .ocr:
             shortcutDestination = .ocr
         }

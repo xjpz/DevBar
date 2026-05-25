@@ -26,7 +26,7 @@ enum SettingsTab: String, CaseIterable {
         case .notifications: return "bell"
         case .finder: return "folder"
         case .accounts: return "person.badge.key"
-        case .weChat: return "message.fill"
+        case .weChat: return "rectangle.connected.to.line.below"
         }
     }
 }

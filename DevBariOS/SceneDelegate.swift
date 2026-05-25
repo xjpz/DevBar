@@ -25,12 +25,9 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     private func mapAction(_ item: UIApplicationShortcutItem) -> ShortcutStore.Action {
-        switch item.type {
-        case "com.xjpz.DevBar.memo":       return .memo
-        case "com.xjpz.DevBar.qr-scan":    return .qrScan
-        case "com.xjpz.DevBar.api-client": return .apiClient
-        case "com.xjpz.DevBar.ocr":        return .ocr
-        default:                            return .memo
+        if let action = IOSHomeScreenShortcutController.action(for: item.type) {
+            return ShortcutStore.action(for: action)
         }
+        return .memo
     }
 }

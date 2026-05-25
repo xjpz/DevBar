@@ -1,28 +1,49 @@
 // SettingsWeChat.swift
 // DevBar
 
+import DevBarCore
 import SwiftUI
 
 struct SettingsWeChat: View {
     @ObservedObject var viewModel: WeChatViewModel
+    @ObservedObject var relayManager: DeviceRelayManager
     @ObservedObject private var agentRouter: WeChatAgentRouter
     @ObservedObject private var approvalCoordinator: WeChatApprovalCoordinator
     @ObservedObject private var authorizedDirectoryStore: WeChatAuthorizedDirectoryStore
     @State private var showLoginSheet = false
     @State private var showAddAgent = false
+    @State private var showPairQRCode = false
+    @State private var isCreatingPairCode = false
+    @State private var deletingRelayPeerID: String?
     @State private var cwdAccessError: String?
+    @State private var selectedTab: RemoteSettingsTab = .wechat
+    @State private var relayStatusNow = Date()
+    @AppStorage(DevBarCoreConstants.Defaults.relayMacEnabledKey) private var relayEnabled = true
 
-    init(viewModel: WeChatViewModel) {
+    init(viewModel: WeChatViewModel, relayManager: DeviceRelayManager) {
         self.viewModel = viewModel
+        self.relayManager = relayManager
         self.agentRouter = viewModel.agentRouter
         self.approvalCoordinator = viewModel.agentRouter.approvalCoordinator
         self.authorizedDirectoryStore = viewModel.agentRouter.authorizedDirectoryStore
     }
 
     var body: some View {
-        Form {
+        VStack(spacing: 6) {
+            Picker("远程控制", selection: $selectedTab) {
+                ForEach(RemoteSettingsTab.allCases) { tab in
+                    Text(tab.title).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 16)
+            .padding(.top, 4)
+
+            Form {
             // Enable toggle
-            Section {
+            if selectedTab == .wechat {
+                Section {
                 Toggle(isOn: $viewModel.isEnabled) {
                     HStack(spacing: 8) {
                         Image(systemName: "message.fill")
@@ -30,10 +51,97 @@ struct SettingsWeChat: View {
                         Text("wechat_enable")
                     }
                 }
+                }
+            }
+
+            if selectedTab == .relay {
+                Section {
+                    Toggle(isOn: $relayEnabled) {
+                        Label("远程中继", systemImage: "macbook.and.iphone")
+                    }
+                    .onChange(of: relayEnabled) { _, enabled in
+                        updateRelayEnabled(enabled)
+                    }
+
+                    if relayEnabled {
+                        if relayManager.peers.isEmpty {
+                            Text("尚未绑定 iPhone。生成二维码后，用 iPhone DevBar 扫描完成配对。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(relayManager.peers) { peer in
+                                let status = relayManager.connectionStatus(for: peer, now: relayStatusNow)
+                                HStack(spacing: 10) {
+                                    Image(systemName: "circle.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(relayPeerStatusColor(status))
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(relayPeerDisplayName(peer))
+                                        Text(relayPeerStatusTitle(status))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Button(role: .destructive) {
+                                        deleteRelayPeer(peer)
+                                    } label: {
+                                        if deletingRelayPeerID == peer.deviceId {
+                                            ProgressView()
+                                                .controlSize(.small)
+                                        } else {
+                                            Label("ios_tools_md_delete", systemImage: "trash")
+                                        }
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(deletingRelayPeerID != nil)
+                                }
+                            }
+                        }
+
+                        if let error = relayManager.lastErrorMessage {
+                            Label(error, systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+
+                        HStack {
+                            Button {
+                                createPairQRCode()
+                            } label: {
+                                if isCreatingPairCode {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Label("连接 iPhone", systemImage: "qrcode")
+                                }
+                            }
+                            .disabled(isCreatingPairCode)
+
+                            Spacer()
+
+                            Button {
+                                Task { await relayManager.refreshPeers() }
+                            } label: {
+                                Label("刷新", systemImage: "arrow.clockwise")
+                            }
+                        }
+                    } else {
+                        Text("relay_disabled_hint")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+            } header: {
+                Text("远程设备")
+            } footer: {
+                Text("Relay 只转发消息和在线状态，Agent 执行与敏感凭证仍保留在 Mac 本地。")
+            }
+
+                relayLogsSection
             }
 
             // Connection status
-            if viewModel.isEnabled {
+            if (selectedTab == .wechat && viewModel.isEnabled) || selectedTab == .agent {
+                if selectedTab == .wechat {
                 Section {
                     HStack {
                         Text("wechat_status")
@@ -103,9 +211,11 @@ struct SettingsWeChat: View {
                 } header: {
                     Text("wechat_accounts")
                 }
+                }
 
                 // Agent config
-                Section {
+                if selectedTab == .agent {
+                    Section {
                     if hasProtectedWorkingDirectories {
                         Label("wechat_cwd_protected_notice", systemImage: "exclamationmark.triangle.fill")
                             .font(.caption)
@@ -243,8 +353,10 @@ struct SettingsWeChat: View {
                 } header: {
                     Text("wechat_agents")
                 }
+                }
 
-                Section {
+                if selectedTab == .agent {
+                    Section {
                     Text("添加目录时会同时验证 DevBar 和外部 CLI 子进程访问权限。若目录位于文稿、桌面、下载或 iCloud，系统授权会在这里完成，避免远程首次访问才弹窗。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -303,8 +415,9 @@ struct SettingsWeChat: View {
                 } header: {
                     Text("远程可切换目录")
                 }
+                }
 
-                if !approvalCoordinator.pendingRequests.isEmpty {
+                if selectedTab == .agent && !approvalCoordinator.pendingRequests.isEmpty {
                     Section {
                         ForEach(approvalCoordinator.pendingRequests) { request in
                             VStack(alignment: .leading, spacing: 8) {
@@ -372,7 +485,7 @@ struct SettingsWeChat: View {
                     }
                 }
 
-                if !approvalCoordinator.recentRequests.isEmpty {
+                if selectedTab == .agent && !approvalCoordinator.recentRequests.isEmpty {
                     Section {
                         ForEach(approvalCoordinator.recentRequests.prefix(5)) { request in
                             VStack(alignment: .leading, spacing: 4) {
@@ -399,7 +512,8 @@ struct SettingsWeChat: View {
                 }
 
                 // Logs
-                Section {
+                if selectedTab == .wechat {
+                    Section {
                     ScrollViewReader { proxy in
                         ScrollView {
                             LazyVStack(alignment: .leading) {
@@ -435,9 +549,11 @@ struct SettingsWeChat: View {
                 } header: {
                     Text("wechat_logs")
                 }
+                }
             }
         }
-        .formStyle(.grouped)
+            .formStyle(.grouped)
+        }
         .sheet(isPresented: $showLoginSheet) {
             WeChatLoginSheet(authService: viewModel.authService) {
                 showLoginSheet = false
@@ -446,6 +562,23 @@ struct SettingsWeChat: View {
         }
         .sheet(isPresented: $showAddAgent) {
             WeChatAddAgentSheet(router: viewModel.agentRouter)
+        }
+        .sheet(isPresented: $showPairQRCode) {
+            if let payload = relayManager.pairQRCodePayload {
+                DevicePairQRCodeSheet(payload: payload)
+            }
+        }
+        .onChange(of: relayManager.localConnectedPeerIDs) { _, _ in
+            Task { await relayManager.refreshPeers() }
+        }
+        .task(id: selectedTab) {
+            guard selectedTab == .relay else { return }
+            await relayManager.refreshPeers()
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                relayStatusNow = Date()
+                await relayManager.refreshPeers()
+            }
         }
         .alert("wechat_cwd_access_failed", isPresented: cwdAccessErrorBinding) {
             Button("OK", role: .cancel) {
@@ -457,6 +590,90 @@ struct SettingsWeChat: View {
     }
 
     // MARK: - Helpers
+
+    private var relayLogsSection: some View {
+        Section {
+            if relayManager.logLines.isEmpty {
+                Text("暂无中继日志")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading) {
+                            ForEach(relayManager.logLines) { entry in
+                                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                                    Text(entry.time, style: .time)
+                                        .font(.system(.caption2, design: .monospaced))
+                                        .foregroundStyle(.tertiary)
+                                    Text(entry.message)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .foregroundStyle(relayLogColor(entry.level))
+                                }
+                                .id(entry.id)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .frame(maxHeight: 160)
+                    .onChange(of: relayManager.logLines.count) { _, _ in
+                        if let last = relayManager.logLines.last {
+                            withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
+                        }
+                    }
+                }
+            }
+        } header: {
+            Text("中继日志")
+        }
+    }
+
+    private func relayPeerDisplayName(_ peer: DeviceRelayDevice) -> String {
+        let deviceName = relayManager.displayName(for: peer)
+        if peer.deviceType == .iPhone, deviceName == "iPhone" {
+            return "\(deviceName) · \(shortRelayDeviceID(peer.deviceId))"
+        }
+        return deviceName
+    }
+
+    private func shortRelayDeviceID(_ deviceID: String) -> String {
+        String(deviceID.suffix(4)).uppercased()
+    }
+
+    private func relayPeerStatusTitle(_ status: DeviceRelayPeerConnectionStatus) -> LocalizedStringKey {
+        switch status {
+        case .local:
+            return "device_relay_status_local"
+        case .remote:
+            return "device_relay_status_remote"
+        case .offline:
+            return "device_relay_status_offline"
+        }
+    }
+
+    private func relayPeerStatusColor(_ status: DeviceRelayPeerConnectionStatus) -> Color {
+        switch status {
+        case .local:
+            return .green
+        case .remote:
+            return .blue
+        case .offline:
+            return .gray
+        }
+    }
+
+    private func relayLogColor(_ level: DeviceRelayLogEntry.Level) -> Color {
+        switch level {
+        case .info:
+            return .secondary
+        case .success:
+            return .green
+        case .warning:
+            return .orange
+        case .error:
+            return .red
+        }
+    }
 
     @ViewBuilder
     private var statusView: some View {
@@ -478,6 +695,41 @@ struct SettingsWeChat: View {
                 .foregroundStyle(.red)
                 .font(.caption)
         }
+    }
+
+    private func createPairQRCode() {
+        isCreatingPairCode = true
+        Task { @MainActor in
+            defer { isCreatingPairCode = false }
+            await relayManager.createPairQRCode(
+                deviceName: Host.current().localizedName ?? ProcessInfo.processInfo.hostName
+            )
+            if relayManager.pairQRCodePayload != nil {
+                showPairQRCode = true
+            }
+        }
+    }
+
+    private func updateRelayEnabled(_ enabled: Bool) {
+        Task { @MainActor in
+            if enabled {
+                await relayManager.setup(deviceType: .mac, deviceName: Self.currentMacDeviceName)
+            } else {
+                relayManager.stop()
+            }
+        }
+    }
+
+    private func deleteRelayPeer(_ peer: DeviceRelayDevice) {
+        deletingRelayPeerID = peer.deviceId
+        Task { @MainActor in
+            await relayManager.revokePair(peerDeviceID: peer.deviceId)
+            deletingRelayPeerID = nil
+        }
+    }
+
+    private static var currentMacDeviceName: String {
+        Host.current().localizedName ?? ProcessInfo.processInfo.hostName
     }
 
     private func agentIcon(_ type: WeChatAgentRouter.AgentConfig.AgentType) -> String {
@@ -596,6 +848,25 @@ struct SettingsWeChat: View {
 
     private func isCodexAppServer(_ agent: WeChatAgentRouter.AgentConfig) -> Bool {
         agent.type == .acp && (agent.name == "codex" || agent.args?.contains("app-server") == true)
+    }
+}
+
+private enum RemoteSettingsTab: String, CaseIterable, Identifiable {
+    case wechat
+    case relay
+    case agent
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .wechat:
+            return "微信"
+        case .relay:
+            return "中继"
+        case .agent:
+            return "Agent"
+        }
     }
 }
 

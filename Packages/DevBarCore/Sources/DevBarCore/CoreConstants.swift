@@ -14,6 +14,11 @@ public enum DevBarCoreConstants {
         public static let cookieKey = "cookie_string"
         public static let openAIAccessTokenKey = "openai_access_token"
         public static let mimoServiceTokenKey = "mimo_service_token"
+        public static let macRelayDeviceSecretKey = "relay_device_secret_mac"
+        public static let iPhoneRelayDeviceSecretKey = "relay_device_secret_iphone"
+        public static let relayDeviceTokenKey = "relay_device_token"
+        public static let relayLocalPairSecretPrefix = "relay_local_pair_secret_"
+        public static let relayPendingLocalPairSecretPrefix = "relay_pending_local_pair_secret_"
     }
 
     public enum OpenAI {
@@ -31,6 +36,24 @@ public enum DevBarCoreConstants {
         public static let baseURL = "https://dev.xjpz.cc"
         public static let transfersPath = "/api/devbar/transfers"
         public static let directQRCodeLengthThreshold = 1_800
+    }
+
+    public enum DeviceRelay {
+        public static let baseURL = "https://dev.xjpz.cc"
+        public static let registerPath = "/api/devbar/devices/register"
+        public static let peersPath = "/api/devbar/devices/peers"
+        public static let createPairPath = "/api/devbar/pair/create"
+        public static let confirmPairPath = "/api/devbar/pair/confirm"
+        public static let revokePairPath = "/api/devbar/pair/revoke"
+        public static let socketPath = "/ws/devbar-relay"
+        public static let heartbeatInterval: TimeInterval = 25
+        public static let localServiceType = "_devbar-relay._tcp"
+        public static let localHeartbeatInterval: TimeInterval = 10
+        public static let localConnectTimeout: TimeInterval = 1.5
+
+        public static func commandPath(targetDeviceId: String) -> String {
+            "/api/devbar/devices/\(targetDeviceId)/commands"
+        }
     }
 
     public enum AppGroup {
@@ -51,5 +74,10 @@ public enum DevBarCoreConstants {
         public static let openAIQuotaCacheKey = "openai_quota_cache"
         public static let mimoQuotaCacheKey = "mimo_quota_cache"
         public static let liveActivitySettingsKey = "live_activity_settings"
+        public static let relayMacDeviceIDKey = "relay_mac_device_id"
+        public static let relayIPhoneDeviceIDKey = "relay_iphone_device_id"
+        public static let relayDeviceTokenKey = "relay_device_token"
+        public static let relayIPhoneDeviceNameKey = "relay_iphone_device_name"
+        public static let relayMacEnabledKey = "relay_mac_enabled"
     }
 }

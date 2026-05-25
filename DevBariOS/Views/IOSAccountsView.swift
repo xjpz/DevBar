@@ -669,13 +669,13 @@ struct IOSAccountsView: View {
         defer { isResolvingTransfer = false }
 
         do {
-            let payload = try await appViewModel.prepareTransferImport(from: code)
-            if TransferPayloadCodec.isRelayTransferURL(code) {
-                pendingRelayTransferURL = URL(string: code)
-            } else {
+            switch try await appViewModel.resolveScannedCode(code) {
+            case .macPaired:
                 pendingRelayTransferURL = nil
+            case let .providerTransfer(preview, relayURL):
+                pendingRelayTransferURL = relayURL
+                pendingImportPreview = preview
             }
-            pendingImportPreview = appViewModel.makeTransferImportPreview(for: payload)
         } catch {
             pendingRelayTransferURL = nil
             transferImportError = error.localizedDescription

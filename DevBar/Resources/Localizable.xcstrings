@@ -4,6 +4,9 @@
     "" : {
 
     },
+    "%@" : {
+
+    },
     "%@ - %@" : {
       "localizations" : {
         "zh-Hans" : {
@@ -43,6 +46,9 @@
           }
         }
       }
+    },
+    "%@ 会立即回到登录窗口。" : {
+
     },
     "%lld" : {
 
@@ -1282,6 +1288,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "DevBar %@"
+          }
+        }
+      }
+    },
+    "device_relay_lock_locked" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Locked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已锁定"
+          }
+        }
+      }
+    },
+    "device_relay_status_local" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地"
+          }
+        }
+      }
+    },
+    "device_relay_status_offline" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离线"
+          }
+        }
+      }
+    },
+    "device_relay_status_remote" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remote"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "远程"
           }
         }
       }
@@ -2584,6 +2654,246 @@
         }
       }
     },
+    "ios_home_shortcut_api_client" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API Client"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API 调试"
+          }
+        }
+      }
+    },
+    "ios_home_shortcut_lock_mac" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "锁定 Mac"
+          }
+        }
+      }
+    },
+    "ios_home_shortcut_memo" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "备忘录"
+          }
+        }
+      }
+    },
+    "ios_home_shortcut_ocr" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCR"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCR 识别"
+          }
+        }
+      }
+    },
+    "ios_home_shortcut_scan" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扫一扫"
+          }
+        }
+      }
+    },
+    "ios_home_shortcut_sleep_mac_display" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn Off Display"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭显示器"
+          }
+        }
+      }
+    },
+    "ios_home_shortcut_wake_mac" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wake Mac"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点亮 Mac"
+          }
+        }
+      }
+    },
+    "ios_mac_relay_scan_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pairing failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配对失败"
+          }
+        }
+      }
+    },
+    "ios_mac_relay_scan_pair" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan to pair"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扫码配对"
+          }
+        }
+      }
+    },
+    "ios_mac_relay_scan_provider_transfer_unsupported" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is a provider transfer QR code. Please scan it from the home page."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是 Provider 迁移二维码，请回到首页扫一扫处理。"
+          }
+        }
+      }
+    },
+    "ios_mac_relay_task_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失败"
+          }
+        }
+      }
+    },
+    "ios_mac_relay_task_pending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pending"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待中"
+          }
+        }
+      }
+    },
+    "ios_mac_relay_task_running" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Running"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "执行中"
+          }
+        }
+      }
+    },
+    "ios_mac_relay_task_succeeded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
+          }
+        }
+      }
+    },
+    "ios_mac_relay_tasks_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent Tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent 任务"
+          }
+        }
+      }
+    },
     "ios_memo_faceid_not_available" : {
       "localizations" : {
         "en" : {
@@ -3002,6 +3312,38 @@
         }
       }
     },
+    "ios_settings_home_shortcuts_footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose up to 4. Mac control shortcuts are hidden until a Mac is paired."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最多选择 4 个。未绑定 Mac 时，Mac 控制类快捷方式不会出现。"
+          }
+        }
+      }
+    },
+    "ios_settings_home_shortcuts_section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Home Screen Quick Actions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "桌面快捷方式"
+          }
+        }
+      }
+    },
     "ios_settings_interval_3m" : {
       "localizations" : {
         "en" : {
@@ -3289,6 +3631,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刷新"
+          }
+        }
+      }
+    },
+    "ios_settings_relay_device_name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone name"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 名称"
+          }
+        }
+      }
+    },
+    "ios_settings_relay_device_name_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This name is sent to the paired Mac. If iOS only exposes “iPhone”, you can set a custom display name here."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个名称会发送给已配对 Mac。如果系统只返回“iPhone”，可以在这里设置自定义显示名。"
+          }
+        }
+      }
+    },
+    "ios_settings_relay_section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac Relay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac 中继"
           }
         }
       }
@@ -5695,6 +6085,18 @@
         }
       }
     },
+    "Mac" : {
+
+    },
+    "Mac Relay" : {
+
+    },
+    "Mac Relay, %@" : {
+
+    },
+    "Mac：%@" : {
+
+    },
     "Markdown (.md)" : {
 
     },
@@ -6736,6 +7138,28 @@
         }
       }
     },
+    "Relay 只转发消息和在线状态，Agent 执行与敏感凭证仍保留在 Mac 本地。" : {
+
+    },
+    "relay_disabled_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relay is off. iPhone devices cannot connect to this Mac until it is enabled."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中继已关闭，开启后 iPhone 才能连接这台 Mac。"
+          }
+        }
+      }
+    },
+    "Relay：%@" : {
+
+    },
     "Request URL" : {
 
     },
@@ -7052,13 +7476,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "WeChat"
+            "value" : "Connect"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "微信"
+            "value" : "连接"
           }
         }
       }
@@ -8381,6 +8805,15 @@
     "Word 文档 (.docx)" : {
 
     },
+    "中继日志" : {
+
+    },
+    "中继未连接" : {
+
+    },
+    "中继连接失败" : {
+
+    },
     "二维码包含账号凭证，只建议在你自己的可信设备之间迁移。" : {
 
     },
@@ -8396,7 +8829,25 @@
     "关闭" : {
 
     },
+    "关闭 Mac 显示器" : {
+
+    },
+    "关闭显示器" : {
+
+    },
     "最近授权" : {
+
+    },
+    "刷新" : {
+
+    },
+    "发送" : {
+
+    },
+    "发送任务到在线 Mac" : {
+
+    },
+    "取消" : {
 
     },
     "只读适合远程问答；工作区写入允许 Codex 修改当前工作目录下文件，仍会走授权确认。" : {
@@ -8411,6 +8862,9 @@
     "导入到 iPhone" : {
 
     },
+    "尚未绑定 iPhone。生成二维码后，用 iPhone DevBar 扫描完成配对。" : {
+
+    },
     "工具：%@" : {
 
     },
@@ -8421,6 +8875,12 @@
 
     },
     "待授权" : {
+
+    },
+    "扫一扫" : {
+
+    },
+    "扫描 Mac DevBar 里的连接二维码后，这里会显示已绑定 Mac。" : {
 
     },
     "拒绝" : {
@@ -8447,10 +8907,19 @@
     "显示二维码" : {
 
     },
+    "暂无中继日志" : {
+
+    },
     "未添加授权目录" : {
 
     },
+    "本地连接" : {
+
+    },
     "来源：%@" : {
+
+    },
+    "正在读取二维码..." : {
 
     },
     "正在读取迁移配置..." : {
@@ -8465,19 +8934,64 @@
     "添加目录时会同时验证 DevBar 和外部 CLI 子进程访问权限。若目录位于文稿、桌面、下载或 iCloud，系统授权会在这里完成，避免远程首次访问才弹窗。" : {
 
     },
+    "点亮 Mac" : {
+
+    },
     "生成一个 5 分钟内有效的二维码，在 iPhone 上扫码导入当前配置。" : {
+
+    },
+    "用 iPhone DevBar 扫描二维码完成配对。二维码不包含设备密钥，过期后请重新生成。" : {
 
     },
     "迁移到 iPhone" : {
 
     },
+    "远程中继" : {
+
+    },
     "远程可切换目录" : {
+
+    },
+    "远程控制" : {
+
+    },
+    "远程设备" : {
+
+    },
+    "连接 iPhone" : {
+
+    },
+    "连接中" : {
 
     },
     "选择当前工作目录，所选目录会加入远程可用目录" : {
 
     },
+    "通过 DevBar Relay 关闭已配对 Mac 的显示器。" : {
+
+    },
+    "通过 DevBar Relay 点亮已配对 Mac 的显示器。" : {
+
+    },
+    "通过 DevBar Relay 锁定已配对的 Mac。" : {
+
+    },
     "鄂ICP备2021013794号-4A" : {
+
+    },
+    "配对码：%@" : {
+
+    },
+    "锁定" : {
+
+    },
+    "锁定 %@" : {
+
+    },
+    "锁定 Mac？" : {
+
+    },
+    "锁屏 Mac" : {
 
     },
     "需重新授权" : {

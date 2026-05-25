@@ -31,6 +31,11 @@ struct DevBariOSApp: App {
                         await appViewModel.refreshOnForeground()
                     }
                 }
+                .onChange(of: languageManager.selectedLanguage) { _, _ in
+                    Task {
+                        await appViewModel.refreshHomeScreenShortcutsForCurrentState()
+                    }
+                }
         }
         .modelContainer(for: [IOSAPIRecord.self, IOSWebHistoryRecord.self, IOSMemoItem.self, IOSMarkdownDocument.self], isAutosaveEnabled: true, isUndoEnabled: false)
     }

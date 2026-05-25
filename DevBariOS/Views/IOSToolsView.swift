@@ -91,6 +91,19 @@ struct IOSToolsView: View {
                 }
                 .buttonStyle(.plain)
 
+                NavigationLink {
+                    IOSMacRelayView()
+                } label: {
+                    IOSToolCard(
+                        title: "Mac 中继",
+                        subtitle: "Relay",
+                        systemImage: "macbook.and.iphone",
+                        iconColor: .green,
+                        theme: theme
+                    )
+                }
+                .buttonStyle(.plain)
+
                 if #available(iOS 18.0, *) {
                     NavigationLink {
                         IOSTranslationView()

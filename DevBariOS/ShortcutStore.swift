@@ -1,4 +1,5 @@
 import Combine
+import DevBarCore
 import SwiftUI
 
 /// 快捷方式动作状态管理
@@ -12,7 +13,22 @@ final class ShortcutStore: ObservableObject {
         case memo
         case qrScan
         case apiClient
+        case lockMac
+        case wakeMacDisplay
+        case sleepMacDisplay
         case ocr
+    }
+
+    static func action(for shortcutAction: DeviceRelayHomeScreenShortcutAction) -> Action {
+        switch shortcutAction {
+        case .memo: return .memo
+        case .qrScan: return .qrScan
+        case .apiClient: return .apiClient
+        case .lockMac: return .lockMac
+        case .wakeMacDisplay: return .wakeMacDisplay
+        case .sleepMacDisplay: return .sleepMacDisplay
+        case .ocr: return .ocr
+        }
     }
 
     @Published private(set) var pendingAction: Action?

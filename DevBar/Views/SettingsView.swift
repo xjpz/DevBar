@@ -53,7 +53,10 @@ struct SettingsView: View {
             case .accounts:
                 SettingsAccounts()
             case .weChat:
-                SettingsWeChat(viewModel: appViewModel.weChatViewModel)
+                SettingsWeChat(
+                    viewModel: appViewModel.weChatViewModel,
+                    relayManager: appViewModel.deviceRelayManager
+                )
             }
         }
         .frame(width: 340, height: 480)
