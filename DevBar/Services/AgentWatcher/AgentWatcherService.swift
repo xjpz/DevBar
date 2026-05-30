@@ -18,15 +18,21 @@ class AgentWatcherService: ObservableObject {
     @Published var isEnabled = true
     @Published var isServerRunning = false
     @Published var lastError: String?
+    @Published var waitingCount: Int = 0
 
     private let serverPort: UInt16 = 49321
     private var cancellables = Set<AnyCancellable>()
+
+    // 通知节流：记录每个 session 上次通知时间
+    private var lastNotificationTime: [String: Date] = [:]
+    private let notificationCooldown: TimeInterval = 60 // 同一 session 60秒内不重复通知
 
     // MARK: - Initialization
 
     private init() {
         setupHandlers()
         setupNotifications()
+        requestNotificationPermission()
     }
 
     private func setupHandlers() {
@@ -35,13 +41,22 @@ class AgentWatcherService: ObservableObject {
     }
 
     private func setupNotifications() {
-        // 监听会话变化，发送通知
+        // 监听会话变化，发送通知和更新 badge
         sessionStore.$sessions
             .receive(on: DispatchQueue.main)
             .sink { [weak self] sessions in
                 self?.handleSessionChanges(sessions)
             }
             .store(in: &cancellables)
+    }
+
+    private func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            if let error = error {
+                print("[AgentWatcherService] Notification permission error: \(error)")
+            }
+            print("[AgentWatcherService] Notification permission granted: \(granted)")
+        }
     }
 
     // MARK: - Server Management
@@ -168,12 +183,30 @@ class AgentWatcherService: ObservableObject {
     private func handleSessionChanges(_ sessions: [String: AgentSession]) {
         let waitingSessions = sessions.values.filter { $0.isWaiting }
 
+        // 更新等待数量
+        waitingCount = waitingSessions.count
+
+        // 对新进入等待状态的 session 发送通知（带节流）
         for session in waitingSessions {
-            sendLocalNotification(for: session)
+            if shouldNotify(for: session.id) {
+                sendLocalNotification(for: session)
+                lastNotificationTime[session.id] = Date()
+            }
         }
+
+        // 清理已不再等待的 session 的通知记录
+        let waitingIds = Set(waitingSessions.map { $0.id })
+        lastNotificationTime = lastNotificationTime.filter { waitingIds.contains($0.key) }
 
         // 更新菜单栏状态
         updateMenuBarStatus()
+    }
+
+    private func shouldNotify(for sessionId: String) -> Bool {
+        guard let lastTime = lastNotificationTime[sessionId] else {
+            return true // 从未通知过
+        }
+        return Date().timeIntervalSince(lastTime) > notificationCooldown
     }
 
     private func sendLocalNotification(for session: AgentSession) {
@@ -181,6 +214,7 @@ class AgentWatcherService: ObservableObject {
         content.title = "\(session.source.displayName) 需要处理"
         content.body = session.lastEvent?.message ?? "任务等待处理"
         content.sound = .default
+        content.categoryIdentifier = "AGENT_WATCHER"
 
         let request = UNNotificationRequest(
             identifier: "agent-watcher-\(session.id)",
@@ -196,13 +230,12 @@ class AgentWatcherService: ObservableObject {
     }
 
     private func updateMenuBarStatus() {
-        // 这里会通过 NotificationCenter 通知 MenuBarView 更新状态
         NotificationCenter.default.post(
             name: .agentWatcherStatusChanged,
             object: nil,
             userInfo: [
                 "hasWaiting": sessionStore.hasWaitingSessions,
-                "waitingCount": sessionStore.waitingSessions.count
+                "waitingCount": waitingCount
             ]
         )
     }

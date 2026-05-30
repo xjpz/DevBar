@@ -297,6 +297,30 @@ final class AppViewModel: ObservableObject {
                 self.agentWatcherService.startServer()
             }
         }
+
+        // 监听 Agent Watcher 状态变化，更新菜单栏
+        NotificationCenter.default.addObserver(
+            forName: .agentWatcherStatusChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                self?.updateMenuBarBadge(from: notification)
+            }
+        }
+    }
+
+    private func updateMenuBarBadge(from notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let waitingCount = userInfo["waitingCount"] as? Int else {
+            return
+        }
+
+        // 更新菜单栏 badge
+        if waitingCount > 0 {
+            statusBarButton?.appearsDisabled = false
+            // 可以在这里更新额外的 badge 显示
+        }
     }
 
     private static var currentDeviceName: String {

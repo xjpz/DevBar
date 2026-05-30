@@ -152,11 +152,14 @@ private struct LoggedInContentView: View {
             }) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: "eye")
-                    if appViewModel.agentWatcherService.sessionStore.hasWaitingSessions {
-                        Circle()
-                            .fill(.red)
-                            .frame(width: 8, height: 8)
-                            .offset(x: 4, y: -4)
+                    if appViewModel.agentWatcherService.waitingCount > 0 {
+                        Text("\(appViewModel.agentWatcherService.waitingCount)")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(2)
+                            .background(Color.red)
+                            .clipShape(Circle())
+                            .offset(x: 6, y: -6)
                     }
                 }
             }

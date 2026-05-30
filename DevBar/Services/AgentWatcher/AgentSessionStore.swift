@@ -84,12 +84,29 @@ struct AgentSession: Codable, Identifiable {
 @MainActor
 class AgentSessionStore: ObservableObject {
     @Published var sessions: [String: AgentSession] = [:]
+    @Published var tick: Bool = false // 用于触发 UI 刷新
 
     private let storageKey = "DevBarAgentWatcherSessions"
     private let maxRecentEvents = 50
+    private var timer: Timer?
 
     init() {
         loadSessions()
+        startWaitingTimer()
+    }
+
+    deinit {
+        timer?.invalidate()
+    }
+
+    // MARK: - Timer for waiting time updates
+
+    private func startWaitingTimer() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.tick.toggle() // 触发 UI 刷新
+            }
+        }
     }
 
     // MARK: - Session Management
