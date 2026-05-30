@@ -96,4 +96,34 @@ public final class WidgetDataManager {
         saveMacThemeSnapshot(snapshot)
         WidgetCenter.shared.reloadAllTimelines()
     }
+
+    // MARK: - Agent Watcher Widget Data
+
+    public func saveAgentWatcherData(_ data: AgentWatcherWidgetData) {
+        guard let defaults else { return }
+        do {
+            let encoded = try JSONEncoder().encode(data)
+            defaults.set(encoded, forKey: DevBarCoreConstants.AppGroup.agentWatcherWidgetKey)
+        } catch {
+            print("[DevBar] Failed to save agent watcher widget data: \(error)")
+        }
+    }
+
+    public func loadAgentWatcherData() -> AgentWatcherWidgetData? {
+        guard let defaults,
+              let data = defaults.data(forKey: DevBarCoreConstants.AppGroup.agentWatcherWidgetKey) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(AgentWatcherWidgetData.self, from: data)
+    }
+
+    public func clearAgentWatcherData() {
+        guard let defaults else { return }
+        defaults.removeObject(forKey: DevBarCoreConstants.AppGroup.agentWatcherWidgetKey)
+    }
+
+    public func saveAndReloadAgentWatcher(_ data: AgentWatcherWidgetData) {
+        saveAgentWatcherData(data)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
 }

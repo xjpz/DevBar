@@ -62,6 +62,7 @@ public enum DevBarCoreConstants {
         public static let macThemeWidgetSnapshotKey = "mac_theme_widget_snapshot"
         public static let macThemeWidgetSelectedPageKey = "mac_theme_widget_selected_page"
         public static let liveActivitySelectedProviderKey = "live_activity_selected_provider"
+        public static let agentWatcherWidgetKey = "agent_watcher_widget_data"
 
         public static func sharedDataKey(for provider: String) -> String {
             "widget_shared_data_\(provider)"

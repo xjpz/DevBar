@@ -73,3 +73,56 @@ public struct WidgetQuotaLimit: Codable, Sendable, Identifiable, Equatable {
         self.formattedResetTime = formattedResetTime
     }
 }
+
+// MARK: - Agent Watcher Widget Data
+
+public struct AgentWatcherWidgetData: Codable, Sendable, Equatable {
+    public let waitingCount: Int
+    public let activeCount: Int
+    public let lastUpdated: Date
+    public let waitingSessions: [AgentWatcherSessionInfo]
+
+    public init(
+        waitingCount: Int,
+        activeCount: Int,
+        lastUpdated: Date,
+        waitingSessions: [AgentWatcherSessionInfo]
+    ) {
+        self.waitingCount = waitingCount
+        self.activeCount = activeCount
+        self.lastUpdated = lastUpdated
+        self.waitingSessions = waitingSessions
+    }
+
+    public static let placeholder = AgentWatcherWidgetData(
+        waitingCount: 0,
+        activeCount: 0,
+        lastUpdated: .distantPast,
+        waitingSessions: []
+    )
+}
+
+public struct AgentWatcherSessionInfo: Codable, Sendable, Equatable, Identifiable {
+    public let id: String
+    public let source: String
+    public let projectName: String
+    public let state: String
+    public let waitingSince: Date?
+    public let message: String
+
+    public init(
+        id: String,
+        source: String,
+        projectName: String,
+        state: String,
+        waitingSince: Date?,
+        message: String
+    ) {
+        self.id = id
+        self.source = source
+        self.projectName = projectName
+        self.state = state
+        self.waitingSince = waitingSince
+        self.message = message
+    }
+}

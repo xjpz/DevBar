@@ -213,6 +213,9 @@ class AgentWatcherService: ObservableObject {
 
         // 更新菜单栏状态
         updateMenuBarStatus()
+
+        // 更新 Widget 数据
+        updateWidgetData()
     }
 
     private func shouldNotify(for sessionId: String) -> Bool {
@@ -294,6 +297,29 @@ class AgentWatcherService: ObservableObject {
                 "waitingCount": waitingCount
             ]
         )
+    }
+
+    private func updateWidgetData() {
+        let waitingSessions = sessionStore.waitingSessions
+        let sessionInfos = waitingSessions.map { session in
+            AgentWatcherSessionInfo(
+                id: session.id,
+                source: session.source.displayName,
+                projectName: session.projectName ?? "Unknown",
+                state: session.state.rawValue,
+                waitingSince: session.waitingSince,
+                message: session.lastEvent?.message ?? ""
+            )
+        }
+
+        let widgetData = AgentWatcherWidgetData(
+            waitingCount: waitingSessions.count,
+            activeCount: sessionStore.activeSessions.count,
+            lastUpdated: Date(),
+            waitingSessions: sessionInfos
+        )
+
+        WidgetDataManager.shared.saveAndReloadAgentWatcher(widgetData)
     }
 
     // MARK: - Session Management
