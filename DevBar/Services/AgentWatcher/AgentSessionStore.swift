@@ -108,8 +108,8 @@ class AgentSessionStore: ObservableObject {
         var newSession = AgentSession(
             id: sessionId,
             source: source,
-            cwd: cwd,
             projectName: cwd.flatMap { extractProjectName(from: $0) },
+            cwd: cwd,
             state: .running
         )
         newSession.updatedAt = Date()

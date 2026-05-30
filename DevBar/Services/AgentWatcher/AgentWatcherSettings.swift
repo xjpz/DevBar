@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 // MARK: - Notification Mode
 
@@ -272,12 +273,12 @@ struct UserActivityState {
 // MARK: - Notification Decision
 
 struct NotificationDecision {
-    let showInStatusCenter: Bool
-    let updateMacBadge: Bool
-    let sendMacNotification: Bool
-    let sendPhoneNotification: Bool
+    var showInStatusCenter: Bool
+    var updateMacBadge: Bool
+    var sendMacNotification: Bool
+    var sendPhoneNotification: Bool
     var delayPhoneNotificationSeconds: Int?
-    let reason: String
+    var reason: String
 
     static func statusOnly(reason: String) -> NotificationDecision {
         NotificationDecision(

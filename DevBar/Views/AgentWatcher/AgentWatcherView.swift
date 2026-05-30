@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct AgentWatcherView: View {
     @StateObject private var watcherService = AgentWatcherService.shared
