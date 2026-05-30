@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct IOSBase64View: View {
     @Environment(\.themeTokens) private var theme
@@ -6,6 +7,7 @@ struct IOSBase64View: View {
     @State private var output = ""
     @State private var mode: Base64Mode = .encode
     @State private var isKeyboardVisible = false
+    @State private var copyFeedback = false
 
     var body: some View {
         ScrollView {
@@ -69,10 +71,18 @@ struct IOSBase64View: View {
                 .padding(12)
                 .iosGlassContainer(theme, cornerRadius: 18)
                 .disabled(true)
+
+            if !text.isEmpty {
+                IOSToolCopyButton(isCopied: copyFeedback) {
+                    copyOutput()
+                }
+            }
         }
     }
 
     private func transform() {
+        copyFeedback = false
+
         switch mode {
         case .encode:
             output = Data(input.utf8).base64EncodedString()
@@ -82,6 +92,14 @@ struct IOSBase64View: View {
                 return
             }
             output = String(decoding: data, as: UTF8.self)
+        }
+    }
+
+    private func copyOutput() {
+        UIPasteboard.general.string = output
+        copyFeedback = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            if copyFeedback { copyFeedback = false }
         }
     }
 }

@@ -12,6 +12,7 @@ struct IOSDashboardView: View {
     @State private var pendingImportPreview: TransferImportPreview?
     @State private var pendingRelayTransferURL: URL?
     @State private var scanError: String?
+    @State private var handledScanRequestID: UUID?
 
     var body: some View {
         ZStack {
@@ -116,6 +117,12 @@ struct IOSDashboardView: View {
         }
         .refreshable {
             await appViewModel.refreshAll()
+        }
+        .onAppear {
+            openScannerIfRequested()
+        }
+        .onChange(of: appViewModel.dashboardScanRequestID) { _, _ in
+            openScannerIfRequested()
         }
     }
 
@@ -480,6 +487,15 @@ struct IOSDashboardView: View {
             pendingRelayTransferURL = nil
             scanError = error.localizedDescription
         }
+    }
+
+    private func openScannerIfRequested() {
+        guard let requestID = appViewModel.dashboardScanRequestID,
+              handledScanRequestID != requestID else {
+            return
+        }
+        handledScanRequestID = requestID
+        isShowingScanner = true
     }
 
     private func importPayload(_ payload: TransferPayload) async {

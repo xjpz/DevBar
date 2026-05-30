@@ -3,7 +3,7 @@ import DevBarCore
 import Foundation
 
 struct MacDeviceEntity: AppEntity, Identifiable {
-    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "Mac")
+    static var typeDisplayRepresentation = TypeDisplayRepresentation(name: "电脑")
     static var defaultQuery = MacDeviceEntityQuery()
 
     let id: String
@@ -20,6 +20,6 @@ struct MacDeviceEntity: AppEntity, Identifiable {
 
     init(device: DeviceRelayDevice) {
         self.id = device.deviceId
-        self.name = device.deviceName?.isEmpty == false ? device.deviceName! : "Mac \(device.deviceId.suffix(6))"
+        self.name = device.deviceName?.isEmpty == false ? device.deviceName! : "电脑 \(device.deviceId.suffix(6))"
     }
 }

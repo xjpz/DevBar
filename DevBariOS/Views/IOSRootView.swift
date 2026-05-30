@@ -105,7 +105,11 @@ struct IOSRootView: View {
         case .memo:
             shortcutDestination = .memo
         case .qrScan:
-            shortcutDestination = .accounts
+            shortcutDestination = nil
+            appViewModel.selectedTab = .dashboard
+            DispatchQueue.main.async {
+                appViewModel.requestDashboardScanner()
+            }
         case .apiClient:
             shortcutDestination = .apiClient
         case .lockMac:

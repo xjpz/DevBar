@@ -37,6 +37,9 @@
         }
       }
     },
+    "%@ · AI 额度" : {
+
+    },
     "%@ (%@)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -917,6 +920,12 @@
     "ACP" : {
 
     },
+    "AI 额度" : {
+
+    },
+    "AI 额度提供方" : {
+
+    },
     "alerts_footer" : {
       "localizations" : {
         "en" : {
@@ -1257,6 +1266,9 @@
 
     },
     "DevBar Quota" : {
+
+    },
+    "DevBar 电脑主题" : {
 
     },
     "devbar_update" : {
@@ -1674,6 +1686,9 @@
     "Hello" : {
 
     },
+    "Hi, %@" : {
+
+    },
     "hide_from_dock" : {
       "localizations" : {
         "en" : {
@@ -1925,7 +1940,6 @@
       }
     },
     "invalid_response" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2655,6 +2669,7 @@
       }
     },
     "ios_home_shortcut_api_client" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2671,6 +2686,7 @@
       }
     },
     "ios_home_shortcut_lock_mac" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2687,6 +2703,7 @@
       }
     },
     "ios_home_shortcut_memo" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2703,6 +2720,7 @@
       }
     },
     "ios_home_shortcut_ocr" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2719,6 +2737,7 @@
       }
     },
     "ios_home_shortcut_scan" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2735,6 +2754,7 @@
       }
     },
     "ios_home_shortcut_sleep_mac_display" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2751,6 +2771,7 @@
       }
     },
     "ios_home_shortcut_wake_mac" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6085,9 +6106,6 @@
         }
       }
     },
-    "Mac" : {
-
-    },
     "Mac Relay" : {
 
     },
@@ -6232,6 +6250,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "serviceToken 或 Cookie"
+          }
+        }
+      }
+    },
+    "mimo_cookie_renewal_needs_login" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo login has expired. Sign in again from Settings."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo 登录已失效，请在设置中重新登录。"
+          }
+        }
+      }
+    },
+    "mimo_cookie_renewal_running" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refreshing MiMo login in the background..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在后台刷新 MiMo 登录..."
+          }
+        }
+      }
+    },
+    "mimo_cookie_renewal_success" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo login refreshed at %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo 登录已于 %@ 刷新"
           }
         }
       }
@@ -6942,6 +7008,9 @@
           }
         }
       }
+    },
+    "Page" : {
+
     },
     "Pages you open in WebKit will appear here." : {
 
@@ -8829,13 +8898,16 @@
     "关闭" : {
 
     },
-    "关闭 Mac 显示器" : {
-
-    },
     "关闭显示器" : {
 
     },
+    "关闭电脑显示器" : {
+
+    },
     "最近授权" : {
+
+    },
+    "切换小组件页面" : {
 
     },
     "刷新" : {
@@ -8854,6 +8926,15 @@
 
     },
     "在 Finder 中右键即可使用这些功能。需在系统设置 > 扩展中启用 DevBar Finder Extension。" : {
+
+    },
+    "在一个大号小组件里查看 AI 额度和电脑控制入口。" : {
+
+    },
+    "在小组件内切换显示页面。" : {
+
+    },
+    "在线" : {
 
     },
     "如果二维码过期，请关闭后重新生成。" : {
@@ -8875,6 +8956,9 @@
 
     },
     "待授权" : {
+
+    },
+    "待连接" : {
 
     },
     "扫一扫" : {
@@ -8934,13 +9018,22 @@
     "添加目录时会同时验证 DevBar 和外部 CLI 子进程访问权限。若目录位于文稿、桌面、下载或 iCloud，系统授权会在这里完成，避免远程首次访问才弹窗。" : {
 
     },
-    "点亮 Mac" : {
+    "点亮电脑" : {
 
     },
     "生成一个 5 分钟内有效的二维码，在 iPhone 上扫码导入当前配置。" : {
 
     },
     "用 iPhone DevBar 扫描二维码完成配对。二维码不包含设备密钥，过期后请重新生成。" : {
+
+    },
+    "电脑" : {
+
+    },
+    "电脑控制台" : {
+
+    },
+    "请使用大号小组件" : {
 
     },
     "迁移到 iPhone" : {
@@ -8967,13 +9060,16 @@
     "选择当前工作目录，所选目录会加入远程可用目录" : {
 
     },
-    "通过 DevBar Relay 关闭已配对 Mac 的显示器。" : {
+    "选择默认页面和 AI 额度提供方。" : {
 
     },
-    "通过 DevBar Relay 点亮已配对 Mac 的显示器。" : {
+    "通过 DevBar Relay 关闭已配对电脑的显示器。" : {
 
     },
-    "通过 DevBar Relay 锁定已配对的 Mac。" : {
+    "通过 DevBar Relay 点亮已配对电脑的显示器。" : {
+
+    },
+    "通过 DevBar Relay 锁定已配对的电脑。" : {
 
     },
     "鄂ICP备2021013794号-4A" : {
@@ -8991,10 +9087,13 @@
     "锁定 Mac？" : {
 
     },
-    "锁屏 Mac" : {
+    "锁屏电脑" : {
 
     },
     "需重新授权" : {
+
+    },
+    "页面" : {
 
     },
     "高风险也允许微信确认" : {
@@ -9004,6 +9103,9 @@
 
     },
     "默认终端" : {
+
+    },
+    "默认页面" : {
 
     }
   },

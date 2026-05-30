@@ -123,17 +123,6 @@ struct IOSOCRView: View {
                 Text("ios_tools_ocr_result")
                     .font(.headline)
                     .foregroundStyle(theme.textPrimary)
-                Spacer()
-                if !recognizedText.isEmpty {
-                    Button {
-                        copyResult()
-                    } label: {
-                        Image(systemName: copyFeedback ? "checkmark" : "doc.on.doc")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(copyFeedback ? theme.success : theme.brandPrimary)
-                    }
-                    .disabled(copyFeedback)
-                }
             }
 
             if recognizedText.isEmpty && !isRecognizing {
@@ -157,6 +146,12 @@ struct IOSOCRView: View {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(theme.borderSubtle, lineWidth: 1)
                 )
+
+                if !recognizedText.isEmpty {
+                    IOSToolCopyButton(isCopied: copyFeedback) {
+                        copyResult()
+                    }
+                }
             }
         }
         .animation(.easeOut(duration: 0.25), value: copyFeedback)

@@ -16,10 +16,45 @@ final class AppViewModel: ObservableObject {
         case expired
     }
 
+    enum MimoCookieRenewalState: Equatable {
+        case idle
+        case renewing
+        case renewed(Date)
+        case needsLogin(String)
+        case failed(String)
+
+        var message: String? {
+            switch self {
+            case .idle:
+                return nil
+            case .renewing:
+                return String(localized: "mimo_cookie_renewal_running")
+            case .renewed(let date):
+                return String(
+                    format: String(localized: "mimo_cookie_renewal_success"),
+                    date.formatted(date: .omitted, time: .shortened)
+                )
+            case .needsLogin(let message), .failed(let message):
+                return message
+            }
+        }
+
+        var isFailure: Bool {
+            switch self {
+            case .needsLogin, .failed:
+                return true
+            case .idle, .renewing, .renewed:
+                return false
+            }
+        }
+    }
+
     @Published var authState: AuthState = .loading
     @Published var credentials: AuthCredentials?
+    @Published var mimoCookieRenewalState: MimoCookieRenewalState = .idle
 
     private let authService = AuthService()
+    private let mimoCookieRenewalService = MimoCookieRenewalService()
     let quotaViewModel = QuotaViewModel()
     let openAIQuotaViewModel = OpenAIQuotaViewModel()
     let mimoQuotaViewModel = MimoQuotaViewModel()
@@ -37,6 +72,7 @@ final class AppViewModel: ObservableObject {
     private var previousOpenAINotificationItems: [NotificationQuotaItem]?
     private var hasLaunched = false
     private var handledRelayRequestIDs: Set<String> = []
+    private var mimoCookieRenewalTimer: Timer?
     weak var languageManager: LanguageManager?
 
     // MARK: - Account Configs
@@ -86,6 +122,13 @@ final class AppViewModel: ObservableObject {
         updateStatusText()
     }
 
+    func markMimoCookieUpdated() {
+        UserDefaults.standard.set(Date(), forKey: DevBarCoreConstants.Defaults.mimoCookieLastRenewedAtKey)
+        UserDefaults.standard.removeObject(forKey: DevBarCoreConstants.Defaults.mimoCookieLastRenewFailedAtKey)
+        mimoCookieRenewalState = .renewed(Date())
+        updateMimoCookieRenewalTimer()
+    }
+
     func isProviderEnabled(_ provider: QuotaProvider) -> Bool {
         accountConfigs.first(where: { $0.provider == provider })?.isEnabled ?? false
     }
@@ -96,6 +139,9 @@ final class AppViewModel: ObservableObject {
         }
         syncAuthState()
         updateStatusText()
+        if provider == .mimo {
+            updateMimoCookieRenewalTimer()
+        }
     }
 
     weak var statusBarButton: NSStatusBarButton?
@@ -221,11 +267,12 @@ final class AppViewModel: ObservableObject {
             let token = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
             if let token, !token.isEmpty {
                 Task { @MainActor [weak self] in
-                    await mimoQuotaViewModel.fetchUsage(storedServiceToken: token, silent: true)
+                    await self?.refreshMimoQuotaWithAutoRenew(silent: true)
                     self?.checkAndNotify()
                 }
             }
         }
+        updateMimoCookieRenewalTimer()
 
         // Setup WeChat service if enabled
         Task { @MainActor [weak self] in
@@ -496,6 +543,7 @@ final class AppViewModel: ObservableObject {
 
     deinit {
         statusTextUpdateTask?.cancel()
+        mimoCookieRenewalTimer?.invalidate()
         print("[DevBar] AppViewModel DEINIT")
     }
 
@@ -512,6 +560,8 @@ final class AppViewModel: ObservableObject {
         case .mimo:
             mimoQuotaViewModel.resetForLogout()
             KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
+            mimoCookieRenewalState = .idle
+            updateMimoCookieRenewalTimer()
         }
         refreshAuthenticationState()
     }
@@ -579,10 +629,90 @@ final class AppViewModel: ObservableObject {
         }
 
         if isProviderEnabled(.mimo), hasAuthenticatedSession(for: .mimo) {
-            await mimoQuotaViewModel.fetchUsage(silent: silent)
+            await refreshMimoQuotaWithAutoRenew(silent: silent)
         }
 
         checkAndNotify()
+    }
+
+    private func refreshMimoQuotaWithAutoRenew(silent: Bool) async {
+        guard let serviceToken = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey),
+              !serviceToken.isEmpty else {
+            mimoQuotaViewModel.errorMessage = String(localized: "mimo_cookie_required")
+            return
+        }
+
+        do {
+            _ = try await mimoQuotaViewModel.fetchUsage(serviceToken: serviceToken, silent: silent)
+            await mimoQuotaViewModel.fetchPlanDetailIfNeeded(serviceToken: serviceToken)
+        } catch APIError.mimoCookieExpired {
+            await renewMimoCookieAndRetryUsage(silent: silent)
+        } catch {
+            return
+        }
+    }
+
+    private func renewMimoCookieAndRetryUsage(silent: Bool) async {
+        mimoCookieRenewalState = .renewing
+        let result = await mimoCookieRenewalService.forceRenew(reason: .apiExpired)
+        await handleMimoCookieRenewalResult(result, retryUsage: true, silent: silent)
+    }
+
+    private func handleMimoCookieRenewalResult(
+        _ result: MimoCookieRenewalResult,
+        retryUsage: Bool,
+        silent: Bool
+    ) async {
+        switch result {
+        case .skipped:
+            mimoCookieRenewalState = .idle
+        case .renewed(let cookie), .unchanged(let cookie):
+            mimoCookieRenewalState = .renewed(Date())
+            guard retryUsage else { return }
+            do {
+                _ = try await mimoQuotaViewModel.fetchUsage(serviceToken: cookie, silent: silent)
+                await mimoQuotaViewModel.fetchPlanDetailIfNeeded(serviceToken: cookie)
+            } catch let error as APIError {
+                mimoQuotaViewModel.errorMessage = error.errorDescription
+                if case .mimoCookieExpired = error {
+                    mimoCookieRenewalState = .needsLogin(String(localized: "mimo_cookie_renewal_needs_login"))
+                }
+            } catch {
+                mimoQuotaViewModel.errorMessage = error.localizedDescription
+            }
+        case .needsLogin(let message):
+            mimoCookieRenewalState = .needsLogin(message)
+            mimoQuotaViewModel.errorMessage = message
+        case .failed(let message):
+            mimoCookieRenewalState = .failed(message)
+            mimoQuotaViewModel.errorMessage = message
+        }
+    }
+
+    private func updateMimoCookieRenewalTimer() {
+        mimoCookieRenewalTimer?.invalidate()
+        mimoCookieRenewalTimer = nil
+
+        guard isProviderEnabled(.mimo), hasAuthenticatedSession(for: .mimo) else { return }
+
+        mimoCookieRenewalTimer = Timer.scheduledTimer(withTimeInterval: 6 * 60 * 60, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.renewMimoCookieIfNeededFromTimer()
+            }
+        }
+
+        Task { @MainActor [weak self] in
+            await self?.renewMimoCookieIfNeededFromTimer(reason: .startup)
+        }
+    }
+
+    private func renewMimoCookieIfNeededFromTimer(reason: MimoCookieRenewalReason = .timer) async {
+        guard isProviderEnabled(.mimo), hasAuthenticatedSession(for: .mimo) else { return }
+
+        let result = await mimoCookieRenewalService.renewIfNeeded(reason: reason)
+        if result != .skipped {
+            await handleMimoCookieRenewalResult(result, retryUsage: false, silent: true)
+        }
     }
 
     /// Start refresh if not already running (prevents duplicate timers)

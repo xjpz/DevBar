@@ -31,6 +31,32 @@ final class ShortcutStore: ObservableObject {
         }
     }
 
+    static func action(for url: URL) -> Action? {
+        guard url.scheme == "devbar" else { return nil }
+
+        switch url.host {
+        case "quota", "mac-dashboard":
+            return nil
+        case "mac-control":
+            let action = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first { $0.name == "action" }?
+                .value
+            switch action {
+            case "lock":
+                return .lockMac
+            case "wakeDisplay":
+                return .wakeMacDisplay
+            case "sleepDisplay":
+                return .sleepMacDisplay
+            default:
+                return nil
+            }
+        default:
+            return nil
+        }
+    }
+
     @Published private(set) var pendingAction: Action?
 
     @MainActor

@@ -303,6 +303,16 @@ private struct LoggedInContentView: View {
                 .foregroundStyle(.orange)
             }
 
+            if appViewModel.mimoCookieRenewalState.isFailure,
+               let message = appViewModel.mimoCookieRenewalState.message {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text(message)
+                }
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+
             ForEach(mimoQuotaViewModel.quotaRows) { row in
                 QuotaRowItemView(item: row)
             }

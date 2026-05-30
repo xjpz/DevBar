@@ -36,6 +36,10 @@ struct DevBariOSApp: App {
                         await appViewModel.refreshHomeScreenShortcutsForCurrentState()
                     }
                 }
+                .onOpenURL { url in
+                    guard let action = ShortcutStore.action(for: url) else { return }
+                    shortcutStore.handle(action)
+                }
         }
         .modelContainer(for: [IOSAPIRecord.self, IOSWebHistoryRecord.self, IOSMemoItem.self, IOSMarkdownDocument.self], isAutosaveEnabled: true, isUndoEnabled: false)
     }

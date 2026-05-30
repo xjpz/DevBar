@@ -59,6 +59,7 @@ final class IOSAppViewModel: ObservableObject {
     }
     @Published private(set) var availableHomeScreenShortcutActions: [DeviceRelayHomeScreenShortcutAction]
     @Published private(set) var selectedHomeScreenShortcutActions: [DeviceRelayHomeScreenShortcutAction]
+    @Published private(set) var dashboardScanRequestID: UUID?
 
     let quotaViewModel = QuotaViewModel()
     let openAIQuotaViewModel = OpenAIQuotaViewModel()
@@ -92,6 +93,7 @@ final class IOSAppViewModel: ObservableObject {
             guard let self else { return }
             await self.deviceRelayManager.setup(deviceType: .iPhone, deviceName: self.relayDeviceName)
             await self.refreshHomeScreenShortcuts()
+            self.syncMacThemeWidgetSnapshot()
         }
     }
 
@@ -318,6 +320,7 @@ final class IOSAppViewModel: ObservableObject {
     func pairMacDevice(from rawValue: String) async throws {
         try await deviceRelayManager.confirmPairing(from: rawValue, deviceName: relayDeviceName)
         await refreshHomeScreenShortcuts()
+        syncMacThemeWidgetSnapshot()
     }
 
     func resolveScannedCode(_ rawValue: String) async throws -> IOSScannedCodeResolution {
@@ -355,10 +358,15 @@ final class IOSAppViewModel: ObservableObject {
             selectedActions: selectedHomeScreenShortcutActions,
             hasPairedMac: hasPairedMac
         )
+        syncMacThemeWidgetSnapshot()
     }
 
     func refreshHomeScreenShortcutsForCurrentState() async {
         await refreshHomeScreenShortcuts()
+    }
+
+    func requestDashboardScanner() {
+        dashboardScanRequestID = UUID()
     }
 
     func setHomeScreenShortcutAction(_ action: DeviceRelayHomeScreenShortcutAction, enabled: Bool) {
@@ -411,6 +419,49 @@ final class IOSAppViewModel: ObservableObject {
             return peers.contains { $0.deviceType == .mac }
         } catch {
             return false
+        }
+    }
+
+    private func syncMacThemeWidgetSnapshot() {
+        let now = Date()
+        let mac = deviceRelayManager.peers.first { $0.deviceType == .mac }
+        let macStatus = mac.map { mac in
+            let connectionStatus = deviceRelayManager.connectionStatus(for: mac, now: now)
+            let screenLocked = deviceRelayManager.screenLocked(for: mac)
+            return MacStatusWidgetSnapshot(
+                deviceID: mac.deviceId,
+                deviceName: deviceRelayManager.displayName(for: mac),
+                isOnline: connectionStatus != .offline,
+                lastSeenAt: mac.lastSeenAt.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) },
+                screenState: screenLocked.map { $0 ? .locked : .unlocked } ?? .unknown,
+                displayState: .unknown,
+                keepAwakeState: .unknown,
+                connectionMode: macThemeConnectionMode(for: connectionStatus),
+                batteryPercent: nil,
+                cpuPercent: nil,
+                memoryPercent: nil,
+                lastUpdated: now
+            )
+        }
+
+        WidgetDataManager.shared.saveAndReload(
+            MacThemeWidgetSnapshot(
+                schemaVersion: MacThemeWidgetSnapshot.currentSchemaVersion,
+                user: MacThemeWidgetUserSnapshot(displayName: relayDeviceName, avatarSymbol: "iphone.gen3"),
+                macStatus: macStatus,
+                lastUpdated: now
+            )
+        )
+    }
+
+    private func macThemeConnectionMode(for status: DeviceRelayPeerConnectionStatus) -> MacWidgetConnectionMode {
+        switch status {
+        case .local:
+            return .local
+        case .remote:
+            return .relay
+        case .offline:
+            return .unknown
         }
     }
 
@@ -521,7 +572,11 @@ final class IOSAppViewModel: ObservableObject {
 
         deviceRelayManager.objectWillChange
             .sink { [weak self] _ in
-                self?.objectWillChange.send()
+                guard let self else { return }
+                self.objectWillChange.send()
+                DispatchQueue.main.async { [weak self] in
+                    self?.syncMacThemeWidgetSnapshot()
+                }
             }
             .store(in: &childObservers)
     }

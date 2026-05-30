@@ -52,6 +52,29 @@ public final class WidgetDataManager {
         defaults.removeObject(forKey: DevBarCoreConstants.AppGroup.sharedDataKey(for: provider))
     }
 
+    public func saveMacThemeSnapshot(_ snapshot: MacThemeWidgetSnapshot) {
+        guard let defaults else { return }
+        do {
+            let encoded = try JSONEncoder().encode(snapshot)
+            defaults.set(encoded, forKey: DevBarCoreConstants.AppGroup.macThemeWidgetSnapshotKey)
+        } catch {
+            print("[DevBar] Failed to save Mac theme widget snapshot: \(error)")
+        }
+    }
+
+    public func loadMacThemeSnapshot() -> MacThemeWidgetSnapshot? {
+        guard let defaults,
+              let data = defaults.data(forKey: DevBarCoreConstants.AppGroup.macThemeWidgetSnapshotKey) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(MacThemeWidgetSnapshot.self, from: data)
+    }
+
+    public func clearMacThemeSnapshot() {
+        guard let defaults else { return }
+        defaults.removeObject(forKey: DevBarCoreConstants.AppGroup.macThemeWidgetSnapshotKey)
+    }
+
     public func saveAndReload(_ data: WidgetSharedData) {
         saveSharedData(data)
         WidgetCenter.shared.reloadAllTimelines()
@@ -66,6 +89,11 @@ public final class WidgetDataManager {
         } catch {
             print("[DevBar] Failed to save widget data: \(error)")
         }
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    public func saveAndReload(_ snapshot: MacThemeWidgetSnapshot) {
+        saveMacThemeSnapshot(snapshot)
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

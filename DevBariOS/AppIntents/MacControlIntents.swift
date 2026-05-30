@@ -3,10 +3,10 @@ import DevBarCore
 import Foundation
 
 struct LockMacIntent: AppIntent {
-    static var title: LocalizedStringResource = "锁屏 Mac"
-    static var description = IntentDescription("通过 DevBar Relay 锁定已配对的 Mac。")
+    static var title: LocalizedStringResource = "锁屏电脑"
+    static var description = IntentDescription("通过 DevBar Relay 锁定已配对的电脑。")
 
-    @Parameter(title: "Mac")
+    @Parameter(title: "电脑")
     var mac: MacDeviceEntity?
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -16,10 +16,10 @@ struct LockMacIntent: AppIntent {
 }
 
 struct WakeMacDisplayIntent: AppIntent {
-    static var title: LocalizedStringResource = "点亮 Mac"
-    static var description = IntentDescription("通过 DevBar Relay 点亮已配对 Mac 的显示器。")
+    static var title: LocalizedStringResource = "点亮电脑"
+    static var description = IntentDescription("通过 DevBar Relay 点亮已配对电脑的显示器。")
 
-    @Parameter(title: "Mac")
+    @Parameter(title: "电脑")
     var mac: MacDeviceEntity?
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -29,10 +29,10 @@ struct WakeMacDisplayIntent: AppIntent {
 }
 
 struct SleepMacDisplayIntent: AppIntent {
-    static var title: LocalizedStringResource = "关闭 Mac 显示器"
-    static var description = IntentDescription("通过 DevBar Relay 关闭已配对 Mac 的显示器。")
+    static var title: LocalizedStringResource = "关闭电脑显示器"
+    static var description = IntentDescription("通过 DevBar Relay 关闭已配对电脑的显示器。")
 
-    @Parameter(title: "Mac")
+    @Parameter(title: "电脑")
     var mac: MacDeviceEntity?
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
@@ -45,7 +45,7 @@ enum MacControlIntentRunner {
     static func run(_ command: DeviceRelayCommandType, selectedMac: MacDeviceEntity?) async -> String {
         let store = DeviceRelayStore()
         guard let token = store.loadDeviceToken(), !token.isEmpty else {
-            return "还没有配对 Mac，请先在 DevBar 中扫码配对。"
+            return "还没有配对电脑，请先在 DevBar 中扫码配对。"
         }
 
         let targetMac: MacDeviceEntity?
@@ -56,7 +56,7 @@ enum MacControlIntentRunner {
         }
 
         guard let targetMac else {
-            return "还没有配对 Mac，请先在 DevBar 中扫码配对。"
+            return "还没有配对电脑，请先在 DevBar 中扫码配对。"
         }
 
         do {
@@ -67,7 +67,7 @@ enum MacControlIntentRunner {
             )
             return successText(for: command, macName: targetMac.name)
         } catch DeviceRelayError.serverError(let code) where code == "target_offline" {
-            return "Mac 当前不在线，无法执行。"
+            return "电脑当前不在线，无法执行。"
         } catch {
             return "DevBar 发送命令失败：\(error.localizedDescription)"
         }

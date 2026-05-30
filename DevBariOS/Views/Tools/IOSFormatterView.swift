@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Types
 
@@ -68,6 +69,7 @@ struct IOSFormatterView: View {
     @State private var input = "{\"name\":\"DevBar\",\"version\":1,\"features\":[\"quota\",\"tools\"]}"
     @State private var output = ""
     @State private var isKeyboardVisible = false
+    @State private var copyFeedback = false
 
     var body: some View {
         ScrollView {
@@ -144,13 +146,29 @@ struct IOSFormatterView: View {
                 .padding(12)
                 .iosGlassContainer(theme, cornerRadius: 18)
                 .disabled(true)
+
+            if !text.isEmpty {
+                IOSToolCopyButton(isCopied: copyFeedback) {
+                    copyOutput()
+                }
+            }
         }
         .foregroundStyle(theme.textPrimary)
+    }
+
+    private func copyOutput() {
+        UIPasteboard.general.string = output
+        copyFeedback = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            if copyFeedback { copyFeedback = false }
+        }
     }
 
     // MARK: - Operations
 
     private func perform(_ op: FormatterOp) {
+        copyFeedback = false
+
         switch format {
         case .json:
             formatJSON(pretty: op == .prettyPrint)

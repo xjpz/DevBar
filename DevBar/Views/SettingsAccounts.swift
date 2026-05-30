@@ -393,6 +393,19 @@ struct SettingsAccounts: View {
                     .background(Color.red.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
+
+            if let message = appViewModel.mimoCookieRenewalState.message {
+                Label(
+                    message,
+                    systemImage: appViewModel.mimoCookieRenewalState.isFailure ? "exclamationmark.triangle.fill" : "arrow.triangle.2.circlepath"
+                )
+                .font(.caption2)
+                .foregroundStyle(appViewModel.mimoCookieRenewalState.isFailure ? .red : .secondary)
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background((appViewModel.mimoCookieRenewalState.isFailure ? Color.red : Color.primary).opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
         }
     }
 
@@ -725,6 +738,7 @@ struct SettingsAccounts: View {
                 originalMimoCookieInput = credential
                 editingProviders.remove(.mimo)
                 appViewModel.updateAccountConfig(provider: .mimo, isEnabled: true)
+                appViewModel.markMimoCookieUpdated()
                 appViewModel.refreshAuthenticationState()
             } catch let error as APIError {
                 mimoImportError = error.errorDescription
@@ -774,6 +788,7 @@ struct SettingsAccounts: View {
                         originalMimoCookieInput = storedValue
                         editingProviders.remove(.mimo)
                         appViewModel.updateAccountConfig(provider: .mimo, isEnabled: true)
+                        appViewModel.markMimoCookieUpdated()
                         appViewModel.refreshAuthenticationState()
                         print("[MiMo:WebViewLogin:Settings] auth state refreshed")
                     } catch let error as APIError {

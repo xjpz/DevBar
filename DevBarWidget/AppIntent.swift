@@ -4,6 +4,8 @@
 //
 
 import AppIntents
+import DevBarCore
+import WidgetKit
 
 enum WidgetProviderSelection: String, AppEnum {
     case glm
@@ -37,4 +39,60 @@ struct ConfigurationAppIntent: WidgetConfigurationIntent {
 
     @Parameter(title: "Provider", default: .glm)
     var provider: WidgetProviderSelection
+}
+
+enum MacThemeWidgetPageSelection: String, AppEnum {
+    case quota
+    case macConsole
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Page")
+    }
+
+    static var caseDisplayRepresentations: [MacThemeWidgetPageSelection: DisplayRepresentation] {
+        [
+            .quota: DisplayRepresentation(title: "AI 额度"),
+            .macConsole: DisplayRepresentation(title: "电脑控制台")
+        ]
+    }
+
+    var corePage: MacThemeWidgetPage {
+        switch self {
+        case .quota: return .quota
+        case .macConsole: return .macConsole
+        }
+    }
+}
+
+struct MacThemeWidgetConfigurationIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource { "DevBar 电脑主题" }
+    static var description: IntentDescription { "选择默认页面和 AI 额度提供方。" }
+
+    @Parameter(title: "默认页面", default: .quota)
+    var defaultPage: MacThemeWidgetPageSelection
+
+    @Parameter(title: "AI 额度提供方", default: .glm)
+    var provider: WidgetProviderSelection
+}
+
+struct SetMacThemeWidgetPageIntent: AppIntent {
+    static var title: LocalizedStringResource { "切换小组件页面" }
+    static var description = IntentDescription("在小组件内切换显示页面。")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "页面")
+    var page: MacThemeWidgetPageSelection
+
+    init() {}
+
+    init(page: MacThemeWidgetPageSelection) {
+        self.page = page
+    }
+
+    func perform() async throws -> some IntentResult {
+        let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID)
+        defaults?.set(page.rawValue, forKey: DevBarCoreConstants.AppGroup.macThemeWidgetSelectedPageKey)
+        WidgetCenter.shared.reloadTimelines(ofKind: "DevBarMacThemeWidget")
+        return .result()
+    }
 }

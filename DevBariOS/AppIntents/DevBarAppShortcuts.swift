@@ -5,31 +5,31 @@ struct DevBarAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: LockMacIntent(),
             phrases: [
-                "用 \(.applicationName) 锁屏 Mac",
-                "\(.applicationName) 锁定我的 Mac",
-                "Lock my Mac with \(.applicationName)",
+                "用 \(.applicationName) 锁屏电脑",
+                "\(.applicationName) 锁定我的电脑",
+                "Lock my computer with \(.applicationName)",
             ],
-            shortTitle: "锁屏 Mac",
+            shortTitle: "锁屏电脑",
             systemImageName: "lock"
         )
 
         AppShortcut(
             intent: WakeMacDisplayIntent(),
             phrases: [
-                "用 \(.applicationName) 点亮 Mac",
-                "\(.applicationName) 点亮我的 Mac",
-                "Wake my Mac display with \(.applicationName)",
+                "用 \(.applicationName) 点亮电脑",
+                "\(.applicationName) 点亮我的电脑",
+                "Wake my computer display with \(.applicationName)",
             ],
-            shortTitle: "点亮 Mac",
+            shortTitle: "点亮电脑",
             systemImageName: "sun.max"
         )
 
         AppShortcut(
             intent: SleepMacDisplayIntent(),
             phrases: [
-                "用 \(.applicationName) 关闭 Mac 显示器",
-                "\(.applicationName) 关闭我的 Mac 显示器",
-                "Turn off my Mac display with \(.applicationName)",
+                "用 \(.applicationName) 关闭电脑显示器",
+                "\(.applicationName) 关闭我的电脑显示器",
+                "Turn off my computer display with \(.applicationName)",
             ],
             shortTitle: "关闭显示器",
             systemImageName: "moon"

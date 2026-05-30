@@ -59,6 +59,8 @@ public enum DevBarCoreConstants {
     public enum AppGroup {
         public static let groupID = "group.cc.xjpz.DevBar"
         public static let sharedDataKey = "widget_shared_data"
+        public static let macThemeWidgetSnapshotKey = "mac_theme_widget_snapshot"
+        public static let macThemeWidgetSelectedPageKey = "mac_theme_widget_selected_page"
         public static let liveActivitySelectedProviderKey = "live_activity_selected_provider"
 
         public static func sharedDataKey(for provider: String) -> String {
@@ -73,6 +75,9 @@ public enum DevBarCoreConstants {
         public static let glmQuotaCacheKey = "glm_quota_cache"
         public static let openAIQuotaCacheKey = "openai_quota_cache"
         public static let mimoQuotaCacheKey = "mimo_quota_cache"
+        public static let mimoCookieLastRenewedAtKey = "mimo_cookie_last_renewed_at"
+        public static let mimoCookieLastRenewFailedAtKey = "mimo_cookie_last_renew_failed_at"
+        public static let mimoCookieAutoRenewEnabledKey = "mimo_cookie_auto_renew_enabled"
         public static let liveActivitySettingsKey = "live_activity_settings"
         public static let relayMacDeviceIDKey = "relay_mac_device_id"
         public static let relayIPhoneDeviceIDKey = "relay_iphone_device_id"

@@ -10,6 +10,7 @@ import SwiftUI
 struct DevBarWidgetBundle: WidgetBundle {
     var body: some Widget {
         DevBarWidget()
+        MacThemeWidget()
         DevBarLockScreenQuotaWidget()
         #if os(iOS)
         if #available(iOSApplicationExtension 17.0, *) {

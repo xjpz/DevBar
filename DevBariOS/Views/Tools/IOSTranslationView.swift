@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import Translation
 
 // MARK: - Translation
@@ -166,17 +167,6 @@ struct IOSTranslationView: View {
                 Text("ios_tools_translate_result")
                     .font(.headline)
                     .foregroundStyle(theme.textPrimary)
-                Spacer()
-                if !translatedText.isEmpty {
-                    Button {
-                        copyTranslation()
-                    } label: {
-                        Image(systemName: copyFeedback ? "checkmark" : "doc.on.doc")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(copyFeedback ? theme.success : theme.brandPrimary)
-                    }
-                    .disabled(copyFeedback)
-                }
             }
 
             if let errorMessage {
@@ -206,6 +196,10 @@ struct IOSTranslationView: View {
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                         .stroke(theme.borderSubtle, lineWidth: 1)
                 )
+
+                IOSToolCopyButton(isCopied: copyFeedback) {
+                    copyTranslation()
+                }
             }
         }
         .animation(.easeOut(duration: 0.25), value: copyFeedback)
