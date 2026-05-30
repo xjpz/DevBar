@@ -293,6 +293,7 @@ final class AppViewModel: ObservableObject {
         // 启动 Agent Watcher 服务
         Task { @MainActor [weak self] in
             guard let self else { return }
+            self.agentWatcherService.relayManager = self.deviceRelayManager
             if self.agentWatcherService.isEnabled {
                 self.agentWatcherService.startServer()
             }

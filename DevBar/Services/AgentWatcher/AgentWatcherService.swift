@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import UserNotifications
+import DevBarCore
 
 // MARK: - Agent Watcher Service
 
@@ -15,6 +16,9 @@ class AgentWatcherService: ObservableObject {
     private var claudeHandler: ClaudeHookHandler?
     private var codexHandler: CodexHookHandler?
 
+    // Relay 集成，用于 iPhone 推送
+    weak var relayManager: DeviceRelayManager?
+
     @Published var isEnabled = true
     @Published var isServerRunning = false
     @Published var lastError: String?
@@ -26,6 +30,9 @@ class AgentWatcherService: ObservableObject {
     // 通知节流：记录每个 session 上次通知时间
     private var lastNotificationTime: [String: Date] = [:]
     private let notificationCooldown: TimeInterval = 60 // 同一 session 60秒内不重复通知
+    // iPhone 推送节流
+    private var lastRelayNotificationTime: [String: Date] = [:]
+    private let relayNotificationCooldown: TimeInterval = 120 // iPhone 推送 2分钟节流
 
     // MARK: - Initialization
 
@@ -191,12 +198,18 @@ class AgentWatcherService: ObservableObject {
             if shouldNotify(for: session.id) {
                 sendLocalNotification(for: session)
                 lastNotificationTime[session.id] = Date()
+
+                // 重要事件同时推送到 iPhone
+                if let event = session.lastEvent {
+                    sendRelayNotification(for: event)
+                }
             }
         }
 
         // 清理已不再等待的 session 的通知记录
         let waitingIds = Set(waitingSessions.map { $0.id })
         lastNotificationTime = lastNotificationTime.filter { waitingIds.contains($0.key) }
+        lastRelayNotificationTime = lastRelayNotificationTime.filter { waitingIds.contains($0.key) }
 
         // 更新菜单栏状态
         updateMenuBarStatus()
@@ -225,6 +238,49 @@ class AgentWatcherService: ObservableObject {
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
                 print("[AgentWatcherService] Failed to send notification: \(error)")
+            }
+        }
+    }
+
+    // MARK: - iPhone Push via Relay
+
+    func sendRelayNotification(for event: AgentEvent) {
+        guard let relayManager = relayManager else { return }
+        guard event.severity == .important || event.severity == .critical else { return }
+
+        // 节流检查
+        let sessionId = event.sessionId ?? "unknown"
+        if let lastTime = lastRelayNotificationTime[sessionId],
+           Date().timeIntervalSince(lastTime) < relayNotificationCooldown {
+            return
+        }
+
+        lastRelayNotificationTime[sessionId] = Date()
+
+        // 使用 approvalRequest 消息类型
+        let messageType: DeviceRelayMessageType = .approvalRequest
+        let payload: [String: String] = [
+            "status": "waiting",
+            "source": event.source.rawValue,
+            "eventType": event.eventType.rawValue,
+            "severity": event.severity.rawValue,
+            "message": event.message,
+            "projectName": event.projectName ?? "",
+            "projectPath": event.cwd ?? "",
+            "waitingSince": ISO8601DateFormatter().string(from: event.createdAt)
+        ]
+
+        Task {
+            do {
+                try await relayManager.send(DeviceRelayMessage(
+                    type: messageType,
+                    requestId: event.id,
+                    fromDeviceId: relayManager.localDeviceID,
+                    payload: payload
+                ))
+                print("[AgentWatcherService] Relay notification sent for session \(sessionId)")
+            } catch {
+                print("[AgentWatcherService] Failed to send relay notification: \(error)")
             }
         }
     }
