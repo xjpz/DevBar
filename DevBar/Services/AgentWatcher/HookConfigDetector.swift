@@ -181,18 +181,68 @@ class HookConfigDetector {
     // MARK: - Config Installation
 
     func installClaudeConfig() -> Bool {
-        let config = generateClaudeConfig()
-        return writeConfig(to: claudeConfigPath, content: config)
+        // 读取现有配置并合并 hooks，而不是覆盖
+        var existingConfig: [String: Any] = [:]
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: claudeConfigPath)),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            existingConfig = json
+        }
+
+        // 合并 hooks
+        existingConfig["hooks"] = [
+            "Notification": [
+                ["matcher": "", "hooks": [
+                    ["type": "command", "command": "curl -s -X POST http://127.0.0.1:49321/agent/claude/notification -H 'Content-Type: application/json' -d @-"]
+                ]]
+            ],
+            "Stop": [
+                ["matcher": "", "hooks": [
+                    ["type": "command", "command": "curl -s -X POST http://127.0.0.1:49321/agent/claude/stop -H 'Content-Type: application/json' -d @-"]
+                ]]
+            ]
+        ]
+
+        return writeJSONConfig(to: claudeConfigPath, content: existingConfig)
     }
 
     func installCodexConfig() -> Bool {
-        let config = generateCodexHooksConfig()
-        return writeConfig(to: codexHooksPath, content: config)
+        // 读取现有 hooks.json 并合并，避免覆盖用户已有的其他 hooks
+        var existingConfig: [String: Any] = [:]
+        if let data = try? Data(contentsOf: URL(fileURLWithPath: codexHooksPath)),
+           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            existingConfig = json
+        }
+
+        // 合并 DevBar hooks（保留用户已有的其他 hooks 事件）
+        var hooks = existingConfig["hooks"] as? [String: Any] ?? [:]
+        hooks["PermissionRequest"] = [
+            ["matcher": "", "hooks": [
+                ["type": "command",
+                 "command": "curl -s -X POST http://127.0.0.1:49321/agent/codex/permission-request -H 'Content-Type: application/json' -d @-",
+                 "statusMessage": "Notifying DevBar"]
+            ]]
+        ]
+        hooks["SessionStart"] = [
+            ["matcher": "startup|resume", "hooks": [
+                ["type": "command",
+                 "command": "curl -s -X POST http://127.0.0.1:49321/agent/codex/session-start -H 'Content-Type: application/json' -d @-",
+                 "statusMessage": "Notifying DevBar"]
+            ]]
+        ]
+        hooks["Stop"] = [
+            ["matcher": "", "hooks": [
+                ["type": "command",
+                 "command": "curl -s -X POST http://127.0.0.1:49321/agent/codex/stop -H 'Content-Type: application/json' -d @-",
+                 "statusMessage": "Notifying DevBar"]
+            ]]
+        ]
+        existingConfig["hooks"] = hooks
+
+        return writeJSONConfig(to: codexHooksPath, content: existingConfig)
     }
 
-    private func writeConfig(to path: String, content: String) -> Bool {
+    private func writeJSONConfig(to path: String, content: [String: Any]) -> Bool {
         do {
-            // 确保目录存在
             let directory = (path as NSString).deletingLastPathComponent
             try FileManager.default.createDirectory(
                 atPath: directory,
@@ -200,7 +250,24 @@ class HookConfigDetector {
                 attributes: nil
             )
 
-            // 写入文件
+            let data = try JSONSerialization.data(withJSONObject: content, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: URL(fileURLWithPath: path), options: .atomic)
+            return true
+        } catch {
+            print("[HookConfigDetector] Failed to write config to \(path): \(error)")
+            return false
+        }
+    }
+
+    private func writeRawConfig(to path: String, content: String) -> Bool {
+        do {
+            let directory = (path as NSString).deletingLastPathComponent
+            try FileManager.default.createDirectory(
+                atPath: directory,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+
             try content.write(toFile: path, atomically: true, encoding: .utf8)
             return true
         } catch {
