@@ -54,6 +54,7 @@ private struct LoggedInContentView: View {
     @EnvironmentObject private var mimoQuotaViewModel: MimoQuotaViewModel
     @EnvironmentObject private var updateViewModel: UpdateViewModel
     @State private var selectedProvider: QuotaProvider = .glm
+    @State private var showAgentWatcher = false
 
     private var enabledProviders: [QuotaProvider] {
         appViewModel.enabledProviders
@@ -143,6 +144,26 @@ private struct LoggedInContentView: View {
             if isSelectedProviderLoading {
                 ProgressView()
                     .controlSize(.small)
+            }
+
+            // Agent Watcher 按钮
+            Button(action: {
+                showAgentWatcher.toggle()
+            }) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "eye")
+                    if appViewModel.agentWatcherService.sessionStore.hasWaitingSessions {
+                        Circle()
+                            .fill(.red)
+                            .frame(width: 8, height: 8)
+                            .offset(x: 4, y: -4)
+                    }
+                }
+            }
+            .buttonStyle(.borderless)
+            .help("Agent Watcher")
+            .popover(isPresented: $showAgentWatcher) {
+                AgentWatcherView()
             }
 
             Button(action: {

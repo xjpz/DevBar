@@ -63,6 +63,7 @@ final class AppViewModel: ObservableObject {
     let weChatViewModel = WeChatViewModel()
     let deviceRelayManager = DeviceRelayManager()
     let antiSleepService = AntiSleepService()
+    let agentWatcherService = AgentWatcherService.shared
     private var statusTextUpdateTask: Task<Void, Never>?
     private var antiSleepStatusCancellable: AnyCancellable?
     /// Prevents duplicate handleLoginSuccess calls
@@ -286,6 +287,14 @@ final class AppViewModel: ObservableObject {
                 UserDefaults.standard.bool(forKey: DevBarCoreConstants.Defaults.relayMacEnabledKey)
             if relayEnabled {
                 await self.deviceRelayManager.setup(deviceType: .mac, deviceName: Self.currentDeviceName)
+            }
+        }
+
+        // 启动 Agent Watcher 服务
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if self.agentWatcherService.isEnabled {
+                self.agentWatcherService.startServer()
             }
         }
     }
