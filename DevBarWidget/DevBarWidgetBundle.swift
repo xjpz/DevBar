@@ -8,6 +8,13 @@ import SwiftUI
 
 @main
 struct DevBarWidgetBundle: WidgetBundle {
+    init() {
+        // 设置透明背景（仅 iOS）
+        #if os(iOS)
+        WidgetTransparentBackground.setup()
+        #endif
+    }
+
     var body: some Widget {
         DevBarWidget()
         MacThemeWidget()
