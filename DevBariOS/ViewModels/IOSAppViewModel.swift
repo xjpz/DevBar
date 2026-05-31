@@ -3,6 +3,7 @@ import DevBarCore
 import Foundation
 import SwiftUI
 import UIKit
+import UserNotifications
 
 enum IOSScannedCodeResolution {
     case macPaired
@@ -579,6 +580,97 @@ final class IOSAppViewModel: ObservableObject {
                 }
             }
             .store(in: &childObservers)
+
+        // 监听 Relay 消息
+        deviceRelayManager.messageHandler = { [weak self] message in
+            Task { @MainActor [weak self] in
+                self?.handleRelayMessage(message)
+            }
+        }
+    }
+
+    // MARK: - Relay Message Handling
+
+    @Published var agentWatcherAlerts: [AgentWatcherAlert] = []
+
+    struct AgentWatcherAlert: Identifiable {
+        let id: String
+        let source: String
+        let projectName: String
+        let message: String
+        let severity: String
+        let receivedAt: Date
+    }
+
+    private func handleRelayMessage(_ message: DeviceRelayMessage) {
+        switch message.type {
+        case .approvalRequest:
+            handleApprovalRequest(message)
+        default:
+            break
+        }
+    }
+
+    private func handleApprovalRequest(_ message: DeviceRelayMessage) {
+        let payload = message.payload
+
+        let alert = AgentWatcherAlert(
+            id: message.requestId ?? UUID().uuidString,
+            source: payload["source"] ?? "Unknown",
+            projectName: payload["projectName"] ?? "Unknown",
+            message: payload["message"] ?? "任务等待处理",
+            severity: payload["severity"] ?? "important",
+            receivedAt: Date()
+        )
+
+        agentWatcherAlerts.append(alert)
+
+        // 发送本地通知
+        let content = UNMutableNotificationContent()
+        content.title = "\(alert.source) 需要处理"
+        content.body = alert.message
+        content.sound = .default
+        content.categoryIdentifier = "AGENT_WATCHER"
+
+        let request = UNNotificationRequest(
+            identifier: "agent-watcher-\(alert.id)",
+            content: content,
+            trigger: nil
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("[IOSAppViewModel] Failed to send notification: \(error)")
+            }
+        }
+
+        // 更新 Live Activity
+        updateAgentWatcherLiveActivity()
+    }
+
+    private func updateAgentWatcherLiveActivity() {
+        let manager = AgentWatcherLiveActivityManager.shared
+
+        if agentWatcherAlerts.isEmpty {
+            Task { await manager.endActivity() }
+        } else {
+            let firstAlert = agentWatcherAlerts.first
+            Task {
+                await manager.updateActivity(
+                    waitingCount: agentWatcherAlerts.count,
+                    activeCount: 0,
+                    waitingSource: firstAlert?.source,
+                    waitingProject: firstAlert?.projectName,
+                    waitingMessage: firstAlert?.message,
+                    waitingSince: firstAlert?.receivedAt
+                )
+            }
+        }
+    }
+
+    func dismissAgentWatcherAlert(_ alertId: String) {
+        agentWatcherAlerts.removeAll { $0.id == alertId }
+        updateAgentWatcherLiveActivity()
     }
 
     private var latestRefreshDate: Date? {

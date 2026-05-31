@@ -320,7 +320,34 @@ class AgentWatcherService: ObservableObject {
         )
 
         WidgetDataManager.shared.saveAndReloadAgentWatcher(widgetData)
+
+        // 更新 Live Activity (iOS)
+        #if os(iOS)
+        Task {
+            await updateLiveActivity(waitingSessions: waitingSessions)
+        }
+        #endif
     }
+
+    #if os(iOS)
+    private func updateLiveActivity(waitingSessions: [AgentSession]) async {
+        let manager = AgentWatcherLiveActivityManager.shared
+
+        if waitingSessions.isEmpty {
+            await manager.endActivity()
+        } else {
+            let firstSession = waitingSessions.first
+            await manager.updateActivity(
+                waitingCount: waitingSessions.count,
+                activeCount: sessionStore.activeSessions.count,
+                waitingSource: firstSession?.source.displayName,
+                waitingProject: firstSession?.projectName,
+                waitingMessage: firstSession?.lastEvent?.message,
+                waitingSince: firstSession?.waitingSince
+            )
+        }
+    }
+    #endif
 
     // MARK: - Session Management
 

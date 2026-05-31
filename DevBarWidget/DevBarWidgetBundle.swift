@@ -14,6 +14,7 @@ struct DevBarWidgetBundle: WidgetBundle {
         AgentWatcherWidget()
         DevBarLockScreenQuotaWidget()
         #if os(iOS)
+        AgentWatcherLiveActivityWidget()
         if #available(iOSApplicationExtension 17.0, *) {
             DevBarQuotaLiveActivityWidget()
         }
