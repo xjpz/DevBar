@@ -31,6 +31,9 @@ struct AgentWatcherView: View {
                             sessions: watcherService.sessionStore.waitingSessions,
                             onResolve: { sessionId in
                                 watcherService.resolveSession(sessionId)
+                            },
+                            onMute: { sessionId in
+                                watcherService.muteSession(sessionId, duration: 30 * 60)
                             }
                         )
 
@@ -39,7 +42,7 @@ struct AgentWatcherView: View {
 
                     // 最近事件
                     RecentEventsSection(
-                        sessions: watcherService.sessionStore.activeSessions
+                        sessions: watcherService.sessionStore.recentSessions
                     )
 
                     Divider()
@@ -173,6 +176,7 @@ struct HookConfigSection: View {
 struct WaitingSessionsSection: View {
     let sessions: [AgentSession]
     let onResolve: (String) -> Void
+    let onMute: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -183,6 +187,8 @@ struct WaitingSessionsSection: View {
             ForEach(sessions) { session in
                 WaitingSessionCard(session: session, onResolve: {
                     onResolve(session.id)
+                }, onMute: {
+                    onMute(session.id)
                 })
             }
         }
@@ -192,6 +198,7 @@ struct WaitingSessionsSection: View {
 struct WaitingSessionCard: View {
     let session: AgentSession
     let onResolve: () -> Void
+    let onMute: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -236,7 +243,7 @@ struct WaitingSessionCard: View {
                 Spacer()
 
                 Button("静音") {
-                    // TODO: 实现静音
+                    onMute()
                 }
                 .buttonStyle(.link)
                 .font(.caption)

@@ -13,6 +13,7 @@ struct QuotaMediumView: View {
     let subscriptionPrice: String?
     let subscriptionExpireDate: String?
     let lastUpdated: Date
+    var visualStyle: WidgetVisualStyle = .liquidGlass
 
     private var sortedLimits: [WidgetQuotaLimit] {
         limits.sorted { a, b in
@@ -33,6 +34,7 @@ struct QuotaMediumView: View {
             HStack {
                 Text(title)
                     .font(.headline)
+                    .foregroundStyle(primaryTextColor)
                 Spacer()
                 if let lvl = level {
                     Text(lvl.capitalized)
@@ -40,7 +42,7 @@ struct QuotaMediumView: View {
                         .fontWeight(.medium)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.quaternary, in: Capsule())
+                        .background(levelBadgeBackground, in: Capsule())
                 }
             }
             .padding(.bottom, 8)
@@ -52,11 +54,12 @@ struct QuotaMediumView: View {
                         Text(limit.displayName)
                             .font(.caption)
                             .fontWeight(.medium)
+                            .foregroundStyle(primaryTextColor)
                         Spacer()
                         if let reset = limit.formattedResetTime {
                             Text(reset)
                                 .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(secondaryTextColor)
                         }
                     }
                     HStack(spacing: 4) {
@@ -80,25 +83,37 @@ struct QuotaMediumView: View {
                 if let sub = subscriptionName {
                     Text(sub)
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(secondaryTextColor)
                 }
                 if let price = subscriptionPrice {
                     Text(price)
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(secondaryTextColor)
                 }
                 if let expire = subscriptionExpireDate {
                     Text(expire)
                         .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(secondaryTextColor)
                 }
                 Spacer()
                 Text(String(localized: "widget_last_updated \(lastUpdated.formatted(.dateTime.hour().minute().second()))"))
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(secondaryTextColor)
             }
             .padding(.top, 4)
         }
+    }
+
+    private var primaryTextColor: Color {
+        visualStyle == .transparent ? .primary : .white
+    }
+
+    private var secondaryTextColor: Color {
+        visualStyle == .transparent ? .secondary : .white.opacity(0.58)
+    }
+
+    private var levelBadgeBackground: Color {
+        visualStyle == .transparent ? Color.secondary.opacity(0.15) : .white.opacity(0.18)
     }
 
     private func limitColor(_ percentage: Int) -> Color {

@@ -1,0 +1,112 @@
+import Foundation
+
+public enum PushNotificationServiceError: Error, Equatable {
+    case invalidURL
+    case invalidResponse
+    case httpError(Int)
+    case serverError(String)
+}
+
+public final class PushNotificationService: Sendable {
+    public static let shared = PushNotificationService()
+
+    private let baseURL: URL
+    private let session: URLSession
+
+    public init(
+        baseURL: URL = URL(string: DevBarCoreConstants.DeviceRelay.baseURL)!,
+        session: URLSession = .shared
+    ) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
+    public func register(
+        _ registration: PushDeviceRegistration,
+        deviceToken: String
+    ) async throws -> PushDeviceRegistrationResponse {
+        try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.registerPath,
+            method: "POST",
+            body: registration,
+            bearerToken: deviceToken
+        )
+    }
+
+    public func fetchPreferences(deviceToken: String) async throws -> PushNotificationPreferences {
+        try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.preferencesPath,
+            method: "GET",
+            body: Optional<EmptyBody>.none,
+            bearerToken: deviceToken
+        )
+    }
+
+    public func updatePreferences(
+        _ preferences: PushNotificationPreferences,
+        deviceToken: String
+    ) async throws -> PushNotificationPreferences {
+        try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.preferencesPath,
+            method: "PUT",
+            body: preferences,
+            bearerToken: deviceToken
+        )
+    }
+
+    private func sendJSON<RequestBody: Encodable, ResponseBody: Decodable>(
+        path: String,
+        method: String,
+        body: RequestBody?,
+        bearerToken: String
+    ) async throws -> ResponseBody {
+        guard let endpoint = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
+            throw PushNotificationServiceError.invalidURL
+        }
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        if let body {
+            request.httpBody = try JSONEncoder().encode(body)
+        }
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw PushNotificationServiceError.invalidResponse
+        }
+        guard 200..<300 ~= httpResponse.statusCode else {
+            throw PushNotificationServiceError.httpError(httpResponse.statusCode)
+        }
+
+        if let envelope = try? JSONDecoder().decode(ErrorEnvelope.self, from: data),
+           envelope.success == false {
+            throw PushNotificationServiceError.serverError(envelope.message ?? String(envelope.code ?? 0))
+        }
+
+        do {
+            return try JSONDecoder().decode(SuccessEnvelope<ResponseBody>.self, from: data).data
+        } catch {
+            throw PushNotificationServiceError.invalidResponse
+        }
+    }
+}
+
+private struct SuccessEnvelope<Content: Decodable>: Decodable {
+    let data: Content
+}
+
+private struct ErrorEnvelope: Decodable {
+    let success: Bool?
+    let code: Int?
+    let message: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case success
+        case code
+        case message = "msg"
+    }
+}
+
+private struct EmptyBody: Encodable {}

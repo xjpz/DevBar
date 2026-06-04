@@ -41,7 +41,7 @@ enum NotificationMode: String, Codable, CaseIterable {
 class AgentWatcherSettings: ObservableObject {
     static let shared = AgentWatcherSettings()
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
     // MARK: - Keys
 
@@ -53,6 +53,7 @@ class AgentWatcherSettings: ObservableObject {
         static let idleMinutesForPhone = "agentWatcher.idleMinutesForPhone"
         static let approvalEscalationSeconds = "agentWatcher.approvalEscalationSeconds"
         static let repeatIntervalMinutes = "agentWatcher.repeatIntervalMinutes"
+        static let stalledThresholdMinutes = "agentWatcher.stalledThresholdMinutes"
         static let notifyOnTaskComplete = "agentWatcher.notifyOnTaskComplete"
         static let notifyOnTaskFailure = "agentWatcher.notifyOnTaskFailure"
         static let notifyOnLoginExpired = "agentWatcher.notifyOnLoginExpired"
@@ -92,6 +93,10 @@ class AgentWatcherSettings: ObservableObject {
         didSet { defaults.set(repeatIntervalMinutes, forKey: Keys.repeatIntervalMinutes) }
     }
 
+    @Published var stalledThresholdMinutes: Int {
+        didSet { defaults.set(stalledThresholdMinutes, forKey: Keys.stalledThresholdMinutes) }
+    }
+
     @Published var notifyOnTaskComplete: Bool {
         didSet { defaults.set(notifyOnTaskComplete, forKey: Keys.notifyOnTaskComplete) }
     }
@@ -122,7 +127,8 @@ class AgentWatcherSettings: ObservableObject {
 
     // MARK: - Initialization
 
-    private init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         // 加载保存的设置或使用默认值
         self.isEnabled = defaults.object(forKey: Keys.isEnabled) as? Bool ?? true
         self.claudeEnabled = defaults.object(forKey: Keys.claudeEnabled) as? Bool ?? true
@@ -134,6 +140,7 @@ class AgentWatcherSettings: ObservableObject {
         self.idleMinutesForPhone = defaults.object(forKey: Keys.idleMinutesForPhone) as? Int ?? 3
         self.approvalEscalationSeconds = defaults.object(forKey: Keys.approvalEscalationSeconds) as? Int ?? 120
         self.repeatIntervalMinutes = defaults.object(forKey: Keys.repeatIntervalMinutes) as? Int ?? 5
+        self.stalledThresholdMinutes = defaults.object(forKey: Keys.stalledThresholdMinutes) as? Int ?? 10
 
         self.notifyOnTaskComplete = defaults.object(forKey: Keys.notifyOnTaskComplete) as? Bool ?? false
         self.notifyOnTaskFailure = defaults.object(forKey: Keys.notifyOnTaskFailure) as? Bool ?? true
@@ -148,6 +155,16 @@ class AgentWatcherSettings: ObservableObject {
     // MARK: - Notification Decision
 
     func shouldNotify(for event: AgentEvent, userActivity: UserActivityState) -> NotificationDecision {
+        guard event.canNotifyUser else {
+            return NotificationDecision(
+                showInStatusCenter: true,
+                updateMacBadge: event.requiresUserAction,
+                sendMacNotification: false,
+                sendPhoneNotification: false,
+                reason: "event notifications suppressed"
+            )
+        }
+
         // 安静模式
         if notificationMode == .quiet {
             return NotificationDecision(
@@ -174,6 +191,10 @@ class AgentWatcherSettings: ObservableObject {
         }
 
         if event.eventType == .loginRequired && notifyOnLoginExpired {
+            decision.sendMacNotification = true
+        }
+
+        if event.eventType == .waitingUserInput {
             decision.sendMacNotification = true
         }
 
@@ -250,6 +271,7 @@ class AgentWatcherSettings: ObservableObject {
         idleMinutesForPhone = 3
         approvalEscalationSeconds = 120
         repeatIntervalMinutes = 5
+        stalledThresholdMinutes = 10
         notifyOnTaskComplete = false
         notifyOnTaskFailure = true
         notifyOnLoginExpired = true

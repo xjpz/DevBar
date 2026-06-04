@@ -1,5 +1,7 @@
 import DevBarCore
+import PhotosUI
 import SwiftUI
+import UIKit
 
 struct IOSSettingsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
@@ -7,6 +9,8 @@ struct IOSSettingsView: View {
     @EnvironmentObject private var themeManager: IOSThemeManager
     @Environment(\.themeTokens) private var theme
     @State private var isGreetingEditorExpanded = false
+    @State private var selectedMacThemeAvatarItem: PhotosPickerItem?
+    @State private var macThemeAvatarErrorMessage: String?
 
     private let intervals: [(LocalizedStringKey, TimeInterval)] = [
         ("ios_settings_interval_3m", 180),
@@ -108,15 +112,80 @@ struct IOSSettingsView: View {
                 .accessibilityIdentifier("ios.settings.refreshInterval")
             }
 
-            Section("ios_settings_relay_section") {
-                TextField("ios_settings_relay_device_name", text: $appViewModel.relayDeviceName)
+            Section {
+                TextField("iPhone 名称", text: $appViewModel.relayDeviceName)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
                     .accessibilityIdentifier("ios.settings.relayDeviceName")
 
-                Text("ios_settings_relay_device_name_hint")
+                Text("用于 Mac 上显示连接的 iPhone 名称。")
                     .font(.caption)
                     .foregroundStyle(theme.textSecondary)
+
+                TextField("用户名称", text: $appViewModel.macThemeWidgetUserName)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("ios.settings.macThemeWidgetUserName")
+
+                Text("用于 Mac 主题小组件顶部问候语；留空时使用 iPhone 名称。")
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+
+                PhotosPicker(selection: $selectedMacThemeAvatarItem, matching: .images) {
+                    HStack(spacing: 12) {
+                        macThemeAvatarPreview
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("头像")
+                                .foregroundStyle(theme.textPrimary)
+                            Text("从照片中选择")
+                                .font(.caption)
+                                .foregroundStyle(theme.textSecondary)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(theme.textTertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .accessibilityIdentifier("ios.settings.macThemeWidgetAvatar")
+
+                if appViewModel.macThemeWidgetAvatarFileName != nil {
+                    Button("移除头像", role: .destructive) {
+                        appViewModel.clearMacThemeWidgetAvatar()
+                    }
+                }
+
+                if let macThemeAvatarErrorMessage {
+                    Text(macThemeAvatarErrorMessage)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } header: {
+                Label("设备与小组件", systemImage: "iphone.and.arrow.forward")
+            }
+
+            Section {
+                Toggle(isOn: $appViewModel.pushNotificationPreferences.pushEnabled) {
+                    Label("允许离线推送", systemImage: "bell.badge")
+                }
+                Toggle(isOn: $appViewModel.pushNotificationPreferences.agentWatcherEnabled) {
+                    Label("Agent Watcher 通知", systemImage: "terminal")
+                }
+                Toggle(isOn: $appViewModel.pushNotificationPreferences.summaryEnabled) {
+                    Label("高频事件摘要", systemImage: "list.bullet.rectangle")
+                }
+                TextField("HTTPS 图标 URL", text: pushIconURLBinding)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            } header: {
+                Label("推送通知", systemImage: "bell")
+            } footer: {
+                Text("离线通知使用已绑定 Relay iPhone。自定义图标仅接受 HTTPS URL。")
             }
 
             Section {
@@ -190,6 +259,70 @@ struct IOSSettingsView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .accessibilityIdentifier("ios.settings.screen")
+        .onChange(of: selectedMacThemeAvatarItem) { _, item in
+            guard let item else { return }
+            Task {
+                defer { selectedMacThemeAvatarItem = nil }
+                guard let data = try? await item.loadTransferable(type: Data.self),
+                      let image = UIImage(data: data),
+                      let avatarData = Self.macThemeWidgetAvatarData(from: image) else {
+                    macThemeAvatarErrorMessage = "头像处理失败，请重试。"
+                    return
+                }
+                do {
+                    try appViewModel.saveMacThemeWidgetAvatarData(avatarData)
+                    macThemeAvatarErrorMessage = nil
+                } catch {
+                    macThemeAvatarErrorMessage = "头像保存失败，请重试。"
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var macThemeAvatarPreview: some View {
+        ZStack {
+            Circle()
+                .fill(theme.surfaceSecondary)
+
+            if let data = appViewModel.macThemeWidgetAvatarData,
+               let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(theme.textSecondary)
+            }
+        }
+        .frame(width: 44, height: 44)
+        .clipShape(Circle())
+    }
+
+    private static func macThemeWidgetAvatarData(from image: UIImage) -> Data? {
+        let sideLength = min(image.size.width, image.size.height)
+        guard sideLength > 0 else { return nil }
+
+        let cropRect = CGRect(
+            x: (image.size.width - sideLength) / 2,
+            y: (image.size.height - sideLength) / 2,
+            width: sideLength,
+            height: sideLength
+        )
+        let outputSize = CGSize(width: 256, height: 256)
+        let renderer = UIGraphicsImageRenderer(size: outputSize)
+        let resizedImage = renderer.image { _ in
+            image.draw(
+                in: CGRect(
+                    x: -cropRect.minX * outputSize.width / sideLength,
+                    y: -cropRect.minY * outputSize.height / sideLength,
+                    width: image.size.width * outputSize.width / sideLength,
+                    height: image.size.height * outputSize.height / sideLength
+                )
+            )
+        }
+        return resizedImage.jpegData(compressionQuality: 0.82)
     }
 
     private var greetingPreviewText: String {
@@ -240,6 +373,15 @@ struct IOSSettingsView: View {
             appViewModel.selectedHomeScreenShortcutActions.contains(action)
         } set: { enabled in
             appViewModel.setHomeScreenShortcutAction(action, enabled: enabled)
+        }
+    }
+
+    private var pushIconURLBinding: Binding<String> {
+        Binding {
+            appViewModel.pushNotificationPreferences.iconUrl ?? ""
+        } set: { value in
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            appViewModel.pushNotificationPreferences.iconUrl = trimmed.isEmpty ? nil : trimmed
         }
     }
 

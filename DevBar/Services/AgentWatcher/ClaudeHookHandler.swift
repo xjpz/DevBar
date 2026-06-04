@@ -9,6 +9,35 @@ class ClaudeHookHandler {
         self.sessionStore = sessionStore
     }
 
+    // MARK: - Handle PermissionRequest Hook
+
+    func handlePermissionRequest(request: HTTPRequest) -> HTTPResponse {
+        guard let body = request.body else {
+            return HTTPResponse(statusCode: 400, json: ["error": "Missing body"])
+        }
+
+        do {
+            let payload = try JSONDecoder().decode(ClaudeHookPayload.self, from: body)
+            let event = createPermissionEvent(from: payload)
+
+            if let sessionId = payload.sessionId {
+                Task { @MainActor in
+                    sessionStore?.getOrCreateSession(
+                        for: .claudeCode,
+                        sessionId: sessionId,
+                        cwd: payload.cwd
+                    )
+                    sessionStore?.updateSession(sessionId, with: event)
+                }
+            }
+
+            return HTTPResponse(statusCode: 200, json: ["status": "ok"])
+        } catch {
+            print("[ClaudeHookHandler] Failed to parse permission request: \(error)")
+            return HTTPResponse(statusCode: 400, json: ["error": "Invalid payload"])
+        }
+    }
+
     // MARK: - Handle Notification Hook
 
     func handleNotification(request: HTTPRequest) -> HTTPResponse {
@@ -51,6 +80,11 @@ class ClaudeHookHandler {
 
             if let sessionId = payload.sessionId {
                 Task { @MainActor in
+                    sessionStore?.getOrCreateSession(
+                        for: .claudeCode,
+                        sessionId: sessionId,
+                        cwd: payload.cwd
+                    )
                     sessionStore?.updateSession(sessionId, with: event)
                 }
             }
@@ -75,6 +109,11 @@ class ClaudeHookHandler {
 
             if let sessionId = payload.sessionId {
                 Task { @MainActor in
+                    sessionStore?.getOrCreateSession(
+                        for: .claudeCode,
+                        sessionId: sessionId,
+                        cwd: payload.cwd
+                    )
                     sessionStore?.updateSession(sessionId, with: event)
                 }
             }
@@ -88,8 +127,32 @@ class ClaudeHookHandler {
 
     // MARK: - Event Creation
 
+    private func createPermissionEvent(from payload: ClaudeHookPayload) -> AgentEvent {
+        let toolName = payload.toolName ?? "Unknown"
+        let command = payload.toolInput?.command ?? "unknown command"
+
+        return AgentEvent(
+            source: .claudeCode,
+            eventType: .approvalRequired,
+            severity: .important,
+            projectName: payload.cwd.flatMap { extractProjectName(from: $0) },
+            cwd: payload.cwd,
+            sessionId: payload.sessionId,
+            taskTitle: "\(toolName) permission",
+            message: "Claude Code 等待授权运行 \(toolName)",
+            rawSnippet: command,
+            requiresUserAction: true,
+            canResolveOnMac: true,
+            canNotifyPhone: true
+        )
+    }
+
     private func createEvent(from payload: ClaudeHookPayload, eventType: AgentEventType) -> AgentEvent {
-        let (inferredType, severity) = inferEventType(from: payload.message, defaultType: eventType)
+        let (inferredType, severity) = Self.inferEventType(
+            notificationType: payload.notificationType,
+            message: payload.message,
+            defaultType: eventType
+        )
 
         return AgentEvent(
             source: .claudeCode,
@@ -107,28 +170,46 @@ class ClaudeHookHandler {
         )
     }
 
-    private func inferEventType(from message: String?, defaultType: AgentEventType) -> (AgentEventType, AgentSeverity) {
+    static func inferEventType(
+        notificationType: String?,
+        message: String?,
+        defaultType: AgentEventType
+    ) -> (AgentEventType, AgentSeverity) {
+        switch notificationType?.lowercased() {
+        case "permission_prompt":
+            return (.approvalRequired, .important)
+        case "idle_prompt", "elicitation_dialog":
+            return (.waitingUserInput, .warning)
+        default:
+            break
+        }
+
         guard let message = message?.lowercased() else {
             return (defaultType, .info)
         }
 
-        if message.contains("permission") || message.contains("approval") || message.contains("authorize") {
+        if message.contains("permission") || message.contains("approval") || message.contains("authorize") ||
+            message.contains("授权") || message.contains("权限") {
             return (.approvalRequired, .important)
         }
 
-        if message.contains("login") || message.contains("auth") || message.contains("expired") {
+        if message.contains("login") || message.contains("auth") || message.contains("expired") ||
+            message.contains("登录") || message.contains("过期") {
             return (.loginRequired, .critical)
         }
 
-        if message.contains("waiting") || message.contains("input") {
+        if message.contains("waiting") || message.contains("input") ||
+            message.contains("等待") || message.contains("输入") || message.contains("确认") {
             return (.waitingUserInput, .warning)
         }
 
-        if message.contains("error") || message.contains("failed") {
+        if message.contains("error") || message.contains("failed") ||
+            message.contains("失败") || message.contains("错误") {
             return (.taskFailed, .warning)
         }
 
-        if message.contains("complete") || message.contains("finish") {
+        if message.contains("complete") || message.contains("finish") ||
+            message.contains("完成") {
             return (.taskCompleted, .info)
         }
 

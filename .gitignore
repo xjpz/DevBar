@@ -15,6 +15,7 @@ xcuserdata/
 # Swift Package Manager
 .build/
 Package.resolved
+*.profraw
 
 # Temporary / secret files
 tmp/
@@ -22,3 +23,6 @@ tmp/
 
 # Documentation (internal design docs)
 docs/
+
+# Local visual brainstorming previews
+.superpowers/

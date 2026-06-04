@@ -45,6 +45,9 @@
 		<string>JetBrainsMono-Regular.ttf</string>
 		<string>JetBrainsMono-Medium.ttf</string>
 		<string>JetBrainsMono-Bold.ttf</string>
+		<string>XuJinglei-DroidSans.ttf</string>
+		<string>XuJinglei-Arial.ttf</string>
+		<string>XuJinglei-DroidSansFallback.ttf</string>
 	</array>
 </dict>
 </plist>

@@ -99,6 +99,11 @@ public actor AgentWatcherLiveActivityManager {
         waitingMessage: String? = nil,
         waitingSince: Date? = nil
     ) async {
+        if currentActivityId == nil ||
+            !Activity<AgentWatcherActivityAttributes>.activities.contains(where: { $0.id == currentActivityId }) {
+            await startActivity()
+        }
+
         guard let activityId = currentActivityId,
               let activity = Activity<AgentWatcherActivityAttributes>.activities.first(where: { $0.id == activityId }) else {
             return

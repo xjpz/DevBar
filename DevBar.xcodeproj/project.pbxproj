@@ -14,7 +14,8 @@
 		90D001042D00000100000001 /* DevBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 90D001022D00000100000001 /* DevBarCore */; };
 		90D001052D00000100000001 /* DevBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 90D001032D00000100000001 /* DevBarCore */; };
 		90D001082D00000100000001 /* DevBarCore in Frameworks */ = {isa = PBXBuildFile; productRef = 90D001072D00000100000001 /* DevBarCore */; };
-		90D001142D00000100000001 /* DevBarWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		90D001142D00000100000001 /* DevBarWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 86A450BA2F95172C00748112 /* DevBarWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		90D003012D00000300000001 /* DevBarNotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 90D003022D00000300000001 /* DevBarNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -60,6 +61,13 @@
 			remoteGlobalIDString = 90D0010D2D00000100000001;
 			remoteInfo = DevBariOS;
 		};
+		90D003032D00000300000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 86C289782F8D19D100A3610C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 90D0030A2D00000300000001;
+			remoteInfo = DevBarNotificationService;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -75,15 +83,16 @@
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		90D001162D00000100000001 /* Embed App Extensions */ = {
+		90D001162D00000100000001 /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				90D001142D00000100000001 /* DevBarWidgetExtension.appex in Embed App Extensions */,
+				90D001142D00000100000001 /* DevBarWidgetExtension.appex in Embed Foundation Extensions */,
+				90D003012D00000300000001 /* DevBarNotificationService.appex in Embed Foundation Extensions */,
 			);
-			name = "Embed App Extensions";
+			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -99,6 +108,7 @@
 		86C289972F8D19D300A3610C /* DevBarUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DevBarUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		90D0010A2D00000100000001 /* DevBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DevBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		90D002022D00000100000001 /* DevBariOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DevBariOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		90D003022D00000300000001 /* DevBarNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DevBarNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -143,6 +153,13 @@
 				Info.plist,
 			);
 			target = 86B85FA12FAA3DE6003AB1E8 /* DevBarFinderSync */;
+		};
+		90D003042D00000300000001 /* Exceptions for "DevBarNotificationService" folder in "DevBarNotificationService" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 90D0030A2D00000300000001 /* DevBarNotificationService */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -194,6 +211,14 @@
 		90D002032D00000100000001 /* DevBariOSUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = DevBariOSUITests;
+			sourceTree = "<group>";
+		};
+		90D003052D00000300000001 /* DevBarNotificationService */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				90D003042D00000300000001 /* Exceptions for "DevBarNotificationService" folder in "DevBarNotificationService" target */,
+			);
+			path = DevBarNotificationService;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -253,6 +278,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		90D003062D00000300000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -271,6 +303,7 @@
 				86A450E12F9518A000748112 /* DevBarWidgetExtension.entitlements */,
 				90D001092D00000100000001 /* DevBariOS */,
 				90D002032D00000100000001 /* DevBariOSUITests */,
+				90D003052D00000300000001 /* DevBarNotificationService */,
 				86C289822F8D19D100A3610C /* DevBar */,
 				86C289902F8D19D300A3610C /* DevBarTests */,
 				86C2899A2F8D19D300A3610C /* DevBarUITests */,
@@ -286,6 +319,7 @@
 			children = (
 				90D0010A2D00000100000001 /* DevBar.app */,
 				90D002022D00000100000001 /* DevBariOSUITests.xctest */,
+				90D003022D00000300000001 /* DevBarNotificationService.appex */,
 				86C289802F8D19D100A3610C /* DevBar.app */,
 				86C2898D2F8D19D300A3610C /* DevBarTests.xctest */,
 				86C289972F8D19D300A3610C /* DevBarUITests.xctest */,
@@ -422,12 +456,13 @@
 				90D0010E2D00000100000001 /* Sources */,
 				90D0010C2D00000100000001 /* Frameworks */,
 				90D0010F2D00000100000001 /* Resources */,
-				90D001162D00000100000001 /* Embed App Extensions */,
+				90D001162D00000100000001 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				90D001172D00000100000001 /* PBXTargetDependency */,
+				90D003092D00000300000001 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				90D001092D00000100000001 /* DevBariOS */,
@@ -463,6 +498,28 @@
 			productReference = 90D002022D00000100000001 /* DevBariOSUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		90D0030A2D00000300000001 /* DevBarNotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 90D0030B2D00000300000001 /* Build configuration list for PBXNativeTarget "DevBarNotificationService" */;
+			buildPhases = (
+				90D003072D00000300000001 /* Sources */,
+				90D003062D00000300000001 /* Frameworks */,
+				90D003082D00000300000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				90D003052D00000300000001 /* DevBarNotificationService */,
+			);
+			name = DevBarNotificationService;
+			packageProductDependencies = (
+			);
+			productName = DevBarNotificationService;
+			productReference = 90D003022D00000300000001 /* DevBarNotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -471,7 +528,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2640;
-				LastUpgradeCheck = 2640;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					86A450B92F95172C00748112 = {
 						CreatedOnToolsVersion = 26.4.1;
@@ -497,6 +554,9 @@
 						CreatedOnToolsVersion = 26.4.1;
 						TestTargetID = 90D0010D2D00000100000001;
 					};
+					90D0030A2D00000300000001 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
 				};
 			};
 			buildConfigurationList = 86C2897B2F8D19D100A3610C /* Build configuration list for PBXProject "DevBar" */;
@@ -519,6 +579,7 @@
 			targets = (
 				90D0010D2D00000100000001 /* DevBariOS */,
 				90D002052D00000100000001 /* DevBariOSUITests */,
+				90D0030A2D00000300000001 /* DevBarNotificationService */,
 				86C2897F2F8D19D100A3610C /* DevBar */,
 				86C2898C2F8D19D300A3610C /* DevBarTests */,
 				86C289962F8D19D300A3610C /* DevBarUITests */,
@@ -578,6 +639,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		90D003082D00000300000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -630,6 +698,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		90D003072D00000300000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -663,6 +738,11 @@
 			target = 90D0010D2D00000100000001 /* DevBariOS */;
 			targetProxy = 90D002042D00000100000001 /* PBXContainerItemProxy */;
 		};
+		90D003092D00000300000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 90D0030A2D00000300000001 /* DevBarNotificationService */;
+			targetProxy = 90D003032D00000300000001 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -673,7 +753,8 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = DevBarWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -689,6 +770,10 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				MARKETING_VERSION = 1.3.0;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fno-objc-arc",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar.DevBarWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -697,6 +782,7 @@
 				SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "DevBarWidget/DevBarWidget-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -710,7 +796,8 @@
 				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
 				CODE_SIGN_ENTITLEMENTS = DevBarWidgetExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -726,6 +813,10 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 26.4;
 				MARKETING_VERSION = 1.3.0;
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fno-objc-arc",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar.DevBarWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -734,6 +825,7 @@
 				SUPPORTED_PLATFORMS = "macosx iphoneos iphonesimulator";
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "DevBarWidget/DevBarWidget-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
@@ -746,7 +838,8 @@
 				CODE_SIGN_ENTITLEMENTS = DevBarFinderSync/FinderSyncExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -780,7 +873,8 @@
 				CODE_SIGN_ENTITLEMENTS = DevBarFinderSync/FinderSyncExtension.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -813,6 +907,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -842,6 +937,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -867,6 +963,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -877,6 +974,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
 				CLANG_ANALYZER_NONNULL = YES;
 				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
@@ -906,6 +1004,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -924,6 +1023,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 			};
 			name = Release;
@@ -936,7 +1036,8 @@
 				CODE_SIGN_ENTITLEMENTS = DevBar/DevBar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -971,7 +1072,8 @@
 				CODE_SIGN_ENTITLEMENTS = DevBar/DevBar.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -1004,6 +1106,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
@@ -1025,6 +1128,7 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
@@ -1045,6 +1149,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.2.0;
@@ -1064,6 +1169,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.2.0;
@@ -1081,11 +1187,12 @@
 		90D001122D00000100000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DevBariOS/DevBariOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DevBariOS/Info.plist;
@@ -1114,11 +1221,12 @@
 		90D001132D00000100000001 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DevBariOS/DevBariOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = AGQDQFK98K;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = DevBariOS/Info.plist;
@@ -1187,6 +1295,50 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = DevBariOS;
+			};
+			name = Release;
+		};
+		90D0030C2D00000300000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevBarNotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		90D0030D2D00000300000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 7;
+				DEVELOPMENT_TEAM = AGQDQFK98K;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DevBarNotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = cc.xjpz.DevBar.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -1261,6 +1413,15 @@
 			buildConfigurations = (
 				90D0020B2D00000100000001 /* Debug */,
 				90D0020C2D00000100000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		90D0030B2D00000300000001 /* Build configuration list for PBXNativeTarget "DevBarNotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				90D0030C2D00000300000001 /* Debug */,
+				90D0030D2D00000300000001 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

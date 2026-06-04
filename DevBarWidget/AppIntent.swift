@@ -7,7 +7,7 @@ import AppIntents
 import DevBarCore
 import WidgetKit
 
-enum WidgetProviderSelection: String, AppEnum {
+enum WidgetProviderSelection: String, AppEnum, CaseIterable {
     case glm
     case openai
     case mimo
@@ -39,6 +39,30 @@ struct ConfigurationAppIntent: WidgetConfigurationIntent {
 
     @Parameter(title: "Provider", default: .glm)
     var provider: WidgetProviderSelection
+}
+
+enum AgentWatcherContentSelection: String, AppEnum {
+    case waiting
+    case overview
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "显示内容")
+    }
+
+    static var caseDisplayRepresentations: [AgentWatcherContentSelection: DisplayRepresentation] {
+        [
+            .waiting: DisplayRepresentation(title: "等待处理", subtitle: "优先显示需要处理的任务"),
+            .overview: DisplayRepresentation(title: "运行概览", subtitle: "显示活跃和等待任务数量")
+        ]
+    }
+}
+
+struct AgentWatcherConfigurationIntent: WidgetConfigurationIntent {
+    static var title: LocalizedStringResource { "Agent Watcher" }
+    static var description: IntentDescription { "选择 Agent Watcher 小组件显示的内容。" }
+
+    @Parameter(title: "显示内容", default: .waiting)
+    var content: AgentWatcherContentSelection
 }
 
 enum MacThemeWidgetPageSelection: String, AppEnum {

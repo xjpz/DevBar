@@ -558,8 +558,12 @@ final class AppViewModel: ObservableObject {
         }
         isHandlingLogin = true
 
+        guard authService.saveCredentials(credentials) else {
+            print("[DevBar] ⑥① Keychain save failed")
+            isHandlingLogin = false
+            return
+        }
         self.credentials = credentials
-        authService.saveCredentials(credentials)
         syncAuthState()
         print("[DevBar] ⑥① authState set to loggedIn")
 

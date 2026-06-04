@@ -1,10 +1,16 @@
 import Foundation
 
 public protocol AccountSettingsStore {
-    func loadAccountConfigs() -> [AccountConfig]
+    func loadAccountConfigs(restoringEnabledProviders: Set<QuotaProvider>) -> [AccountConfig]
     func saveAccountConfigs(_ configs: [AccountConfig])
     func loadOpenAIAccountId() -> String?
     func saveOpenAIAccountId(_ accountId: String?)
+}
+
+public extension AccountSettingsStore {
+    func loadAccountConfigs() -> [AccountConfig] {
+        loadAccountConfigs(restoringEnabledProviders: [])
+    }
 }
 
 public struct UserDefaultsAccountSettingsStore: AccountSettingsStore {
@@ -14,10 +20,10 @@ public struct UserDefaultsAccountSettingsStore: AccountSettingsStore {
         self.defaults = defaults
     }
 
-    public func loadAccountConfigs() -> [AccountConfig] {
+    public func loadAccountConfigs(restoringEnabledProviders: Set<QuotaProvider> = []) -> [AccountConfig] {
         guard let data = defaults.data(forKey: DevBarCoreConstants.Defaults.accountConfigsKey),
               let configs = try? JSONDecoder().decode([AccountConfig].self, from: data) else {
-            return Self.defaultConfigs
+            return Self.configsRestoringEnabledProviders(restoringEnabledProviders)
         }
         return Self.normalizedConfigs(configs)
     }
@@ -45,6 +51,16 @@ public struct UserDefaultsAccountSettingsStore: AccountSettingsStore {
         AccountConfig(provider: .openai, isEnabled: false, order: 1),
         AccountConfig(provider: .mimo, isEnabled: false, order: 2),
     ]
+
+    public static func configsRestoringEnabledProviders(_ providers: Set<QuotaProvider>) -> [AccountConfig] {
+        defaultConfigs.map { config in
+            AccountConfig(
+                provider: config.provider,
+                isEnabled: config.isEnabled || providers.contains(config.provider),
+                order: config.order
+            )
+        }
+    }
 
     public static func normalizedConfigs(_ configs: [AccountConfig]) -> [AccountConfig] {
         var normalized = configs.sorted { $0.order < $1.order }

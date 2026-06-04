@@ -56,11 +56,17 @@ public enum DevBarCoreConstants {
         }
     }
 
+    public enum PushNotifications {
+        public static let registerPath = "/api/devbar/push/register"
+        public static let preferencesPath = "/api/devbar/push/preferences"
+    }
+
     public enum AppGroup {
         public static let groupID = "group.cc.xjpz.DevBar"
         public static let sharedDataKey = "widget_shared_data"
         public static let macThemeWidgetSnapshotKey = "mac_theme_widget_snapshot"
         public static let macThemeWidgetSelectedPageKey = "mac_theme_widget_selected_page"
+        public static let macThemeWidgetAvatarFileName = "mac-theme-widget-avatar.jpg"
         public static let liveActivitySelectedProviderKey = "live_activity_selected_provider"
         public static let agentWatcherWidgetKey = "agent_watcher_widget_data"
 
@@ -84,6 +90,7 @@ public enum DevBarCoreConstants {
         public static let relayIPhoneDeviceIDKey = "relay_iphone_device_id"
         public static let relayDeviceTokenKey = "relay_device_token"
         public static let relayIPhoneDeviceNameKey = "relay_iphone_device_name"
+        public static let macThemeWidgetUserNameKey = "mac_theme_widget_user_name"
         public static let relayMacEnabledKey = "relay_mac_enabled"
     }
 }

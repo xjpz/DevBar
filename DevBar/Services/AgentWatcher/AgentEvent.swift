@@ -124,6 +124,7 @@ struct AgentEvent: Codable, Identifiable {
     let requiresUserAction: Bool
     let canResolveOnMac: Bool
     let canNotifyPhone: Bool
+    let canNotifyUser: Bool
 
     init(
         id: String = UUID().uuidString,
@@ -140,7 +141,8 @@ struct AgentEvent: Codable, Identifiable {
         detectedAt: Date = Date(),
         requiresUserAction: Bool = false,
         canResolveOnMac: Bool = true,
-        canNotifyPhone: Bool = false
+        canNotifyPhone: Bool = false,
+        canNotifyUser: Bool = true
     ) {
         self.id = id
         self.source = source
@@ -157,12 +159,13 @@ struct AgentEvent: Codable, Identifiable {
         self.requiresUserAction = requiresUserAction
         self.canResolveOnMac = canResolveOnMac
         self.canNotifyPhone = canNotifyPhone
+        self.canNotifyUser = canNotifyUser
     }
 }
 
 // MARK: - Codex Hook Payload
 
-struct CodexHookPayload: Codable {
+struct CodexHookPayload: Decodable {
     let sessionId: String?
     let cwd: String?
     let hookEventName: String?
@@ -172,6 +175,7 @@ struct CodexHookPayload: Codable {
     let toolUseId: String?
     let toolInput: ToolInput?
     let permissionMode: String?
+    let approvalsReviewer: String?
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
@@ -183,6 +187,43 @@ struct CodexHookPayload: Codable {
         case toolUseId = "tool_use_id"
         case toolInput = "tool_input"
         case permissionMode = "permission_mode"
+        case permissionModeCamel = "permissionMode"
+        case approvalsReviewer = "approvals_reviewer"
+        case approvalsReviewerCamel = "approvalsReviewer"
+        case approvalPolicy = "approval_policy"
+        case approvalPolicyCamel = "approvalPolicy"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
+        cwd = try container.decodeIfPresent(String.self, forKey: .cwd)
+        hookEventName = try container.decodeIfPresent(String.self, forKey: .hookEventName)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
+        turnId = try container.decodeIfPresent(String.self, forKey: .turnId)
+        toolName = try container.decodeIfPresent(String.self, forKey: .toolName)
+        toolUseId = try container.decodeIfPresent(String.self, forKey: .toolUseId)
+        toolInput = try container.decodeIfPresent(ToolInput.self, forKey: .toolInput)
+        permissionMode = Self.decodeFirstString(
+            from: container,
+            keys: [.permissionMode, .permissionModeCamel]
+        )
+        approvalsReviewer = Self.decodeFirstString(
+            from: container,
+            keys: [.approvalsReviewer, .approvalsReviewerCamel, .approvalPolicy, .approvalPolicyCamel]
+        )
+    }
+
+    private static func decodeFirstString(
+        from container: KeyedDecodingContainer<CodingKeys>,
+        keys: [CodingKeys]
+    ) -> String? {
+        for key in keys {
+            if let value = try? container.decode(String.self, forKey: key) {
+                return value
+            }
+        }
+        return nil
     }
 }
 
@@ -196,14 +237,24 @@ struct ClaudeHookPayload: Codable {
     let sessionId: String?
     let cwd: String?
     let hookEventName: String?
+    let permissionMode: String?
+    let toolName: String?
+    let toolInput: ToolInput?
+    let toolUseId: String?
     let message: String?
     let title: String?
+    let notificationType: String?
 
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
         case cwd
         case hookEventName = "hook_event_name"
+        case permissionMode = "permission_mode"
+        case toolName = "tool_name"
+        case toolInput = "tool_input"
+        case toolUseId = "tool_use_id"
         case message
         case title
+        case notificationType = "notification_type"
     }
 }

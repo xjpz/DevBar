@@ -75,15 +75,17 @@ public struct MacStatusWidgetSnapshot: Codable, Sendable, Equatable {
 public struct MacThemeWidgetUserSnapshot: Codable, Sendable, Equatable {
     public let displayName: String
     public let avatarSymbol: String
+    public let avatarFileName: String?
 
     public static let `default` = MacThemeWidgetUserSnapshot(
         displayName: "DevBar",
         avatarSymbol: "sparkles"
     )
 
-    public init(displayName: String, avatarSymbol: String) {
+    public init(displayName: String, avatarSymbol: String, avatarFileName: String? = nil) {
         self.displayName = displayName
         self.avatarSymbol = avatarSymbol
+        self.avatarFileName = avatarFileName
     }
 }
 

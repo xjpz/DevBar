@@ -10,6 +10,7 @@ struct QuotaLargeView: View {
     let level: String?
     let subscriptionName: String?
     let lastUpdated: Date
+    var visualStyle: WidgetVisualStyle = .liquidGlass
 
     private var sortedLimits: [WidgetQuotaLimit] {
         limits.sorted { a, b in
@@ -29,6 +30,7 @@ struct QuotaLargeView: View {
             HStack {
                 Text("DevBar")
                     .font(.headline)
+                    .foregroundStyle(primaryTextColor)
                 Spacer()
                 if let lvl = level {
                     Text(lvl.capitalized)
@@ -36,14 +38,14 @@ struct QuotaLargeView: View {
                         .fontWeight(.medium)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.quaternary, in: Capsule())
+                        .background(levelBadgeBackground, in: Capsule())
                 }
             }
 
             if let sub = subscriptionName {
                 Text(sub)
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(secondaryTextColor)
             }
 
             Divider()
@@ -54,11 +56,12 @@ struct QuotaLargeView: View {
                         Text(limit.displayName)
                             .font(.subheadline)
                             .fontWeight(.medium)
+                            .foregroundStyle(primaryTextColor)
                         Spacer()
                         if let unitDesc = limit.unitDescription {
                             Text(unitDesc)
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(secondaryTextColor)
                         }
                     }
 
@@ -68,12 +71,12 @@ struct QuotaLargeView: View {
                     HStack {
                         Text(String(format: String(localized: "widget_percent_used"), limit.percentage))
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(secondaryTextColor)
                         Spacer()
                         if let reset = limit.formattedResetTime {
                             Text(String(format: String(localized: "widget_reset_at"), reset))
                                 .font(.caption2)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(secondaryTextColor)
                         }
                     }
                 }
@@ -85,9 +88,21 @@ struct QuotaLargeView: View {
                 Spacer()
                 Text(lastUpdated, style: .relative)
                     .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(secondaryTextColor)
             }
         }
+    }
+
+    private var primaryTextColor: Color {
+        visualStyle == .transparent ? .primary : .white
+    }
+
+    private var secondaryTextColor: Color {
+        visualStyle == .transparent ? .secondary : .white.opacity(0.58)
+    }
+
+    private var levelBadgeBackground: Color {
+        visualStyle == .transparent ? Color.secondary.opacity(0.15) : .white.opacity(0.18)
     }
 
     private func limitColor(_ percentage: Int) -> Color {

@@ -39,6 +39,7 @@ struct AgentSession: Codable, Identifiable {
     var startedAt: Date
     var updatedAt: Date
     var waitingSince: Date?
+    var mutedUntil: Date?
 
     var lastEvent: AgentEvent?
     var recentEvents: [AgentEvent]
@@ -50,7 +51,8 @@ struct AgentSession: Codable, Identifiable {
         cwd: String? = nil,
         state: AgentState = .idle,
         startedAt: Date = Date(),
-        updatedAt: Date = Date()
+        updatedAt: Date = Date(),
+        mutedUntil: Date? = nil
     ) {
         self.id = id
         self.source = source
@@ -59,11 +61,12 @@ struct AgentSession: Codable, Identifiable {
         self.state = state
         self.startedAt = startedAt
         self.updatedAt = updatedAt
+        self.mutedUntil = mutedUntil
         self.recentEvents = []
     }
 
     var isWaiting: Bool {
-        state == .waitingApproval || state == .waitingInput || state == .loginRequired
+        state == .waitingApproval || state == .waitingInput || state == .loginRequired || state == .stalled
     }
 
     var waitingDuration: TimeInterval? {
@@ -104,7 +107,11 @@ class AgentSessionStore: ObservableObject {
     private func startWaitingTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.tick.toggle() // 触发 UI 刷新
+                guard let self else { return }
+                self.tick.toggle() // 触发 UI 刷新
+                self.detectStalledSessions(
+                    threshold: TimeInterval(AgentWatcherSettings.shared.stalledThresholdMinutes * 60)
+                )
             }
         }
     }
@@ -178,6 +185,64 @@ class AgentSessionStore: ObservableObject {
         saveSessions()
     }
 
+    func muteSession(_ sessionId: String, until: Date) {
+        guard var session = sessions[sessionId] else { return }
+        session.mutedUntil = until
+        sessions[sessionId] = session
+        saveSessions()
+    }
+
+    func unmuteSession(_ sessionId: String) {
+        guard var session = sessions[sessionId] else { return }
+        session.mutedUntil = nil
+        sessions[sessionId] = session
+        saveSessions()
+    }
+
+    func isMuted(_ sessionId: String, now: Date = Date()) -> Bool {
+        guard let mutedUntil = sessions[sessionId]?.mutedUntil else { return false }
+        return mutedUntil > now
+    }
+
+    func detectStalledSessions(now: Date = Date(), threshold: TimeInterval) {
+        guard threshold > 0 else { return }
+        var didChange = false
+
+        for (sessionId, var session) in sessions {
+            guard session.state == .running,
+                  now.timeIntervalSince(session.updatedAt) >= threshold
+            else { continue }
+
+            let event = AgentEvent(
+                source: session.source,
+                eventType: .taskStalled,
+                severity: .critical,
+                projectName: session.projectName,
+                cwd: session.cwd,
+                sessionId: sessionId,
+                message: "\(session.source.displayName) 任务长时间无更新",
+                createdAt: now,
+                detectedAt: now,
+                requiresUserAction: true,
+                canNotifyPhone: true
+            )
+
+            session.state = .stalled
+            session.waitingSince = now
+            session.lastEvent = event
+            session.recentEvents.insert(event, at: 0)
+            if session.recentEvents.count > maxRecentEvents {
+                session.recentEvents = Array(session.recentEvents.prefix(maxRecentEvents))
+            }
+            sessions[sessionId] = session
+            didChange = true
+        }
+
+        if didChange {
+            saveSessions()
+        }
+    }
+
     func removeStaleSessions(olderThan interval: TimeInterval = 3600) {
         let cutoff = Date().addingTimeInterval(-interval)
         sessions = sessions.filter { _, session in
@@ -198,6 +263,10 @@ class AgentSessionStore: ObservableObject {
             .sorted { ($0.waitingSince ?? $0.updatedAt) > ($1.waitingSince ?? $1.updatedAt) }
     }
 
+    var recentSessions: [AgentSession] {
+        sessions.values.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
     var hasWaitingSessions: Bool {
         sessions.values.contains { $0.isWaiting }
     }
@@ -207,10 +276,10 @@ class AgentSessionStore: ObservableObject {
     private func determineState(from event: AgentEvent, currentState: AgentState) -> AgentState {
         switch event.eventType {
         case .permissionRequest, .approvalRequired:
-            return .waitingApproval
+            return event.requiresUserAction ? .waitingApproval : .running
         case .commandConfirmationRequired, .filePermissionRequired,
              .networkPermissionRequired, .mcpPermissionRequired:
-            return .waitingApproval
+            return event.requiresUserAction ? .waitingApproval : .running
         case .waitingUserInput:
             return .waitingInput
         case .loginRequired:
@@ -219,6 +288,8 @@ class AgentSessionStore: ObservableObject {
             return .completed
         case .taskFailed:
             return .failed
+        case .taskStalled:
+            return .stalled
         case .sessionStart:
             return .running
         case .stop:

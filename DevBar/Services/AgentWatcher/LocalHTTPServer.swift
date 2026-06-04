@@ -3,7 +3,7 @@ import Network
 
 // MARK: - HTTP Request
 
-struct HTTPRequest {
+struct HTTPRequest: Equatable {
     let method: String
     let path: String
     let headers: [String: String]
@@ -11,6 +11,82 @@ struct HTTPRequest {
 
     var bodyString: String? {
         body.flatMap { String(data: $0, encoding: .utf8) }
+    }
+}
+
+enum LocalHTTPRequestParseResult: Equatable {
+    case incomplete
+    case request(HTTPRequest)
+    case invalid
+}
+
+struct LocalHTTPRequestParser {
+    private static let headerSeparator = Data("\r\n\r\n".utf8)
+    private static let maximumRequestSize = 64 * 1024
+
+    private var buffer = Data()
+
+    mutating func append(_ data: Data) -> LocalHTTPRequestParseResult {
+        guard buffer.count + data.count <= Self.maximumRequestSize else {
+            return .invalid
+        }
+        buffer.append(data)
+
+        guard let separatorRange = buffer.range(of: Self.headerSeparator) else {
+            return .incomplete
+        }
+        guard let headerString = String(data: buffer[..<separatorRange.lowerBound], encoding: .utf8) else {
+            return .invalid
+        }
+
+        let lines = headerString.components(separatedBy: "\r\n")
+        guard let requestLine = lines.first else {
+            return .invalid
+        }
+        let requestParts = requestLine.split(separator: " ", omittingEmptySubsequences: true)
+        guard requestParts.count == 3 else {
+            return .invalid
+        }
+
+        var headers: [String: String] = [:]
+        for line in lines.dropFirst() {
+            guard let colonIndex = line.firstIndex(of: ":") else {
+                return .invalid
+            }
+            let name = String(line[..<colonIndex]).lowercased()
+            let value = String(line[line.index(after: colonIndex)...])
+                .trimmingCharacters(in: .whitespaces)
+            headers[name] = value
+        }
+
+        let contentLength: Int
+        if let value = headers["content-length"] {
+            guard let parsedLength = Int(value), parsedLength >= 0 else {
+                return .invalid
+            }
+            contentLength = parsedLength
+        } else {
+            contentLength = 0
+        }
+
+        let bodyStart = separatorRange.upperBound
+        let bodyEnd = bodyStart + contentLength
+        guard bodyEnd <= Self.maximumRequestSize else {
+            return .invalid
+        }
+        guard buffer.count >= bodyEnd else {
+            return .incomplete
+        }
+
+        let body = contentLength > 0 ? Data(buffer[bodyStart..<bodyEnd]) : nil
+        return .request(
+            HTTPRequest(
+                method: String(requestParts[0]).uppercased(),
+                path: String(requestParts[1]),
+                headers: headers,
+                body: body
+            )
+        )
     }
 }
 
@@ -47,6 +123,7 @@ class LocalHTTPServer {
     private let queue = DispatchQueue(label: "com.devbar.agentwatcher.httpserver", qos: .userInitiated)
 
     var onRequest: ((HTTPRequest) -> HTTPResponse)?
+    var onStateChange: ((NWListener.State) -> Void)?
 
     init(port: UInt16 = 49321) {
         self.port = port
@@ -57,10 +134,15 @@ class LocalHTTPServer {
     func start() throws {
         let parameters = NWParameters.tcp
         parameters.allowLocalEndpointReuse = true
+        parameters.requiredLocalEndpoint = .hostPort(
+            host: .ipv4(IPv4Address("127.0.0.1")!),
+            port: NWEndpoint.Port(rawValue: port)!
+        )
 
-        listener = try NWListener(using: parameters, on: NWEndpoint.Port(rawValue: port)!)
+        listener = try NWListener(using: parameters)
 
         listener?.stateUpdateHandler = { [weak self] state in
+            self?.onStateChange?(state)
             switch state {
             case .ready:
                 print("[HTTPServer] Listening on port \(self?.port ?? 0)")
@@ -86,8 +168,8 @@ class LocalHTTPServer {
 
     // MARK: - Route Registration
 
-    func registerRoute(_ path: String, handler: @escaping RouteHandler) {
-        routes[path] = handler
+    func registerRoute(_ method: String, _ path: String, handler: @escaping RouteHandler) {
+        routes[routeKey(method: method, path: path)] = handler
     }
 
     // MARK: - Connection Handling
@@ -95,75 +177,50 @@ class LocalHTTPServer {
     private func handleConnection(_ connection: NWConnection) {
         connection.start(queue: queue)
 
-        receiveRequest(connection: connection)
+        receiveRequest(connection: connection, parser: LocalHTTPRequestParser())
     }
 
-    private func receiveRequest(connection: NWConnection) {
+    private func receiveRequest(connection: NWConnection, parser: LocalHTTPRequestParser) {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
-            guard let self = self, let data = data, !data.isEmpty else {
+            guard let self, error == nil else {
                 connection.cancel()
                 return
             }
 
-            if let request = self.parseHTTPRequest(data) {
+            var updatedParser = parser
+            switch updatedParser.append(data ?? Data()) {
+            case .request(let request):
                 let response = self.routeRequest(request)
                 self.sendResponse(response, to: connection)
-            } else {
+            case .incomplete where !isComplete:
+                self.receiveRequest(connection: connection, parser: updatedParser)
+            case .incomplete, .invalid:
                 let response = HTTPResponse(statusCode: 400, json: ["error": "Bad Request"])
                 self.sendResponse(response, to: connection)
             }
-
-            if isComplete {
-                connection.cancel()
-            }
         }
-    }
-
-    // MARK: - HTTP Parsing
-
-    private func parseHTTPRequest(_ data: Data) -> HTTPRequest? {
-        guard let string = String(data: data, encoding: .utf8) else { return nil }
-
-        let parts = string.components(separatedBy: "\r\n\r\n")
-        guard let headerPart = parts.first else { return nil }
-
-        let headerLines = headerPart.components(separatedBy: "\r\n")
-        guard let firstLine = headerLines.first else { return nil }
-
-        let firstLineComponents = firstLine.components(separatedBy: " ")
-        guard firstLineComponents.count >= 2 else { return nil }
-
-        let method = firstLineComponents[0]
-        let path = firstLineComponents[1]
-
-        var headers: [String: String] = [:]
-        for i in 1..<headerLines.count {
-            let line = headerLines[i]
-            if let colonIndex = line.firstIndex(of: ":") {
-                let key = String(line[line.startIndex..<colonIndex]).trimmingCharacters(in: .whitespaces)
-                let value = String(line[line.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
-                headers[key] = value
-            }
-        }
-
-        let body: Data? = parts.count > 1 ? parts[1].data(using: .utf8) : nil
-
-        return HTTPRequest(method: method, path: path, headers: headers, body: body)
     }
 
     // MARK: - Routing
 
     private func routeRequest(_ request: HTTPRequest) -> HTTPResponse {
         // 检查注册的路由
-        if let handler = routes[request.path] {
+        let exactRoute = routeKey(method: request.method, path: request.path)
+        if let handler = routes[exactRoute] {
             return handler(request)
         }
 
         // 检查通配路由
         for (pattern, handler) in routes {
-            if matchPattern(pattern, request.path) {
+            if matchPattern(pattern, exactRoute) {
                 return handler(request)
             }
+        }
+
+        if routes.keys.contains(where: { registeredRoute in
+            registeredRoute.split(separator: " ", maxSplits: 1).last.map(String.init) == request.path
+        }) {
+            return HTTPResponse(statusCode: 405, json: ["error": "Method Not Allowed"])
         }
 
         // 默认 404
@@ -177,6 +234,10 @@ class LocalHTTPServer {
             return path.hasPrefix(prefix)
         }
         return pattern == path
+    }
+
+    private func routeKey(method: String, path: String) -> String {
+        "\(method.uppercased()) \(path)"
     }
 
     // MARK: - Response Sending
@@ -213,6 +274,7 @@ class LocalHTTPServer {
         case 201: return "Created"
         case 204: return "No Content"
         case 400: return "Bad Request"
+        case 405: return "Method Not Allowed"
         case 404: return "Not Found"
         case 500: return "Internal Server Error"
         default: return "Unknown"

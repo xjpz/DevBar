@@ -29,6 +29,7 @@ enum IOSAppFont: String, CaseIterable, Identifiable {
     case geist
     case geistMono
     case jetBrainsMono
+    case xuJingleiBold
 
     var id: String { rawValue }
 
@@ -38,6 +39,7 @@ enum IOSAppFont: String, CaseIterable, Identifiable {
         case .geist: return "ios_settings_font_geist"
         case .geistMono: return "ios_settings_font_geist_mono"
         case .jetBrainsMono: return "ios_settings_font_jetbrains_mono"
+        case .xuJingleiBold: return "ios_settings_font_xu_jinglei_bold"
         }
     }
 
@@ -78,6 +80,8 @@ enum IOSAppFont: String, CaseIterable, Identifiable {
             return "Geist Mono"
         case .jetBrainsMono:
             return "JetBrains Mono"
+        case .xuJingleiBold:
+            return "BauhausITC"
         }
     }
 

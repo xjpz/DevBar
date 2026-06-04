@@ -25,6 +25,13 @@ enum HookConfigStatus {
 // MARK: - Hook Config Detector
 
 class HookConfigDetector {
+    private static let claudePermissionCommand = "curl -s -X POST http://127.0.0.1:49321/agent/claude/permission-request -H 'Content-Type: application/json' -d @-"
+    private static let claudeNotificationCommand = "curl -s -X POST http://127.0.0.1:49321/agent/claude/notification -H 'Content-Type: application/json' -d @-"
+    private static let claudeStopCommand = "curl -s -X POST http://127.0.0.1:49321/agent/claude/stop -H 'Content-Type: application/json' -d @-"
+    private static let codexPermissionCommand = "curl -s -X POST http://127.0.0.1:49321/agent/codex/permission-request -H 'Content-Type: application/json' -d @-"
+    private static let codexSessionStartCommand = "curl -s -X POST http://127.0.0.1:49321/agent/codex/session-start -H 'Content-Type: application/json' -d @-"
+    private static let codexStopCommand = "curl -s -X POST http://127.0.0.1:49321/agent/codex/stop -H 'Content-Type: application/json' -d @-"
+
     private let claudeConfigPath: String
     private let codexConfigPath: String
     private let codexHooksPath: String
@@ -53,11 +60,9 @@ class HookConfigDetector {
                 return .notDetected
             }
 
-            // 检查是否有 Notification 或 Stop hook
-            let hasNotification = hooks["Notification"] != nil
-            let hasStop = hooks["Stop"] != nil
-
-            if hasNotification || hasStop {
+            if Self.containsHook(command: Self.claudePermissionCommand, eventName: "PermissionRequest", in: hooks) ||
+                Self.containsHook(command: Self.claudeNotificationCommand, eventName: "Notification", in: hooks) ||
+                Self.containsHook(command: Self.claudeStopCommand, eventName: "Stop", in: hooks) {
                 return .detected
             } else {
                 return .notDetected
@@ -77,7 +82,7 @@ class HookConfigDetector {
                 let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
                 if let hooks = json?["hooks"] as? [String: Any],
-                   hooks["PermissionRequest"] != nil {
+                   Self.containsHook(command: Self.codexPermissionCommand, eventName: "PermissionRequest", in: hooks) {
                     return .detected
                 }
             } catch {
@@ -89,7 +94,7 @@ class HookConfigDetector {
         if fileManager.fileExists(atPath: codexConfigPath) {
             do {
                 let content = try String(contentsOfFile: codexConfigPath, encoding: .utf8)
-                if content.contains("PermissionRequest") || content.contains("hooks") {
+                if content.contains(Self.codexPermissionCommand) {
                     return .detected
                 }
             } catch {
@@ -106,6 +111,17 @@ class HookConfigDetector {
         return """
         {
           "hooks": {
+            "PermissionRequest": [
+              {
+                "matcher": "",
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "curl -s -X POST http://127.0.0.1:49321/agent/claude/permission-request -H 'Content-Type: application/json' -d @-"
+                  }
+                ]
+              }
+            ],
             "Notification": [
               {
                 "matcher": "",
@@ -188,21 +204,7 @@ class HookConfigDetector {
             existingConfig = json
         }
 
-        // 合并 hooks
-        existingConfig["hooks"] = [
-            "Notification": [
-                ["matcher": "", "hooks": [
-                    ["type": "command", "command": "curl -s -X POST http://127.0.0.1:49321/agent/claude/notification -H 'Content-Type: application/json' -d @-"]
-                ]]
-            ],
-            "Stop": [
-                ["matcher": "", "hooks": [
-                    ["type": "command", "command": "curl -s -X POST http://127.0.0.1:49321/agent/claude/stop -H 'Content-Type: application/json' -d @-"]
-                ]]
-            ]
-        ]
-
-        return writeJSONConfig(to: claudeConfigPath, content: existingConfig)
+        return writeJSONConfig(to: claudeConfigPath, content: Self.mergingClaudeHooks(into: existingConfig))
     }
 
     func installCodexConfig() -> Bool {
@@ -213,32 +215,54 @@ class HookConfigDetector {
             existingConfig = json
         }
 
-        // 合并 DevBar hooks（保留用户已有的其他 hooks 事件）
-        var hooks = existingConfig["hooks"] as? [String: Any] ?? [:]
-        hooks["PermissionRequest"] = [
-            ["matcher": "", "hooks": [
-                ["type": "command",
-                 "command": "curl -s -X POST http://127.0.0.1:49321/agent/codex/permission-request -H 'Content-Type: application/json' -d @-",
-                 "statusMessage": "Notifying DevBar"]
-            ]]
-        ]
-        hooks["SessionStart"] = [
-            ["matcher": "startup|resume", "hooks": [
-                ["type": "command",
-                 "command": "curl -s -X POST http://127.0.0.1:49321/agent/codex/session-start -H 'Content-Type: application/json' -d @-",
-                 "statusMessage": "Notifying DevBar"]
-            ]]
-        ]
-        hooks["Stop"] = [
-            ["matcher": "", "hooks": [
-                ["type": "command",
-                 "command": "curl -s -X POST http://127.0.0.1:49321/agent/codex/stop -H 'Content-Type: application/json' -d @-",
-                 "statusMessage": "Notifying DevBar"]
-            ]]
-        ]
-        existingConfig["hooks"] = hooks
+        return writeJSONConfig(to: codexHooksPath, content: Self.mergingCodexHooks(into: existingConfig))
+    }
 
-        return writeJSONConfig(to: codexHooksPath, content: existingConfig)
+    static func mergingClaudeHooks(into config: [String: Any]) -> [String: Any] {
+        var config = config
+        var hooks = config["hooks"] as? [String: Any] ?? [:]
+        appendHook(command: claudePermissionCommand, eventName: "PermissionRequest", to: &hooks)
+        appendHook(command: claudeNotificationCommand, eventName: "Notification", to: &hooks)
+        appendHook(command: claudeStopCommand, eventName: "Stop", to: &hooks)
+        config["hooks"] = hooks
+        return config
+    }
+
+    static func mergingCodexHooks(into config: [String: Any]) -> [String: Any] {
+        var config = config
+        var hooks = config["hooks"] as? [String: Any] ?? [:]
+        appendHook(command: codexPermissionCommand, eventName: "PermissionRequest", to: &hooks, statusMessage: "Notifying DevBar")
+        appendHook(command: codexSessionStartCommand, eventName: "SessionStart", matcher: "startup|resume", to: &hooks, statusMessage: "Notifying DevBar")
+        appendHook(command: codexStopCommand, eventName: "Stop", to: &hooks, statusMessage: "Notifying DevBar")
+        config["hooks"] = hooks
+        return config
+    }
+
+    private static func appendHook(
+        command: String,
+        eventName: String,
+        matcher: String = "",
+        to hooks: inout [String: Any],
+        statusMessage: String? = nil
+    ) {
+        var entries = hooks[eventName] as? [[String: Any]] ?? []
+        let alreadyInstalled = containsHook(command: command, eventName: eventName, in: hooks)
+        guard !alreadyInstalled else { return }
+
+        var commandHook: [String: Any] = ["type": "command", "command": command]
+        if let statusMessage {
+            commandHook["statusMessage"] = statusMessage
+        }
+        entries.append(["matcher": matcher, "hooks": [commandHook]])
+        hooks[eventName] = entries
+    }
+
+    private static func containsHook(command: String, eventName: String, in hooks: [String: Any]) -> Bool {
+        let entries = hooks[eventName] as? [[String: Any]] ?? []
+        return entries.contains { entry in
+            let commands = entry["hooks"] as? [[String: Any]] ?? []
+            return commands.contains { $0["command"] as? String == command }
+        }
     }
 
     private func writeJSONConfig(to path: String, content: [String: Any]) -> Bool {

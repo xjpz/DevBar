@@ -1,6 +1,7 @@
 import Combine
 import DevBarCore
 import Foundation
+import Security
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -45,6 +46,16 @@ final class IOSAppViewModel: ObservableObject {
             Task { await syncLiveActivity() }
         }
     }
+    @Published var pushNotificationPreferences: PushNotificationPreferences {
+        didSet {
+            Task {
+                await IOSPushNotificationCoordinator.shared.syncPreferences(
+                    pushNotificationPreferences,
+                    relayDeviceToken: deviceRelayManager.deviceToken
+                )
+            }
+        }
+    }
     @Published var relayDeviceName: String {
         didSet {
             let normalized = Self.normalizedRelayDeviceName(relayDeviceName)
@@ -52,12 +63,25 @@ final class IOSAppViewModel: ObservableObject {
             if relayDeviceName != normalized {
                 relayDeviceName = normalized
             } else {
+                syncMacThemeWidgetSnapshot()
                 Task {
                     await deviceRelayManager.resumeConnectivity(deviceType: .iPhone, deviceName: normalized)
                 }
             }
         }
     }
+    @Published var macThemeWidgetUserName: String {
+        didSet {
+            let normalized = Self.normalizedMacThemeWidgetUserName(macThemeWidgetUserName)
+            UserDefaults.standard.set(normalized, forKey: DevBarCoreConstants.Defaults.macThemeWidgetUserNameKey)
+            if macThemeWidgetUserName != normalized {
+                macThemeWidgetUserName = normalized
+            } else {
+                syncMacThemeWidgetSnapshot()
+            }
+        }
+    }
+    @Published private(set) var macThemeWidgetAvatarFileName: String?
     @Published private(set) var availableHomeScreenShortcutActions: [DeviceRelayHomeScreenShortcutAction]
     @Published private(set) var selectedHomeScreenShortcutActions: [DeviceRelayHomeScreenShortcutAction]
     @Published private(set) var dashboardScanRequestID: UUID?
@@ -70,6 +94,7 @@ final class IOSAppViewModel: ObservableObject {
     private let authService = AuthService()
     private let settingsStore = UserDefaultsAccountSettingsStore()
     private let liveActivitySettingsStore = LiveActivitySettingsStore()
+    private let macThemeWidgetAvatarStore = MacThemeWidgetAvatarStore()
     private var childObservers = Set<AnyCancellable>()
     private var hasRefreshedOnLaunch = false
     private var lastRefreshAttemptAt: Date?
@@ -78,24 +103,59 @@ final class IOSAppViewModel: ObservableObject {
     private var hasPairedMacForShortcuts = false
 
     init() {
-        self.accountConfigs = settingsStore.loadAccountConfigs()
+        self.accountConfigs = settingsStore.loadAccountConfigs(
+            restoringEnabledProviders: Self.providersWithStoredCredentials()
+        )
         self.glmCredentials = authService.credentials
         self.refreshInterval = UserDefaults.standard.double(forKey: DevBarCoreConstants.Defaults.refreshIntervalKey)
             .nonZero ?? DevBarCoreConstants.Defaults.defaultRefreshInterval
         self.liveActivitySettings = liveActivitySettingsStore.load()
-        self.relayDeviceName = Self.loadRelayDeviceName()
+        self.pushNotificationPreferences = IOSPushNotificationCoordinator.shared.loadPreferences()
+        let relayDeviceName = Self.loadRelayDeviceName()
+        self.relayDeviceName = relayDeviceName
+        self.macThemeWidgetUserName = Self.loadMacThemeWidgetUserName()
+        self.macThemeWidgetAvatarFileName = Self.loadMacThemeWidgetAvatarFileName()
         let storedShortcutActions = IOSHomeScreenShortcutPreferences.loadSelectedActions()
         self.usesDefaultHomeScreenShortcutSelection = storedShortcutActions == nil
         self.selectedHomeScreenShortcutActions = storedShortcutActions
             ?? DeviceRelayHomeScreenShortcutPolicy.defaultSelection(hasPairedMac: false)
         self.availableHomeScreenShortcutActions = DeviceRelayHomeScreenShortcutPolicy.availableActions(hasPairedMac: false)
         bindChildViewModels()
+        NotificationCenter.default.publisher(for: .iosAPNsTokenChanged)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    await IOSPushNotificationCoordinator.shared.syncRegistration(
+                        relayDeviceToken: self.deviceRelayManager.deviceToken
+                    )
+                }
+            }
+            .store(in: &childObservers)
         Task { @MainActor [weak self] in
             guard let self else { return }
             await self.deviceRelayManager.setup(deviceType: .iPhone, deviceName: self.relayDeviceName)
+            await IOSPushNotificationCoordinator.shared.syncRegistration(
+                relayDeviceToken: self.deviceRelayManager.deviceToken
+            )
             await self.refreshHomeScreenShortcuts()
             self.syncMacThemeWidgetSnapshot()
         }
+    }
+
+    private static func providersWithStoredCredentials(
+        keychain: KeychainService = .shared
+    ) -> Set<QuotaProvider> {
+        var providers: Set<QuotaProvider> = []
+        if keychain.load(key: DevBarCoreConstants.Keychain.tokenKey)?.isEmpty == false {
+            providers.insert(.glm)
+        }
+        if keychain.load(key: DevBarCoreConstants.Keychain.openAIAccessTokenKey)?.isEmpty == false {
+            providers.insert(.openai)
+        }
+        if keychain.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)?.isEmpty == false {
+            providers.insert(.mimo)
+        }
+        return providers
     }
 
     var enabledProviders: [QuotaProvider] {
@@ -182,6 +242,7 @@ final class IOSAppViewModel: ObservableObject {
 
     func refreshOnForeground() async {
         await deviceRelayManager.resumeConnectivity(deviceType: .iPhone, deviceName: relayDeviceName)
+        await IOSPushNotificationCoordinator.shared.syncRegistration(relayDeviceToken: deviceRelayManager.deviceToken)
         await refreshHomeScreenShortcuts()
 
         guard let lastRefresh = latestRefreshDate else {
@@ -249,7 +310,9 @@ final class IOSAppViewModel: ObservableObject {
         }
 
         let credentials = AuthCredentials(token: normalized, cookieString: "")
-        authService.saveCredentials(credentials)
+        guard authService.saveCredentials(credentials) else {
+            throw CredentialsError.keychainSaveFailed
+        }
         glmCredentials = credentials
         quotaViewModel.resetForLogout()
         if !isProviderEnabled(.glm) {
@@ -278,7 +341,12 @@ final class IOSAppViewModel: ObservableObject {
             silent: true
         )
 
-        KeychainService.shared.save(key: DevBarCoreConstants.Keychain.openAIAccessTokenKey, value: trimmedToken)
+        guard KeychainService.shared.save(
+            key: DevBarCoreConstants.Keychain.openAIAccessTokenKey,
+            value: trimmedToken
+        ) == errSecSuccess else {
+            throw CredentialsError.keychainSaveFailed
+        }
         settingsStore.saveOpenAIAccountId(trimmedAccountId.isEmpty ? nil : trimmedAccountId)
         if !isProviderEnabled(.openai) {
             updateProvider(.openai, enabled: true)
@@ -302,7 +370,12 @@ final class IOSAppViewModel: ObservableObject {
         _ = try await mimoQuotaViewModel.fetchUsage(serviceToken: credential, silent: true)
         await mimoQuotaViewModel.fetchPlanDetailIfNeeded(serviceToken: credential, force: true)
 
-        KeychainService.shared.save(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey, value: credential)
+        guard KeychainService.shared.save(
+            key: DevBarCoreConstants.Keychain.mimoServiceTokenKey,
+            value: credential
+        ) == errSecSuccess else {
+            throw CredentialsError.keychainSaveFailed
+        }
         if !isProviderEnabled(.mimo) {
             updateProvider(.mimo, enabled: true)
         }
@@ -320,6 +393,7 @@ final class IOSAppViewModel: ObservableObject {
 
     func pairMacDevice(from rawValue: String) async throws {
         try await deviceRelayManager.confirmPairing(from: rawValue, deviceName: relayDeviceName)
+        await IOSPushNotificationCoordinator.shared.syncRegistration(relayDeviceToken: deviceRelayManager.deviceToken)
         await refreshHomeScreenShortcuts()
         syncMacThemeWidgetSnapshot()
     }
@@ -346,6 +420,35 @@ final class IOSAppViewModel: ObservableObject {
     private static func normalizedRelayDeviceName(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "iPhone" : trimmed
+    }
+
+    private static func loadMacThemeWidgetUserName() -> String {
+        let stored = UserDefaults.standard.string(forKey: DevBarCoreConstants.Defaults.macThemeWidgetUserNameKey)
+        return normalizedMacThemeWidgetUserName(stored ?? "")
+    }
+
+    private static func normalizedMacThemeWidgetUserName(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func loadMacThemeWidgetAvatarFileName() -> String? {
+        let fileName = DevBarCoreConstants.AppGroup.macThemeWidgetAvatarFileName
+        return MacThemeWidgetAvatarStore().load(fileName: fileName) == nil ? nil : fileName
+    }
+
+    var macThemeWidgetAvatarData: Data? {
+        macThemeWidgetAvatarStore.load(fileName: macThemeWidgetAvatarFileName)
+    }
+
+    func saveMacThemeWidgetAvatarData(_ data: Data) throws {
+        macThemeWidgetAvatarFileName = try macThemeWidgetAvatarStore.save(data)
+        syncMacThemeWidgetSnapshot()
+    }
+
+    func clearMacThemeWidgetAvatar() {
+        macThemeWidgetAvatarStore.clear(fileName: macThemeWidgetAvatarFileName)
+        macThemeWidgetAvatarFileName = nil
+        syncMacThemeWidgetSnapshot()
     }
 
     private func refreshHomeScreenShortcuts() async {
@@ -448,7 +551,11 @@ final class IOSAppViewModel: ObservableObject {
         WidgetDataManager.shared.saveAndReload(
             MacThemeWidgetSnapshot(
                 schemaVersion: MacThemeWidgetSnapshot.currentSchemaVersion,
-                user: MacThemeWidgetUserSnapshot(displayName: relayDeviceName, avatarSymbol: "iphone.gen3"),
+                user: MacThemeWidgetUserSnapshot(
+                    displayName: macThemeWidgetUserName.isEmpty ? relayDeviceName : macThemeWidgetUserName,
+                    avatarSymbol: "person.crop.circle.fill",
+                    avatarFileName: macThemeWidgetAvatarFileName
+                ),
                 macStatus: macStatus,
                 lastUpdated: now
             )
@@ -506,7 +613,9 @@ final class IOSAppViewModel: ObservableObject {
                         token: token,
                         cookieString: credentialsPayload.cookieString ?? ""
                     )
-                    authService.saveCredentials(credentials)
+                    guard authService.saveCredentials(credentials) else {
+                        throw CredentialsError.keychainSaveFailed
+                    }
                     glmCredentials = credentials
                 } else {
                     authService.logout()
@@ -517,10 +626,12 @@ final class IOSAppViewModel: ObservableObject {
             case .openai:
                 if let token = providerPayload.credentials?.token?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !token.isEmpty {
-                    KeychainService.shared.save(
+                    guard KeychainService.shared.save(
                         key: DevBarCoreConstants.Keychain.openAIAccessTokenKey,
                         value: token
-                    )
+                    ) == errSecSuccess else {
+                        throw CredentialsError.keychainSaveFailed
+                    }
                 } else {
                     KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.openAIAccessTokenKey)
                 }
@@ -531,10 +642,12 @@ final class IOSAppViewModel: ObservableObject {
             case .mimo:
                 if let cookie = providerPayload.credentials?.cookieString?.trimmingCharacters(in: .whitespacesAndNewlines),
                    !cookie.isEmpty {
-                    KeychainService.shared.save(
+                    guard KeychainService.shared.save(
                         key: DevBarCoreConstants.Keychain.mimoServiceTokenKey,
                         value: cookie
-                    )
+                    ) == errSecSuccess else {
+                        throw CredentialsError.keychainSaveFailed
+                    }
                 } else {
                     KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
                 }
@@ -756,6 +869,7 @@ extension IOSAppViewModel {
         case invalidGLMAPIKey
         case emptyOpenAIToken
         case emptyMimoCookie
+        case keychainSaveFailed
 
         var errorDescription: String? {
             switch self {
@@ -767,6 +881,8 @@ extension IOSAppViewModel {
                 return String(localized: "ios_error_enter_openai_token")
             case .emptyMimoCookie:
                 return String(localized: "mimo_cookie_required")
+            case .keychainSaveFailed:
+                return "无法安全保存凭据，请重试"
             }
         }
     }

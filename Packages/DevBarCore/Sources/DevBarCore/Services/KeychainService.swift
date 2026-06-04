@@ -6,9 +6,16 @@ public final class KeychainService: Sendable {
 
     public init() {}
 
-    public func save(credentials: AuthCredentials) {
-        save(key: DevBarCoreConstants.Keychain.tokenKey, value: credentials.token)
-        save(key: DevBarCoreConstants.Keychain.cookieKey, value: credentials.cookieString)
+    @discardableResult
+    public func save(credentials: AuthCredentials) -> Bool {
+        let tokenStatus = save(key: DevBarCoreConstants.Keychain.tokenKey, value: credentials.token)
+        let cookieStatus = save(key: DevBarCoreConstants.Keychain.cookieKey, value: credentials.cookieString)
+        let didSave = tokenStatus == errSecSuccess && cookieStatus == errSecSuccess
+        if !didSave {
+            delete(key: DevBarCoreConstants.Keychain.tokenKey)
+            delete(key: DevBarCoreConstants.Keychain.cookieKey)
+        }
+        return didSave
     }
 
     public func loadCredentials() -> AuthCredentials? {
@@ -26,8 +33,12 @@ public final class KeychainService: Sendable {
         delete(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
     }
 
-    public func save(key: String, value: String) {
-        guard let data = value.data(using: .utf8) else { return }
+    @discardableResult
+    public func save(key: String, value: String) -> OSStatus {
+        guard let data = value.data(using: .utf8) else {
+            print("[KeychainService] Failed to encode value for account \(key)")
+            return errSecParam
+        }
 
         let deleteQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -43,7 +54,11 @@ public final class KeychainService: Sendable {
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
-        SecItemAdd(addQuery as CFDictionary, nil)
+        let status = SecItemAdd(addQuery as CFDictionary, nil)
+        if status != errSecSuccess {
+            print("[KeychainService] Failed to save account \(key): \(status)")
+        }
+        return status
     }
 
     public func load(key: String) -> String? {

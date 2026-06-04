@@ -58,7 +58,7 @@ struct QuotaTimelineProvider: AppIntentTimelineProvider {
         return Timeline(entries: entries, policy: .after(nextUpdate))
     }
 
-    private static func loadSharedData(for provider: WidgetProviderSelection) -> WidgetSharedData? {
+    static func loadSharedData(for provider: WidgetProviderSelection) -> WidgetSharedData? {
         guard let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID),
               let raw = defaults.data(forKey: DevBarCoreConstants.AppGroup.sharedDataKey(for: provider.rawValue)) else {
             return nil
@@ -101,6 +101,7 @@ struct QuotaEntry: TimelineEntry {
 
 struct DevBarWidgetEntryView: View {
     let entry: QuotaEntry
+    var visualStyle: WidgetVisualStyle = .liquidGlass
 
     @Environment(\.widgetFamily) var family
 
@@ -124,17 +125,17 @@ struct DevBarWidgetEntryView: View {
         } else if family == .accessoryRectangular {
             LockScreenHelloView()
         } else if !entry.isLoggedIn {
-            NotLoggedInView(title: providerTitle)
+            NotLoggedInView(title: providerTitle, visualStyle: visualStyle)
         } else if entry.data.limits.isEmpty {
-            NoDataView(title: providerTitle, lastUpdated: entry.data.lastUpdated)
+            NoDataView(title: providerTitle, lastUpdated: entry.data.lastUpdated, visualStyle: visualStyle)
         } else {
             quotaView
         }
         #else
         if !entry.isLoggedIn {
-            NotLoggedInView(title: providerTitle)
+            NotLoggedInView(title: providerTitle, visualStyle: visualStyle)
         } else if entry.data.limits.isEmpty {
-            NoDataView(title: providerTitle, lastUpdated: entry.data.lastUpdated)
+            NoDataView(title: providerTitle, lastUpdated: entry.data.lastUpdated, visualStyle: visualStyle)
         } else {
             quotaView
         }
@@ -148,7 +149,8 @@ struct DevBarWidgetEntryView: View {
             QuotaSmallView(
                 title: providerTitle,
                 limits: entry.data.limits,
-                level: entry.data.level
+                level: entry.data.level,
+                visualStyle: visualStyle
             )
         case .systemMedium:
             QuotaMediumView(
@@ -158,14 +160,16 @@ struct DevBarWidgetEntryView: View {
                 subscriptionName: entry.data.subscriptionName,
                 subscriptionPrice: entry.data.subscriptionPrice,
                 subscriptionExpireDate: entry.data.subscriptionExpireDate,
-                lastUpdated: entry.data.lastUpdated
+                lastUpdated: entry.data.lastUpdated,
+                visualStyle: visualStyle
             )
         case .systemLarge:
             QuotaLargeView(
                 limits: entry.data.limits,
                 level: entry.data.level,
                 subscriptionName: entry.data.subscriptionName,
-                lastUpdated: entry.data.lastUpdated
+                lastUpdated: entry.data.lastUpdated,
+                visualStyle: visualStyle
             )
         default:
             QuotaMediumView(
@@ -175,7 +179,8 @@ struct DevBarWidgetEntryView: View {
                 subscriptionName: entry.data.subscriptionName,
                 subscriptionPrice: entry.data.subscriptionPrice,
                 subscriptionExpireDate: entry.data.subscriptionExpireDate,
-                lastUpdated: entry.data.lastUpdated
+                lastUpdated: entry.data.lastUpdated,
+                visualStyle: visualStyle
             )
         }
     }
@@ -258,6 +263,66 @@ struct LockScreenHelloSquareView: View {
     }
 }
 
+struct DevBarLockScreenHelloWidget: Widget {
+    let kind: String = "DevBarLockScreenHelloWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: LockScreenHelloTimelineProvider()) { _ in
+            LockScreenHelloEntryView()
+                .containerBackground(for: .widget) {
+                    Color.clear
+                }
+        }
+        .configurationDisplayName("DevBar Hello")
+        .description("Show the DevBar Hello signature on the Lock Screen.")
+        .supportedFamilies(supportedFamilies)
+        .containerBackgroundRemovable(true)
+    }
+
+    private var supportedFamilies: [WidgetFamily] {
+        #if os(iOS)
+        [.accessoryRectangular, .accessoryCircular]
+        #else
+        []
+        #endif
+    }
+}
+
+private struct LockScreenHelloEntry: TimelineEntry {
+    let date: Date
+}
+
+private struct LockScreenHelloTimelineProvider: TimelineProvider {
+    func placeholder(in context: Context) -> LockScreenHelloEntry {
+        LockScreenHelloEntry(date: Date())
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (LockScreenHelloEntry) -> Void) {
+        completion(LockScreenHelloEntry(date: Date()))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<LockScreenHelloEntry>) -> Void) {
+        completion(Timeline(entries: [LockScreenHelloEntry(date: Date())], policy: .never))
+    }
+}
+
+private struct LockScreenHelloEntryView: View {
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        #if os(iOS)
+        switch family {
+        case .accessoryCircular:
+            LockScreenHelloSquareView()
+        default:
+            LockScreenHelloView()
+        }
+        #else
+        EmptyView()
+        #endif
+    }
+}
+
 struct DevBarWidget: Widget {
     let kind: String = "DevBarWidget"
 
@@ -267,10 +332,7 @@ struct DevBarWidget: Widget {
             intent: ConfigurationAppIntent.self,
             provider: QuotaTimelineProvider()
         ) { entry in
-            DevBarWidgetEntryView(entry: entry)
-                .containerBackground(for: .widget) {
-                    DevBarWidgetBackground()
-                }
+            DevBarWidgetCompatibilityEntryView(entry: entry)
         }
         .configurationDisplayName(String(localized: "widget_name"))
         .description(String(localized: "widget_description"))
@@ -283,6 +345,32 @@ struct DevBarWidget: Widget {
         [.systemSmall, .systemMedium, .systemLarge, .accessoryCircular, .accessoryRectangular]
         #else
         [.systemSmall, .systemMedium]
+        #endif
+    }
+}
+
+private struct DevBarWidgetCompatibilityEntryView: View {
+    let entry: QuotaEntry
+
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        if isLockScreenFamily {
+            DevBarWidgetEntryView(entry: entry)
+                .containerBackground(for: .widget) {
+                    Color.clear
+                }
+        } else {
+            DevBarWidgetEntryView(entry: entry)
+                .styledWidgetBackground(.liquidGlass)
+        }
+    }
+
+    private var isLockScreenFamily: Bool {
+        #if os(iOS)
+        family == .accessoryCircular || family == .accessoryRectangular
+        #else
+        false
         #endif
     }
 }
@@ -648,42 +736,70 @@ private func lockScreenQuotaMarker(for limit: WidgetQuotaLimit) -> String {
 
 struct NotLoggedInView: View {
     let title: String
+    var visualStyle: WidgetVisualStyle = .liquidGlass
 
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "person.crop.circle.badge.exclamationmark")
                 .font(.title2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(iconColor)
             Text(title)
                 .font(.headline.weight(.semibold))
+                .foregroundStyle(primaryTextColor)
                 .lineLimit(1)
             Text(String(localized: "widget_not_logged_in"))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryTextColor)
                 .multilineTextAlignment(.center)
         }
+    }
+
+    private var primaryTextColor: Color {
+        visualStyle == .transparent ? .primary : .white
+    }
+
+    private var secondaryTextColor: Color {
+        visualStyle == .transparent ? .secondary : .white.opacity(0.58)
+    }
+
+    private var iconColor: Color {
+        visualStyle == .transparent ? .secondary : .white.opacity(0.65)
     }
 }
 
 struct NoDataView: View {
     let title: String
     let lastUpdated: Date
+    var visualStyle: WidgetVisualStyle = .liquidGlass
 
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: "chart.bar.xaxis")
                 .font(.title2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(iconColor)
             Text(title)
                 .font(.headline.weight(.semibold))
+                .foregroundStyle(primaryTextColor)
                 .lineLimit(1)
             Text(String(localized: "widget_waiting_data"))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryTextColor)
             Text(lastUpdated, style: .relative)
                 .font(.caption2)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(secondaryTextColor)
         }
+    }
+
+    private var primaryTextColor: Color {
+        visualStyle == .transparent ? .primary : .white
+    }
+
+    private var secondaryTextColor: Color {
+        visualStyle == .transparent ? .secondary : .white.opacity(0.58)
+    }
+
+    private var iconColor: Color {
+        visualStyle == .transparent ? .secondary : .white.opacity(0.65)
     }
 }
 

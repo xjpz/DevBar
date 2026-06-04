@@ -37,9 +37,6 @@
         }
       }
     },
-    "%@ · AI 额度" : {
-
-    },
     "%@ (%@)" : {
       "localizations" : {
         "zh-Hans" : {
@@ -50,22 +47,39 @@
         }
       }
     },
+    "%@ %lld" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$lld"
+          }
+        }
+      }
+    },
+    "%@ %lld%%" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$lld%%"
+          }
+        }
+      }
+    },
     "%@ 会立即回到登录窗口。" : {
 
     },
     "%lld" : {
 
     },
+    "%lld RUNNING" : {
+
+    },
     "%lld 个任务" : {
 
     },
     "%lld 个任务等待处理" : {
-
-    },
-    "%lld 个任务运行中" : {
-
-    },
-    "%lld 个活跃任务" : {
 
     },
     "%lld%%" : {
@@ -935,7 +949,10 @@
     "Agent Watcher" : {
 
     },
-    "Agent Watcher 背景" : {
+    "AGENT WATCHER" : {
+
+    },
+    "Agent Watcher 通知" : {
 
     },
     "AI 额度" : {
@@ -1286,6 +1303,9 @@
     "DevBar %@" : {
 
     },
+    "DevBar Hello" : {
+
+    },
     "DevBar Lock Screen Quota" : {
 
     },
@@ -1570,6 +1590,9 @@
     "GLM" : {
 
     },
+    "GLM 额度" : {
+
+    },
     "glm_configure_hint" : {
       "localizations" : {
         "en" : {
@@ -1751,6 +1774,9 @@
           }
         }
       }
+    },
+    "HTTPS 图标 URL" : {
+
     },
     "https://github.com/xjpz/DevBar" : {
 
@@ -3275,6 +3301,22 @@
         }
       }
     },
+    "ios_settings_font_xu_jinglei_bold" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xu Jinglei Bold"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "徐静蕾加粗"
+          }
+        }
+      }
+    },
     "ios_settings_font_system" : {
       "localizations" : {
         "en" : {
@@ -3681,6 +3723,7 @@
       }
     },
     "ios_settings_relay_device_name" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3697,6 +3740,7 @@
       }
     },
     "ios_settings_relay_device_name_hint" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3713,6 +3757,7 @@
       }
     },
     "ios_settings_relay_section" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5929,6 +5974,9 @@
         }
       }
     },
+    "iPhone 名称" : {
+
+    },
     "JSON" : {
 
     },
@@ -6136,6 +6184,9 @@
     "Mac Relay, %@" : {
 
     },
+    "Mac 主题" : {
+
+    },
     "Mac：%@" : {
 
     },
@@ -6178,6 +6229,9 @@
 
     },
     "MiMo" : {
+
+    },
+    "MiMo 额度" : {
 
     },
     "mimo_configure_hint" : {
@@ -6820,6 +6874,9 @@
     "OpenAI" : {
 
     },
+    "OpenAI 额度" : {
+
+    },
     "openai_accountid_placeholder" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -7416,6 +7473,9 @@
 
     },
     "Show short-period provider quota usage on the Lock Screen." : {
+
+    },
+    "Show the DevBar Hello signature on the Lock Screen." : {
 
     },
     "show_original" : {
@@ -8916,10 +8976,19 @@
     "二维码生成失败" : {
 
     },
+    "从照片中选择" : {
+
+    },
+    "优先显示需要处理的任务" : {
+
+    },
     "使用说明" : {
 
     },
     "允许" : {
+
+    },
+    "允许离线推送" : {
 
     },
     "关闭" : {
@@ -8932,6 +9001,9 @@
 
     },
     "最近事件" : {
+
+    },
+    "最近同步 %@" : {
 
     },
     "最近授权" : {
@@ -8970,19 +9042,31 @@
     "在线" : {
 
     },
-    "如果二维码过期，请关闭后重新生成。" : {
+    "在线 · %@" : {
 
     },
-    "完全透明背景" : {
+    "头像" : {
+
+    },
+    "如果二维码过期，请关闭后重新生成。" : {
 
     },
     "导入到 iPhone" : {
 
     },
+    "小组件内容" : {
+
+    },
     "尚未绑定 iPhone。生成二维码后，用 iPhone DevBar 扫描完成配对。" : {
 
     },
+    "屏幕：%@" : {
+
+    },
     "工具：%@" : {
+
+    },
+    "已同步 %lld 个 Provider" : {
 
     },
     "当前使用安全中继：账号凭证已在本机加密，服务端只临时保存密文。" : {
@@ -8991,10 +9075,10 @@
     "当前工作目录" : {
 
     },
-    "待授权" : {
+    "当前没有需要处理的任务" : {
 
     },
-    "待连接" : {
+    "待授权" : {
 
     },
     "快速设置" : {
@@ -9024,6 +9108,9 @@
     "推荐" : {
 
     },
+    "推送通知" : {
+
+    },
     "提交代码、写文件、删除、安装、执行等高风险操作也可通过微信 Y 放行" : {
 
     },
@@ -9034,6 +9121,12 @@
 
     },
     "显示二维码" : {
+
+    },
+    "显示内容" : {
+
+    },
+    "显示活跃和等待任务数量" : {
 
     },
     "暂无中继日志" : {
@@ -9054,7 +9147,7 @@
     "标记已处理" : {
 
     },
-    "模糊毛玻璃效果" : {
+    "桌面小组件" : {
 
     },
     "正在读取二维码..." : {
@@ -9072,7 +9165,7 @@
     "深色" : {
 
     },
-    "深色不透明背景" : {
+    "添加到桌面后，可编辑并选择 Provider 额度、Agent Watcher、Mac 主题或翻页时钟。" : {
 
     },
     "添加可切换目录" : {
@@ -9090,6 +9183,15 @@
     "用 iPhone DevBar 扫描二维码完成配对。二维码不包含设备密钥，过期后请重新生成。" : {
 
     },
+    "用于 Mac 上显示连接的 iPhone 名称。" : {
+
+    },
+    "用于 Mac 主题小组件顶部问候语；留空时使用 iPhone 名称。" : {
+
+    },
+    "用户名称" : {
+
+    },
     "电脑" : {
 
     },
@@ -9097,6 +9199,15 @@
 
     },
     "监控 AI 任务状态，查看是否有任务等待处理" : {
+
+    },
+    "离线" : {
+
+    },
+    "离线通知使用已绑定 Relay iPhone。自定义图标仅接受 HTTPS URL。" : {
+
+    },
+    "移除头像" : {
 
     },
     "等待 %@" : {
@@ -9108,19 +9219,28 @@
     "等待中" : {
 
     },
+    "等待你处理" : {
+
+    },
     "等待处理" : {
 
     },
-    "背景模式" : {
+    "等待额度同步" : {
 
     },
-    "请使用大号小组件" : {
+    "翻页时钟" : {
+
+    },
+    "设备与小组件" : {
 
     },
     "迁移到 iPhone" : {
 
     },
     "运行中" : {
+
+    },
+    "运行概览" : {
 
     },
     "运行正常" : {
@@ -9144,16 +9264,25 @@
     "连接中" : {
 
     },
-    "选择小组件的背景样式" : {
+    "选择 Agent Watcher 小组件显示的内容。" : {
 
     },
     "选择当前工作目录，所选目录会加入远程可用目录" : {
+
+    },
+    "选择桌面小组件显示的内容。" : {
 
     },
     "选择默认页面和 AI 额度提供方。" : {
 
     },
     "透明" : {
+
+    },
+    "透明小组件" : {
+
+    },
+    "透明背景小组件，添加后长按可选择 Provider 额度、Agent Watcher、Mac 主题或翻页时钟。" : {
 
     },
     "通知模式" : {
@@ -9199,6 +9328,9 @@
 
     },
     "页面" : {
+
+    },
+    "高频事件摘要" : {
 
     },
     "高风险也允许微信确认" : {

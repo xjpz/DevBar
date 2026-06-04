@@ -9,6 +9,7 @@ struct QuotaSmallView: View {
     let title: String
     let limits: [WidgetQuotaLimit]
     let level: String?
+    var visualStyle: WidgetVisualStyle = .liquidGlass
 
     private var visibleLimits: [WidgetQuotaLimit] {
         let prioritized = limits
@@ -49,7 +50,7 @@ struct QuotaSmallView: View {
 
             ZStack {
                 Circle()
-                    .stroke(Color.secondary.opacity(0.15), lineWidth: 8)
+                    .stroke(circelTrackColor, lineWidth: 8)
                 Circle()
                     .trim(from: 0, to: CGFloat(limit.percentage) / 100.0)
                     .stroke(progressColor(for: limit.percentage), style: StrokeStyle(lineWidth: 8, lineCap: .round))
@@ -58,12 +59,13 @@ struct QuotaSmallView: View {
                 Text("\(limit.percentage)%")
                     .font(.system(.title2, design: .rounded).bold())
                     .monospacedDigit()
+                    .foregroundStyle(primaryTextColor)
             }
             .frame(width: 58, height: 58)
 
             Text(limit.displayName)
                 .font(.system(size: 10.5, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(secondaryTextColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
@@ -76,7 +78,7 @@ struct QuotaSmallView: View {
 
             VStack(alignment: .leading, spacing: visibleLimits.count > 2 ? 7 : 12) {
                 ForEach(visibleLimits) { limit in
-                    QuotaSmallLimitRow(limit: limit)
+                    QuotaSmallLimitRow(limit: limit, visualStyle: visualStyle)
                 }
             }
         }
@@ -87,6 +89,7 @@ struct QuotaSmallView: View {
         HStack(spacing: 4) {
             Text(title)
                 .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundStyle(primaryTextColor)
                 .lineLimit(1)
 
             Spacer(minLength: 4)
@@ -94,11 +97,23 @@ struct QuotaSmallView: View {
             if let lvl = level {
                 Text(lvl.capitalized)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(secondaryTextColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
         }
+    }
+
+    private var primaryTextColor: Color {
+        visualStyle == .transparent ? .primary : .white
+    }
+
+    private var secondaryTextColor: Color {
+        visualStyle == .transparent ? .secondary : .white.opacity(0.65)
+    }
+
+    private var circelTrackColor: Color {
+        visualStyle == .transparent ? Color.secondary.opacity(0.15) : Color.white.opacity(0.18)
     }
 
     private func smallWidgetPriority(_ limit: WidgetQuotaLimit) -> Int {
@@ -127,13 +142,14 @@ struct QuotaSmallView: View {
 
 private struct QuotaSmallLimitRow: View {
     let limit: WidgetQuotaLimit
+    var visualStyle: WidgetVisualStyle = .liquidGlass
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 Text(limit.displayName)
                     .font(.system(size: 10.8, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(secondaryTextColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
 
@@ -149,7 +165,7 @@ private struct QuotaSmallLimitRow: View {
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(.secondary.opacity(0.12))
+                        .fill(trackColor)
                     Capsule()
                         .fill(progressColor)
                         .frame(width: proxy.size.width * CGFloat(limit.percentage) / 100)
@@ -157,6 +173,14 @@ private struct QuotaSmallLimitRow: View {
             }
             .frame(height: 4)
         }
+    }
+
+    private var secondaryTextColor: Color {
+        visualStyle == .transparent ? .secondary : .white.opacity(0.65)
+    }
+
+    private var trackColor: Color {
+        visualStyle == .transparent ? .secondary.opacity(0.12) : .white.opacity(0.15)
     }
 
     private var progressColor: Color {

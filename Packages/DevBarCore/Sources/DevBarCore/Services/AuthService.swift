@@ -11,14 +11,19 @@ public final class AuthService {
         isLoggedIn = credentials.map { !$0.token.isEmpty } ?? false
         if !isLoggedIn {
             credentials = nil
-            keychain.clear()
+            keychain.delete(key: DevBarCoreConstants.Keychain.tokenKey)
+            keychain.delete(key: DevBarCoreConstants.Keychain.cookieKey)
         }
     }
 
-    public func saveCredentials(_ credentials: AuthCredentials) {
+    @discardableResult
+    public func saveCredentials(_ credentials: AuthCredentials) -> Bool {
+        guard keychain.save(credentials: credentials) else {
+            return false
+        }
         self.credentials = credentials
         self.isLoggedIn = true
-        keychain.save(credentials: credentials)
+        return true
     }
 
     public func logout() {

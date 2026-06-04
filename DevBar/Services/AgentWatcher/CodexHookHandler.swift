@@ -80,6 +80,11 @@ class CodexHookHandler {
 
             if let sessionId = payload.sessionId {
                 Task { @MainActor in
+                    sessionStore?.getOrCreateSession(
+                        for: .codexCLI,
+                        sessionId: sessionId,
+                        cwd: payload.cwd
+                    )
                     sessionStore?.updateSession(sessionId, with: event)
                 }
             }
@@ -104,6 +109,11 @@ class CodexHookHandler {
 
             if let sessionId = payload.sessionId {
                 Task { @MainActor in
+                    sessionStore?.getOrCreateSession(
+                        for: .codexCLI,
+                        sessionId: sessionId,
+                        cwd: payload.cwd
+                    )
                     sessionStore?.updateSession(sessionId, with: event)
                 }
             }
@@ -128,6 +138,11 @@ class CodexHookHandler {
 
             if let sessionId = payload.sessionId {
                 Task { @MainActor in
+                    sessionStore?.getOrCreateSession(
+                        for: .codexCLI,
+                        sessionId: sessionId,
+                        cwd: payload.cwd
+                    )
                     sessionStore?.updateSession(sessionId, with: event)
                 }
             }
@@ -144,7 +159,15 @@ class CodexHookHandler {
     private func createPermissionEvent(from payload: CodexHookPayload) -> AgentEvent {
         let toolName = payload.toolName ?? "Unknown"
         let command = payload.toolInput?.command ?? "unknown command"
-        let message = "Codex 等待授权运行: \(command)"
+        let approvalsReviewer = payload.approvalsReviewer ??
+            CodexDesktopPermissionContext.shared.approvalsReviewer(for: payload.sessionId)
+        let canNotifyUser = !CodexPermissionModePolicy.suppressesNotifications(
+            for: payload.permissionMode,
+            approvalsReviewer: approvalsReviewer
+        )
+        let message = canNotifyUser
+            ? "Codex 等待授权运行 \(toolName)"
+            : "Codex 自动审查运行 \(toolName)"
 
         return AgentEvent(
             source: .codexCLI,
@@ -156,14 +179,19 @@ class CodexHookHandler {
             taskTitle: "\(toolName) command",
             message: message,
             rawSnippet: command,
-            requiresUserAction: true,
+            requiresUserAction: canNotifyUser,
             canResolveOnMac: true,
-            canNotifyPhone: true
+            canNotifyPhone: canNotifyUser,
+            canNotifyUser: canNotifyUser
         )
     }
 
     private func createEvent(from payload: CodexHookPayload, eventType: AgentEventType, severity: AgentSeverity) -> AgentEvent {
         let toolName = payload.toolName.map { " (\($0))" } ?? ""
+        let canNotifyUser = !CodexPermissionModePolicy.suppressesNotifications(
+            for: payload.permissionMode,
+            approvalsReviewer: payload.approvalsReviewer
+        )
 
         return AgentEvent(
             source: .codexCLI,
@@ -177,7 +205,8 @@ class CodexHookHandler {
             rawSnippet: payload.toolInput?.command,
             requiresUserAction: eventType.requiresUserAction,
             canResolveOnMac: true,
-            canNotifyPhone: eventType.requiresUserAction
+            canNotifyPhone: canNotifyUser && eventType.requiresUserAction,
+            canNotifyUser: canNotifyUser
         )
     }
 
