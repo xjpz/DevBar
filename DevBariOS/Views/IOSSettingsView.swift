@@ -11,6 +11,9 @@ struct IOSSettingsView: View {
     @State private var isGreetingEditorExpanded = false
     @State private var selectedMacThemeAvatarItem: PhotosPickerItem?
     @State private var macThemeAvatarErrorMessage: String?
+    @State private var versionTapCount = 0
+    @State private var isShowingDebugInfo = false
+    @State private var copiedDebugItemID: String?
 
     private let intervals: [(LocalizedStringKey, TimeInterval)] = [
         ("ios_settings_interval_3m", 180),
@@ -189,6 +192,52 @@ struct IOSSettingsView: View {
             }
 
             Section {
+                LabeledContent {
+                    Text(appViewModel.devBarLiveMessageStatus.title)
+                        .foregroundStyle(devBarLiveMessageStatusColor)
+                } label: {
+                    Label("一句话上岛", systemImage: "capsule.portrait")
+                }
+
+                TextField("输入要显示在灵动岛的一句文案", text: $appViewModel.devBarLiveMessageDraft, axis: .vertical)
+                    .lineLimit(1...3)
+                    .textInputAutocapitalization(.sentences)
+                    .autocorrectionDisabled(false)
+                    .accessibilityIdentifier("ios.settings.liveMessage.text")
+
+                Text(appViewModel.devBarLiveMessageStatus.detail)
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+
+                HStack(spacing: 12) {
+                    Button {
+                        Task { await appViewModel.enableDevBarLiveMessageIsland(message: appViewModel.devBarLiveMessageDraft) }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles")
+                                .font(.body.weight(.semibold))
+                            Text("上岛")
+                        }
+                        .frame(minWidth: 72)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canEnableDevBarLiveMessage)
+
+                    Button(role: .destructive) {
+                        Task { await appViewModel.disableDevBarLiveMessageIsland() }
+                    } label: {
+                        Label("结束", systemImage: "xmark.circle")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!canDisableDevBarLiveMessage)
+                }
+            } header: {
+                Label("DevBar Live Message", systemImage: "iphone.radiowaves.left.and.right")
+            } footer: {
+                Text("本机输入文案点击上岛会立即显示到灵动岛；服务端 API 推送是另一条上岛途径，会显示 API 传来的文案。")
+            }
+
+            Section {
                 ForEach(appViewModel.availableHomeScreenShortcutActions, id: \.self) { action in
                     Toggle(isOn: homeScreenShortcutBinding(for: action)) {
                         Label {
@@ -241,7 +290,11 @@ struct IOSSettingsView: View {
 
             Section {
                 LabeledContent("ios_settings_app_label", value: String(localized: "ios_settings_app_name"))
-                LabeledContent("ios_settings_version_label", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+                LabeledContent("ios_settings_version_label", value: appVersionText)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        handleVersionTap()
+                    }
             } header: {
                 Text("ios_settings_about_section")
             } footer: {
@@ -259,6 +312,13 @@ struct IOSSettingsView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.hidden, for: .tabBar)
         .accessibilityIdentifier("ios.settings.screen")
+        .sheet(isPresented: $isShowingDebugInfo) {
+            IOSSettingsDebugInfoSheet(
+                items: debugInfoItems,
+                copiedItemID: copiedDebugItemID,
+                onCopy: copyDebugValue
+            )
+        }
         .onChange(of: selectedMacThemeAvatarItem) { _, item in
             guard let item else { return }
             Task {
@@ -340,6 +400,73 @@ struct IOSSettingsView: View {
             .map(String.init) ?? IOSThemeManager.defaultGreeting
     }
 
+    private var appVersionText: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
+        guard let build, !build.isEmpty else { return version }
+        return "\(version) (\(build))"
+    }
+
+    private var debugInfoItems: [IOSSettingsDebugInfoItem] {
+        let relayManager = appViewModel.deviceRelayManager
+        let pushDebug = IOSPushNotificationCoordinator.shared.debugSnapshot()
+        let peers = relayManager.peers
+            .map { peer in
+                let name = peer.deviceName?.isEmpty == false ? peer.deviceName! : peer.deviceId
+                return "\(name) / \(peer.deviceType.rawValue) / \(peer.deviceId)"
+            }
+            .joined(separator: "\n")
+
+        return [
+            IOSSettingsDebugInfoItem(title: "App Version", value: appVersionText),
+            IOSSettingsDebugInfoItem(title: "Bundle ID", value: Bundle.main.bundleIdentifier ?? "未获取"),
+            IOSSettingsDebugInfoItem(title: "Relay API", value: DevBarCoreConstants.DeviceRelay.baseURL),
+            IOSSettingsDebugInfoItem(title: "Relay Device ID", value: relayManager.localDeviceID ?? "未注册"),
+            IOSSettingsDebugInfoItem(title: "Relay Device Token", value: relayManager.deviceToken ?? "未注册"),
+            IOSSettingsDebugInfoItem(title: "Relay State", value: relayConnectionStateText(relayManager.connectionState)),
+            IOSSettingsDebugInfoItem(title: "Relay Transport", value: relayManager.activeTransport.rawValue),
+            IOSSettingsDebugInfoItem(title: "Push Environment", value: IOSPushNotificationCoordinator.pushEnvironment.rawValue),
+            IOSSettingsDebugInfoItem(title: "APNs Token", value: pushDebug.apnsToken ?? "未注册"),
+            IOSSettingsDebugInfoItem(title: "Live Activity Push-to-Start Token", value: pushDebug.liveActivityPushToStartToken ?? "未获取"),
+            IOSSettingsDebugInfoItem(title: "Last Push Registration", value: pushDebug.lastPushRegistration ?? "未同步"),
+            IOSSettingsDebugInfoItem(title: "Last Live Activity Push-to-Start Registration", value: pushDebug.lastLiveActivityPushToStartRegistration ?? "未同步"),
+            IOSSettingsDebugInfoItem(title: "Paired Devices", value: peers.isEmpty ? "无" : peers),
+            IOSSettingsDebugInfoItem(title: "Last Relay Error", value: relayManager.lastErrorMessage ?? "无"),
+        ]
+    }
+
+    private func handleVersionTap() {
+        versionTapCount += 1
+        if versionTapCount >= 5 {
+            versionTapCount = 0
+            isShowingDebugInfo = true
+        }
+    }
+
+    private func copyDebugValue(_ item: IOSSettingsDebugInfoItem) {
+        UIPasteboard.general.string = item.value
+        copiedDebugItemID = item.id
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            if copiedDebugItemID == item.id {
+                copiedDebugItemID = nil
+            }
+        }
+    }
+
+    private func relayConnectionStateText(_ state: DeviceRelayConnectionState) -> String {
+        switch state {
+        case .disconnected:
+            return "disconnected"
+        case .connecting:
+            return "connecting"
+        case .connected:
+            return "connected"
+        case .failed(let message):
+            return "failed: \(message)"
+        }
+    }
+
     private var liveActivityStartBinding: Binding<Date> {
         Binding {
             date(hour: appViewModel.liveActivitySettings.startHour, minute: appViewModel.liveActivitySettings.startMinute)
@@ -385,6 +512,38 @@ struct IOSSettingsView: View {
         }
     }
 
+    private var canEnableDevBarLiveMessage: Bool {
+        let hasMessage = !appViewModel.devBarLiveMessageDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        switch appViewModel.devBarLiveMessageStatus {
+        case .notReady, .ready, .active, .failed:
+            return hasMessage
+        case .enabling:
+            return false
+        }
+    }
+
+    private var canDisableDevBarLiveMessage: Bool {
+        if case .active = appViewModel.devBarLiveMessageStatus {
+            return true
+        }
+        return false
+    }
+
+    private var devBarLiveMessageStatusColor: Color {
+        switch appViewModel.devBarLiveMessageStatus {
+        case .active:
+            .green
+        case .failed:
+            .orange
+        case .enabling:
+            theme.textSecondary
+        case .ready:
+            theme.textPrimary
+        case .notReady:
+            theme.textTertiary
+        }
+    }
+
     private func homeScreenShortcutIcon(for action: DeviceRelayHomeScreenShortcutAction) -> String {
         switch action {
         case .memo: return "note.text"
@@ -395,5 +554,68 @@ struct IOSSettingsView: View {
         case .wakeMacDisplay: return "sun.max.fill"
         case .sleepMacDisplay: return "display"
         }
+    }
+}
+
+private struct IOSSettingsDebugInfoItem: Identifiable {
+    let title: String
+    let value: String
+
+    var id: String { title }
+}
+
+private struct IOSSettingsDebugInfoSheet: View {
+    let items: [IOSSettingsDebugInfoItem]
+    let copiedItemID: String?
+    let onCopy: (IOSSettingsDebugInfoItem) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.themeTokens) private var theme
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(items) { item in
+                        Button {
+                            onCopy(item)
+                        } label: {
+                            HStack(alignment: .center, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(item.title)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(theme.textSecondary)
+
+                                    Text(item.value)
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(theme.textPrimary)
+                                        .lineLimit(4)
+                                        .textSelection(.enabled)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Image(systemName: copiedItemID == item.id ? "checkmark.circle.fill" : "doc.on.doc")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(copiedItemID == item.id ? .green : theme.textTertiary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } footer: {
+                    Text("点击任意值复制到剪贴板。")
+                }
+            }
+            .navigationTitle("调试信息")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }

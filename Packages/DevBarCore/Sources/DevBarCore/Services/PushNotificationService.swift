@@ -54,6 +54,54 @@ public final class PushNotificationService: Sendable {
         )
     }
 
+    public func registerLiveActivityPushToStart(
+        _ registration: LiveActivityPushToStartRegistration,
+        deviceToken: String
+    ) async throws -> LiveActivityPushToStartRegistrationResponse {
+        try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.liveActivityPushToStartPath,
+            method: "POST",
+            body: registration,
+            bearerToken: deviceToken
+        )
+    }
+
+    public func registerLiveActivity(
+        _ registration: LiveActivityPushRegistration,
+        deviceToken: String
+    ) async throws -> LiveActivityPushRegistrationResponse {
+        try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.liveActivitiesPath,
+            method: "POST",
+            body: registration,
+            bearerToken: deviceToken
+        )
+    }
+
+    public func sendLiveMessage(
+        _ message: LiveMessageRequest,
+        deviceToken: String
+    ) async throws -> LiveMessageResponse {
+        try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.liveMessagePath,
+            method: "POST",
+            body: message,
+            bearerToken: deviceToken
+        )
+    }
+
+    public func sendSMSAlert(
+        _ alert: SMSAlertRequest,
+        deviceToken: String
+    ) async throws -> SMSAlertResponse {
+        try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.smsAlertPath,
+            method: "POST",
+            body: alert,
+            bearerToken: deviceToken
+        )
+    }
+
     private func sendJSON<RequestBody: Encodable, ResponseBody: Decodable>(
         path: String,
         method: String,

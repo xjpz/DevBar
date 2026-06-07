@@ -155,6 +155,8 @@ public enum DeviceRelayMessageType: String, Codable, Sendable, Equatable {
     case systemCommandResult = "system.command.result"
     case systemStatusRequest = "system.status.request"
     case systemStatus = "system.status"
+    case smsAlert = "sms.alert"
+    case smsAlertAck = "sms.alert.ack"
     case localChallenge = "local.challenge"
     case localAuth = "local.auth"
     case localReady = "local.ready"

@@ -37,6 +37,129 @@ import Testing
     #expect(await recorder.lastRequest?.httpMethod == "GET")
 }
 
+@Test func pushToStartRegistrationUsesExpectedPathAndBody() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"registered":true,"activityType":"devbar_live_message"}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+
+    let response = try await service.registerLiveActivityPushToStart(
+        .init(
+            activityType: .devBarLiveMessage,
+            pushToStartToken: "start-token",
+            bundleId: "cc.xjpz.DevBar",
+            environment: .development,
+            minimumIOSVersion: "17.2"
+        ),
+        deviceToken: "relay-token"
+    )
+
+    #expect(response.registered)
+    #expect(response.activityType == .devBarLiveMessage)
+    #expect(await recorder.lastRequest?.url?.path == "/api/devbar/push/live-activities/push-to-start")
+    #expect(await recorder.lastRequest?.value(forHTTPHeaderField: "Authorization") == "Bearer relay-token")
+    let body = try #require(await recorder.lastRequestBody)
+    let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
+    #expect(json["activityType"] == "devbar_live_message")
+    #expect(json["pushToStartToken"] == "start-token")
+    #expect(json["bundleId"] == "cc.xjpz.DevBar")
+}
+
+@Test func liveActivityRegistrationUsesExpectedPathAndBody() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"registered":true,"activityId":"activity-unit"}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+
+    let response = try await service.registerLiveActivity(
+        .init(
+            activityId: "activity-unit",
+            activityType: .devBarLiveMessage,
+            activityPushToken: "update-token",
+            bundleId: "cc.xjpz.DevBar",
+            environment: .development,
+            startedBy: .local
+        ),
+        deviceToken: "relay-token"
+    )
+
+    #expect(response.registered)
+    #expect(response.activityId == "activity-unit")
+    #expect(await recorder.lastRequest?.url?.path == "/api/devbar/push/live-activities")
+    let body = try #require(await recorder.lastRequestBody)
+    let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
+    #expect(json["activityPushToken"] == "update-token")
+    #expect(json["startedBy"] == "local")
+}
+
+@Test func liveMessageSendUsesRemoteStartAndFallbackFlags() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"delivery":"live_activity","activityId":"activity-unit","startedBy":"remote","fallbackSent":false}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+
+    let response = try await service.sendLiveMessage(
+        .init(
+            targetDeviceId: "iphone-unit",
+            message: "构建完成，可以审核了",
+            source: "Codex",
+            projectName: "DevBar",
+            eventId: "evt-unit",
+            allowRemoteStart: true,
+            fallbackNotification: true
+        ),
+        deviceToken: "relay-token"
+    )
+
+    #expect(response.delivery == .liveActivity)
+    #expect(response.startedBy == .remote)
+    #expect(response.fallbackSent == false)
+    #expect(await recorder.lastRequest?.url?.path == "/api/devbar/push/live-message")
+    let body = try #require(await recorder.lastRequestBody)
+    let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+    #expect(json["message"] as? String == "构建完成，可以审核了")
+    #expect(json["allowRemoteStart"] as? Bool == true)
+    #expect(json["fallbackNotification"] as? Bool == true)
+}
+
+@Test func smsAlertSendUsesExpectedPathAndShortcutPayload() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"eventId":"sms-unit","targetDeviceId":"mac-unit","delivery":"relay_forwarded","fallbackSent":false,"duplicate":false}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+
+    let response = try await service.sendSMSAlert(
+        .init(
+            targetDeviceId: "mac-unit",
+            messageText: "您的验证码是 123456",
+            sender: "955xx",
+            matchedKeyword: "验证码",
+            notificationTitle: "银行验证码",
+            receivedAt: 1_780_660_000_000,
+            dedupKey: "sms-dedup-unit",
+            fallbackNotification: true
+        ),
+        deviceToken: "relay-token"
+    )
+
+    #expect(response.delivery == .relayForwarded)
+    #expect(response.eventId == "sms-unit")
+    #expect(response.targetDeviceId == "mac-unit")
+    #expect(response.fallbackSent == false)
+    #expect(response.duplicate == false)
+    #expect(await recorder.lastRequest?.url?.path == "/api/devbar/push/sms-alert")
+    #expect(await recorder.lastRequest?.value(forHTTPHeaderField: "Authorization") == "Bearer relay-token")
+    let body = try #require(await recorder.lastRequestBody)
+    let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+    #expect(json["messageText"] as? String == "您的验证码是 123456")
+    #expect(json["sender"] as? String == "955xx")
+    #expect(json["matchedKeyword"] as? String == "验证码")
+    #expect(json["notificationTitle"] as? String == "银行验证码")
+    #expect(json["targetDeviceId"] as? String == "mac-unit")
+    #expect(json["dedupKey"] as? String == "sms-dedup-unit")
+    #expect(json["fallbackNotification"] as? Bool == true)
+}
+
 private final class PushRequestRecorder: @unchecked Sendable {
     private let store = Store()
     let session: URLSession

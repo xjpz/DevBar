@@ -2,6 +2,9 @@ import DevBarCore
 import Foundation
 import UIKit
 import UserNotifications
+#if canImport(ActivityKit)
+import ActivityKit
+#endif
 
 @MainActor
 final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDelegate {
@@ -10,11 +13,24 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
     private enum Keys {
         static let apnsToken = "ios.push.apnsToken"
         static let lastRegistration = "ios.push.lastRegistration"
+        static let lastLiveActivityPushToStartRegistration = "ios.push.lastLiveActivityPushToStartRegistration"
+        static let lastLiveActivityRegistrationPrefix = "ios.push.lastLiveActivityRegistration."
+        static let liveActivityPushToStartToken = "ios.push.liveActivityPushToStartToken"
         static let preferences = "ios.push.preferences"
     }
 
     private let defaults = UserDefaults.standard
     private let service = PushNotificationService.shared
+    private var latestRelayDeviceToken: String?
+#if canImport(ActivityKit)
+    private var isObservingLiveActivityTokens = false
+    private var observedActivityIDs: Set<String> = []
+#endif
+
+    private override init() {
+        super.init()
+        startLiveActivityTokenObservation()
+    }
 
     func requestAuthorization(application: UIApplication) {
         let center = UNUserNotificationCenter.current()
@@ -40,7 +56,16 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
         print("[DevBar:iOSPush] APNs registration failed: \(error)")
     }
 
-    func syncRegistration(relayDeviceToken: String?) async {
+    func clearApplicationBadge() {
+        UNUserNotificationCenter.current().setBadgeCount(0) { error in
+            if let error {
+                print("[DevBar:iOSPush] Clear badge failed: \(error)")
+            }
+        }
+    }
+
+    func syncRegistration(relayDeviceToken: String?, force: Bool = false) async {
+        latestRelayDeviceToken = relayDeviceToken
         guard let relayDeviceToken, !relayDeviceToken.isEmpty,
               let apnsToken = defaults.string(forKey: Keys.apnsToken), !apnsToken.isEmpty
         else { return }
@@ -54,7 +79,7 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
 
         let bundleId = Bundle.main.bundleIdentifier ?? "cc.xjpz.DevBariOS"
         let fingerprint = "\(apnsToken)|\(bundleId)|\(environment.rawValue)|\(relayDeviceToken)"
-        guard defaults.string(forKey: Keys.lastRegistration) != fingerprint else { return }
+        guard force || defaults.string(forKey: Keys.lastRegistration) != fingerprint else { return }
 
         do {
             _ = try await service.register(
@@ -67,6 +92,7 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
                 deviceToken: relayDeviceToken
             )
             defaults.set(fingerprint, forKey: Keys.lastRegistration)
+            await syncLiveActivityPushToStart(relayDeviceToken: relayDeviceToken, force: force)
         } catch {
             print("[DevBar:iOSPush] Push token sync failed: \(error)")
         }
@@ -91,16 +117,141 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
         return preferences
     }
 
+    func debugSnapshot() -> IOSPushNotificationDebugSnapshot {
+        IOSPushNotificationDebugSnapshot(
+            apnsToken: defaults.string(forKey: Keys.apnsToken),
+            liveActivityPushToStartToken: defaults.string(forKey: Keys.liveActivityPushToStartToken),
+            lastPushRegistration: defaults.string(forKey: Keys.lastRegistration),
+            lastLiveActivityPushToStartRegistration: defaults.string(forKey: Keys.lastLiveActivityPushToStartRegistration)
+        )
+    }
+
     private func savePreferences(_ preferences: PushNotificationPreferences) {
         guard let data = try? JSONEncoder().encode(preferences) else { return }
         defaults.set(data, forKey: Keys.preferences)
     }
 
+    func syncLiveActivityPushToStart(relayDeviceToken: String?, force: Bool = false) async {
+        latestRelayDeviceToken = relayDeviceToken
+        guard let relayDeviceToken, !relayDeviceToken.isEmpty,
+              let token = defaults.string(forKey: Keys.liveActivityPushToStartToken), !token.isEmpty
+        else { return }
+
+        let registration = LiveActivityPushToStartRegistration(
+            activityType: .devBarLiveMessage,
+            pushToStartToken: token,
+            bundleId: Self.bundleIdentifier,
+            environment: Self.pushEnvironment,
+            minimumIOSVersion: "17.2"
+        )
+        let fingerprint = "\(token)|\(registration.bundleId)|\(registration.environment.rawValue)|\(relayDeviceToken)"
+        guard force || defaults.string(forKey: Keys.lastLiveActivityPushToStartRegistration) != fingerprint else { return }
+
+        do {
+            _ = try await service.registerLiveActivityPushToStart(registration, deviceToken: relayDeviceToken)
+            defaults.set(fingerprint, forKey: Keys.lastLiveActivityPushToStartRegistration)
+        } catch {
+            print("[DevBar:iOSPush] Live Activity push-to-start sync failed: \(error)")
+        }
+    }
+
+    func syncLiveActivityRegistration(_ registration: LiveActivityPushRegistration, relayDeviceToken: String?) async {
+        latestRelayDeviceToken = relayDeviceToken
+        guard let relayDeviceToken, !relayDeviceToken.isEmpty else { return }
+
+        let fingerprint = "\(registration.activityPushToken)|\(registration.bundleId)|\(registration.environment.rawValue)|\(relayDeviceToken)|\(registration.startedBy.rawValue)"
+        let key = Keys.lastLiveActivityRegistrationPrefix + registration.activityId
+        guard defaults.string(forKey: key) != fingerprint else { return }
+
+        do {
+            _ = try await service.registerLiveActivity(registration, deviceToken: relayDeviceToken)
+            defaults.set(fingerprint, forKey: key)
+        } catch {
+            print("[DevBar:iOSPush] Live Activity update token sync failed: \(error)")
+        }
+    }
+
+    static var bundleIdentifier: String {
+        Bundle.main.bundleIdentifier ?? "cc.xjpz.DevBar"
+    }
+
+    static var pushEnvironment: PushEnvironment {
+        #if DEBUG
+        .development
+        #else
+        .production
+        #endif
+    }
+
+    private func startLiveActivityTokenObservation() {
+        #if canImport(ActivityKit)
+        guard !isObservingLiveActivityTokens else { return }
+        isObservingLiveActivityTokens = true
+
+        if #available(iOS 17.2, *) {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                for await tokenData in Activity<DevBarLiveMessageActivityAttributes>.pushToStartTokenUpdates {
+                    let token = tokenData.hexString
+                    self.defaults.set(token, forKey: Keys.liveActivityPushToStartToken)
+                    NotificationCenter.default.post(name: .iosLiveActivityPushToStartTokenChanged, object: nil)
+                    await self.syncLiveActivityPushToStart(relayDeviceToken: self.latestRelayDeviceToken)
+                }
+            }
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            for activity in Activity<DevBarLiveMessageActivityAttributes>.activities {
+                self.observeLiveActivityUpdateTokens(activity)
+            }
+            for await activity in Activity<DevBarLiveMessageActivityAttributes>.activityUpdates {
+                self.observeLiveActivityUpdateTokens(activity)
+            }
+        }
+        #endif
+    }
+
+    #if canImport(ActivityKit)
+    private func observeLiveActivityUpdateTokens(_ activity: Activity<DevBarLiveMessageActivityAttributes>) {
+        guard observedActivityIDs.insert(activity.id).inserted else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if let pushToken = activity.pushToken {
+                await self.syncLiveActivityRegistration(
+                    LiveActivityPushRegistration(
+                        activityId: activity.id,
+                        activityType: .devBarLiveMessage,
+                        activityPushToken: pushToken.hexString,
+                        bundleId: Self.bundleIdentifier,
+                        environment: Self.pushEnvironment,
+                        startedBy: .remote
+                    ),
+                    relayDeviceToken: self.latestRelayDeviceToken
+                )
+            }
+            for await tokenData in activity.pushTokenUpdates {
+                await self.syncLiveActivityRegistration(
+                    LiveActivityPushRegistration(
+                        activityId: activity.id,
+                        activityType: .devBarLiveMessage,
+                        activityPushToken: tokenData.hexString,
+                        bundleId: Self.bundleIdentifier,
+                        environment: Self.pushEnvironment,
+                        startedBy: .remote
+                    ),
+                    relayDeviceToken: self.latestRelayDeviceToken
+                )
+            }
+        }
+    }
+    #endif
+
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound, .badge]
+        [.banner, .list, .sound]
     }
 
     nonisolated func userNotificationCenter(
@@ -117,7 +268,21 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
     }
 }
 
+struct IOSPushNotificationDebugSnapshot {
+    let apnsToken: String?
+    let liveActivityPushToStartToken: String?
+    let lastPushRegistration: String?
+    let lastLiveActivityPushToStartRegistration: String?
+}
+
 extension Notification.Name {
     static let iosAPNsTokenChanged = Notification.Name("iosAPNsTokenChanged")
     static let iosAgentWatcherNotificationOpened = Notification.Name("iosAgentWatcherNotificationOpened")
+    static let iosLiveActivityPushToStartTokenChanged = Notification.Name("iosLiveActivityPushToStartTokenChanged")
+}
+
+private extension Data {
+    var hexString: String {
+        map { String(format: "%02x", $0) }.joined()
+    }
 }

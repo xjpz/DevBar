@@ -10,9 +10,14 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         willConnectTo session: UISceneSession,
         options connectionOptions: UIScene.ConnectionOptions
     ) {
+        IOSPushNotificationCoordinator.shared.clearApplicationBadge()
         if let shortcutItem = connectionOptions.shortcutItem {
             ShortcutStore.shared.handle(mapAction(shortcutItem))
         }
+    }
+
+    func sceneDidBecomeActive(_ scene: UIScene) {
+        IOSPushNotificationCoordinator.shared.clearApplicationBadge()
     }
 
     func windowScene(

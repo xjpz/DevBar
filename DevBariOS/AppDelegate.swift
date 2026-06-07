@@ -11,7 +11,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         IOSPushNotificationCoordinator.shared.requestAuthorization(application: application)
+        IOSPushNotificationCoordinator.shared.clearApplicationBadge()
         return true
+    }
+
+    func applicationDidBecomeActive(_ application: UIApplication) {
+        IOSPushNotificationCoordinator.shared.clearApplicationBadge()
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {

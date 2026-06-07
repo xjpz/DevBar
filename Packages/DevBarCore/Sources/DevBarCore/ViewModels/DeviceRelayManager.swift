@@ -644,6 +644,66 @@ public final class DeviceRelayManager: ObservableObject {
         )
     }
 
+    public static func makeSMSAlertMessage(
+        localDeviceID: String,
+        targetDeviceId: String,
+        messageText: String,
+        sender: String? = nil,
+        matchedKeyword: String? = nil,
+        notificationTitle: String? = nil,
+        receivedAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)
+    ) -> DeviceRelayMessage {
+        var payload: [String: String] = [
+            "messageText": messageText,
+            "source": DeviceRelaySMSAlert.source,
+            "receivedAt": "\(receivedAt)",
+            "dedupKey": DeviceRelaySMSAlert.dedupKey(
+                sender: sender,
+                messageText: messageText,
+                receivedAt: receivedAt
+            ),
+        ]
+        if let sender = normalizedDeviceName(sender) {
+            payload["sender"] = sender
+        }
+        if let matchedKeyword = normalizedDeviceName(matchedKeyword) {
+            payload["matchedKeyword"] = matchedKeyword
+        }
+        if let notificationTitle = normalizedDeviceName(notificationTitle) {
+            payload["notificationTitle"] = notificationTitle
+        }
+        return DeviceRelayMessage(
+            type: .smsAlert,
+            requestId: "sms-\(UUID().uuidString.lowercased())",
+            fromDeviceId: localDeviceID,
+            targetDeviceId: targetDeviceId,
+            timestamp: receivedAt,
+            payload: payload
+        )
+    }
+
+    public static func makeSMSAlertAckMessage(
+        localDeviceID: String,
+        targetDeviceId: String,
+        requestId: String?,
+        status: String,
+        detail: String,
+        shownAt: Int64 = Int64(Date().timeIntervalSince1970 * 1000)
+    ) -> DeviceRelayMessage {
+        DeviceRelayMessage(
+            type: .smsAlertAck,
+            requestId: requestId,
+            fromDeviceId: localDeviceID,
+            targetDeviceId: targetDeviceId,
+            timestamp: shownAt,
+            payload: [
+                "status": status,
+                "message": detail,
+                "shownAt": "\(shownAt)",
+            ]
+        )
+    }
+
     private func handle(_ message: DeviceRelayMessage) {
         switch message.type {
         case .relayConnected:

@@ -470,6 +470,75 @@ func deviceRelayControlCommandTypesMapToWireValues() {
     #expect(DeviceRelayCommandType.displaySleep.rawValue == "displaySleep")
 }
 
+@MainActor
+@Test
+func deviceRelaySMSAlertMessageCarriesShortcutPayloadAndStableDedupKey() throws {
+    let message = DeviceRelayManager.makeSMSAlertMessage(
+        localDeviceID: "iphone-unit",
+        targetDeviceId: "mac-unit",
+        messageText: "验证码 123456，请勿泄露",
+        sender: "955xx",
+        matchedKeyword: "验证码",
+        notificationTitle: "银行验证码",
+        receivedAt: 1_716_120_045_000
+    )
+    let repeated = DeviceRelayManager.makeSMSAlertMessage(
+        localDeviceID: "iphone-unit",
+        targetDeviceId: "mac-unit",
+        messageText: "验证码 123456，请勿泄露",
+        sender: "955xx",
+        matchedKeyword: "验证码",
+        receivedAt: 1_716_120_049_000
+    )
+
+    let encoded = try DeviceRelayMessageCodec.encode(message)
+    let decoded = try DeviceRelayMessageCodec.decode(encoded)
+
+    #expect(decoded.type == .smsAlert)
+    #expect(decoded.requestId?.hasPrefix("sms-") == true)
+    #expect(decoded.fromDeviceId == "iphone-unit")
+    #expect(decoded.targetDeviceId == "mac-unit")
+    #expect(decoded.payload["messageText"] == "验证码 123456，请勿泄露")
+    #expect(decoded.payload["sender"] == "955xx")
+    #expect(decoded.payload["matchedKeyword"] == "验证码")
+    #expect(decoded.payload["notificationTitle"] == "银行验证码")
+    #expect(decoded.payload["source"] == "shortcuts.messageAutomation")
+    #expect(decoded.payload["receivedAt"] == "1716120045000")
+    #expect(decoded.payload["dedupKey"] == repeated.payload["dedupKey"])
+    #expect(decoded.payload["dedupKey"]?.isEmpty == false)
+}
+
+@Test
+func smsAlertSummaryTrimsWhitespaceAndLimitsDisplayedContent() {
+    let longText = "  " + String(repeating: "验证码", count: 90) + "  "
+
+    let summary = DeviceRelaySMSAlert.summary(for: longText, limit: 12)
+
+    #expect(summary == "验证码验证码验证码验证码...")
+}
+
+@MainActor
+@Test
+func deviceRelaySMSAlertAckMessageReportsShownStatus() throws {
+    let message = DeviceRelayManager.makeSMSAlertAckMessage(
+        localDeviceID: "mac-unit",
+        targetDeviceId: "iphone-unit",
+        requestId: "sms-unit",
+        status: "shown",
+        detail: "Mac 已提醒",
+        shownAt: 1_716_120_050_000
+    )
+
+    let encoded = try DeviceRelayMessageCodec.encode(message)
+    let decoded = try DeviceRelayMessageCodec.decode(encoded)
+
+    #expect(decoded.type == .smsAlertAck)
+    #expect(decoded.requestId == "sms-unit")
+    #expect(decoded.payload["status"] == "shown")
+    #expect(decoded.payload["message"] == "Mac 已提醒")
+    #expect(decoded.payload["shownAt"] == "1716120050000")
+}
+
 @Test
 func homeScreenQuickActionsShowLockMacOnlyWhenPairedMacExists() {
     let withoutMac = DeviceRelayHomeScreenShortcutPolicy.availableActions(hasPairedMac: false)

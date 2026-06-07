@@ -26,6 +26,44 @@ final class IOSAppViewModel: ObservableObject {
         case tools
     }
 
+    enum DevBarLiveMessageStatus: Equatable {
+        case notReady
+        case ready
+        case enabling
+        case active
+        case failed(String)
+
+        var title: String {
+            switch self {
+            case .notReady:
+                "可本机上岛"
+            case .ready:
+                "可上岛"
+            case .enabling:
+                "正在上岛"
+            case .active:
+                "已上岛"
+            case .failed:
+                "上岛失败"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .notReady:
+                "本机输入文案可直接上岛；完成 Relay 绑定后，服务端 API 也可远程推送上岛。"
+            case .ready:
+                "输入一句文案即可本机上岛；服务端 API 也可远程推送上岛。"
+            case .enabling:
+                "正在把文案显示到灵动岛。"
+            case .active:
+                "文案已显示在灵动岛；后续 API 推送会显示 API 的新文案。"
+            case .failed(let message):
+                message
+            }
+        }
+    }
+
     @Published var selectedTab: TabSelection = .dashboard
     @Published var accountConfigs: [AccountConfig] {
         didSet {
@@ -85,6 +123,8 @@ final class IOSAppViewModel: ObservableObject {
     @Published private(set) var availableHomeScreenShortcutActions: [DeviceRelayHomeScreenShortcutAction]
     @Published private(set) var selectedHomeScreenShortcutActions: [DeviceRelayHomeScreenShortcutAction]
     @Published private(set) var dashboardScanRequestID: UUID?
+    @Published private(set) var devBarLiveMessageStatus: DevBarLiveMessageStatus = .ready
+    @Published var devBarLiveMessageDraft: String = ""
 
     let quotaViewModel = QuotaViewModel()
     let openAIQuotaViewModel = OpenAIQuotaViewModel()
@@ -126,8 +166,21 @@ final class IOSAppViewModel: ObservableObject {
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     await IOSPushNotificationCoordinator.shared.syncRegistration(
-                        relayDeviceToken: self.deviceRelayManager.deviceToken
+                        relayDeviceToken: self.deviceRelayManager.deviceToken,
+                        force: true
                     )
+                }
+            }
+            .store(in: &childObservers)
+        NotificationCenter.default.publisher(for: .iosLiveActivityPushToStartTokenChanged)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    await IOSPushNotificationCoordinator.shared.syncLiveActivityPushToStart(
+                        relayDeviceToken: self.deviceRelayManager.deviceToken,
+                        force: true
+                    )
+                    self.refreshDevBarLiveMessageReadiness()
                 }
             }
             .store(in: &childObservers)
@@ -135,8 +188,14 @@ final class IOSAppViewModel: ObservableObject {
             guard let self else { return }
             await self.deviceRelayManager.setup(deviceType: .iPhone, deviceName: self.relayDeviceName)
             await IOSPushNotificationCoordinator.shared.syncRegistration(
-                relayDeviceToken: self.deviceRelayManager.deviceToken
+                relayDeviceToken: self.deviceRelayManager.deviceToken,
+                force: true
             )
+            await IOSPushNotificationCoordinator.shared.syncLiveActivityPushToStart(
+                relayDeviceToken: self.deviceRelayManager.deviceToken,
+                force: true
+            )
+            self.refreshDevBarLiveMessageReadiness()
             await self.refreshHomeScreenShortcuts()
             self.syncMacThemeWidgetSnapshot()
         }
@@ -242,7 +301,9 @@ final class IOSAppViewModel: ObservableObject {
 
     func refreshOnForeground() async {
         await deviceRelayManager.resumeConnectivity(deviceType: .iPhone, deviceName: relayDeviceName)
-        await IOSPushNotificationCoordinator.shared.syncRegistration(relayDeviceToken: deviceRelayManager.deviceToken)
+        await IOSPushNotificationCoordinator.shared.syncRegistration(relayDeviceToken: deviceRelayManager.deviceToken, force: true)
+        await IOSPushNotificationCoordinator.shared.syncLiveActivityPushToStart(relayDeviceToken: deviceRelayManager.deviceToken, force: true)
+        refreshDevBarLiveMessageReadiness()
         await refreshHomeScreenShortcuts()
 
         guard let lastRefresh = latestRefreshDate else {
@@ -393,7 +454,8 @@ final class IOSAppViewModel: ObservableObject {
 
     func pairMacDevice(from rawValue: String) async throws {
         try await deviceRelayManager.confirmPairing(from: rawValue, deviceName: relayDeviceName)
-        await IOSPushNotificationCoordinator.shared.syncRegistration(relayDeviceToken: deviceRelayManager.deviceToken)
+        await IOSPushNotificationCoordinator.shared.syncRegistration(relayDeviceToken: deviceRelayManager.deviceToken, force: true)
+        await IOSPushNotificationCoordinator.shared.syncLiveActivityPushToStart(relayDeviceToken: deviceRelayManager.deviceToken, force: true)
         await refreshHomeScreenShortcuts()
         syncMacThemeWidgetSnapshot()
     }
@@ -690,6 +752,7 @@ final class IOSAppViewModel: ObservableObject {
                 self.objectWillChange.send()
                 DispatchQueue.main.async { [weak self] in
                     self?.syncMacThemeWidgetSnapshot()
+                    self?.refreshDevBarLiveMessageReadiness()
                 }
             }
             .store(in: &childObservers)
@@ -784,6 +847,56 @@ final class IOSAppViewModel: ObservableObject {
     func dismissAgentWatcherAlert(_ alertId: String) {
         agentWatcherAlerts.removeAll { $0.id == alertId }
         updateAgentWatcherLiveActivity()
+    }
+
+    func enableDevBarLiveMessageIsland() async {
+        await enableDevBarLiveMessageIsland(message: devBarLiveMessageDraft)
+    }
+
+    func enableDevBarLiveMessageIsland(message rawMessage: String) async {
+        let message = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else {
+            devBarLiveMessageStatus = .failed("请输入要显示在灵动岛的一句文案。")
+            return
+        }
+        devBarLiveMessageStatus = .enabling
+        let registration = await DevBarLiveMessageActivityManager.shared.showMessage(
+            String(message.prefix(80)),
+            source: "iPhone",
+            bundleId: IOSPushNotificationCoordinator.bundleIdentifier,
+            environment: IOSPushNotificationCoordinator.pushEnvironment,
+            startedBy: .local
+        )
+
+        let hasActiveActivity = await DevBarLiveMessageActivityManager.shared.hasActiveActivity()
+        guard registration != nil || hasActiveActivity else {
+            devBarLiveMessageStatus = .failed("Live Activity 启动失败，请稍后重试。")
+            return
+        }
+
+        if let relayDeviceToken = deviceRelayManager.deviceToken, !relayDeviceToken.isEmpty {
+            await IOSPushNotificationCoordinator.shared.syncRegistration(relayDeviceToken: relayDeviceToken)
+            await IOSPushNotificationCoordinator.shared.syncLiveActivityPushToStart(relayDeviceToken: relayDeviceToken)
+            if let registration {
+                await IOSPushNotificationCoordinator.shared.syncLiveActivityRegistration(
+                    registration,
+                    relayDeviceToken: relayDeviceToken
+                )
+            }
+        }
+        devBarLiveMessageStatus = .active
+    }
+
+    func disableDevBarLiveMessageIsland() async {
+        await DevBarLiveMessageActivityManager.shared.endActivity()
+        refreshDevBarLiveMessageReadiness()
+    }
+
+    func refreshDevBarLiveMessageReadiness() {
+        if case .active = devBarLiveMessageStatus {
+            return
+        }
+        devBarLiveMessageStatus = .ready
     }
 
     private var latestRefreshDate: Date? {

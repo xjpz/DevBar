@@ -5,6 +5,7 @@ import SwiftUI
 
 @main
 struct DevBarApp: App {
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
     @StateObject private var appViewModel = AppViewModel()
     @StateObject private var languageManager = LanguageManager()
 

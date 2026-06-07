@@ -34,5 +34,16 @@ struct DevBarAppShortcuts: AppShortcutsProvider {
             shortTitle: "关闭显示器",
             systemImageName: "moon"
         )
+
+        AppShortcut(
+            intent: ForwardSMSAlertIntent(),
+            phrases: [
+                "用 \(.applicationName) 转发短信提醒",
+                "\(.applicationName) 提醒我的电脑这条短信",
+                "Forward SMS alert with \(.applicationName)",
+            ],
+            shortTitle: "短信提醒",
+            systemImageName: "message.badge"
+        )
     }
 }

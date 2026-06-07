@@ -59,6 +59,10 @@ public enum DevBarCoreConstants {
     public enum PushNotifications {
         public static let registerPath = "/api/devbar/push/register"
         public static let preferencesPath = "/api/devbar/push/preferences"
+        public static let liveActivityPushToStartPath = "/api/devbar/push/live-activities/push-to-start"
+        public static let liveActivitiesPath = "/api/devbar/push/live-activities"
+        public static let liveMessagePath = "/api/devbar/push/live-message"
+        public static let smsAlertPath = "/api/devbar/push/sms-alert"
     }
 
     public enum AppGroup {
