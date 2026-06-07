@@ -13,7 +13,7 @@ struct AgentWatcherLiveActivityWidget: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    AgentWatcherExpandedLeading(state: context.state)
+                    AgentWatcherExpandedLeading(title: context.attributes.title, state: context.state)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     AgentWatcherExpandedTrailing(state: context.state)
@@ -106,6 +106,7 @@ private struct AgentWatcherLockScreenView: View {
 // MARK: - Dynamic Island
 
 private struct AgentWatcherExpandedLeading: View {
+    let title: String
     let state: AgentWatcherActivityAttributes.ContentState
 
     var body: some View {
@@ -113,7 +114,7 @@ private struct AgentWatcherExpandedLeading: View {
             Image(systemName: "eye")
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(state.isWaiting ? .red : .green)
-            Text("Agent Watcher")
+            Text(title)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

@@ -10,28 +10,20 @@ struct ClaudeTranscriptMonitorTests {
     }()
 
     @Test
-    func pendingToolUseCreatesApprovalEventAfterGracePeriod() throws {
+    func pendingToolUseDoesNotCreateWaitingInputEvent() throws {
         let transcript = [
             #"{"type":"last-prompt","lastPrompt":"更新菜单配置","sessionId":"session-1"}"#,
             #"{"type":"permission-mode","permissionMode":"acceptEdits","sessionId":"session-1"}"#,
             #"{"type":"assistant","timestamp":"2026-06-04T05:10:30.000Z","cwd":"/Users/xjpz/Documents/workspace/ai/scala/lemonbus-x","sessionId":"session-1","message":{"content":[{"type":"tool_use","id":"tool-1","name":"Bash","input":{"command":"cat > app/models/SystemMenu.scala"}}]}}"#,
         ].joined(separator: "\n")
 
-        let event = try #require(ClaudeTranscriptMonitor.pendingApprovalEvent(
+        let event = ClaudeTranscriptMonitor.pendingApprovalEvent(
             from: transcript,
             now: dateFormatter.date(from: "2026-06-04T05:10:36.000Z")!,
             gracePeriod: 5
-        ))
+        )
 
-        #expect(event.sessionId == "session-1")
-        #expect(event.source == .claudeCode)
-        #expect(event.eventType == .waitingUserInput)
-        #expect(event.severity == .warning)
-        #expect(event.cwd == "/Users/xjpz/Documents/workspace/ai/scala/lemonbus-x")
-        #expect(event.taskTitle == "Bash confirmation")
-        #expect(event.rawSnippet == "cat > app/models/SystemMenu.scala")
-        #expect(event.requiresUserAction)
-        #expect(event.canNotifyPhone)
+        #expect(event == nil)
     }
 
     @Test

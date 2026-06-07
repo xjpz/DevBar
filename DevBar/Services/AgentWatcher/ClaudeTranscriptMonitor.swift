@@ -5,6 +5,7 @@ final class ClaudeTranscriptMonitor {
     private let gracePeriod: TimeInterval
     private let pollInterval: TimeInterval
     private let onPendingApproval: (AgentEvent) -> Void
+    private let hookManagedSessionIds: () -> Set<String>
     private let maxTailBytes = 128 * 1024
     private let recentFileInterval: TimeInterval = 6 * 60 * 60
 
@@ -16,11 +17,13 @@ final class ClaudeTranscriptMonitor {
             .appendingPathComponent(".claude/projects", isDirectory: true),
         gracePeriod: TimeInterval = 5,
         pollInterval: TimeInterval = 3,
+        hookManagedSessionIds: @escaping () -> Set<String> = { [] },
         onPendingApproval: @escaping (AgentEvent) -> Void
     ) {
         self.projectsDirectory = projectsDirectory
         self.gracePeriod = gracePeriod
         self.pollInterval = pollInterval
+        self.hookManagedSessionIds = hookManagedSessionIds
         self.onPendingApproval = onPendingApproval
     }
 
@@ -39,10 +42,19 @@ final class ClaudeTranscriptMonitor {
     }
 
     func poll(now: Date = Date()) {
+        let managedIds = hookManagedSessionIds()
         for transcriptURL in recentTranscriptURLs(now: now) {
             guard let tail = readTail(from: transcriptURL),
                   let event = Self.pendingApprovalEvent(from: tail, now: now, gracePeriod: gracePeriod)
             else { continue }
+
+            // When hooks are active for this session, skip false task-completion
+            // signals from transcript (hooks provide authoritative Stop events).
+            if event.eventType == .taskCompleted,
+               let sessionId = event.sessionId,
+               managedIds.contains(sessionId) {
+                continue
+            }
 
             let key = Self.reportKey(for: event)
             guard !reportedToolUses.contains(key) else { continue }
@@ -61,21 +73,11 @@ final class ClaudeTranscriptMonitor {
 
         var latestSessionId: String?
         var latestCwd: String?
-        var latestPrompt: String?
-        var completedToolIds = Set<String>()
 
         for line in lines {
             guard let object = decodeJSONObject(from: line) else { continue }
             latestSessionId = stringValue(object["sessionId"]) ?? latestSessionId
             latestCwd = stringValue(object["cwd"]) ?? latestCwd
-            latestPrompt = stringValue(object["lastPrompt"]) ?? latestPrompt
-
-            for content in messageContent(from: object) {
-                if stringValue(content["type"]) == "tool_result",
-                   let toolUseId = stringValue(content["tool_use_id"]) {
-                    completedToolIds.insert(toolUseId)
-                }
-            }
         }
 
         guard let latestObject = lines.reversed()
@@ -95,35 +97,8 @@ final class ClaudeTranscriptMonitor {
             ?? stringValue((latestObject["message"] as? [String: Any])?["id"])
             ?? "\(Int(timestamp.timeIntervalSince1970))"
 
-        for content in messageContent(from: latestObject).reversed() {
-            guard stringValue(content["type"]) == "tool_use",
-                  let toolUseId = stringValue(content["id"]),
-                  !completedToolIds.contains(toolUseId)
-            else { continue }
-
-            let toolName = stringValue(content["name"]) ?? "Tool"
-            let input = content["input"] as? [String: Any]
-            let snippet = commandSnippet(from: input)
-            let message = latestPrompt.map { "Claude Code 可能等待终端确认：\($0)" }
-                ?? "Claude Code 可能等待终端确认 \(toolName)"
-
-            return AgentEvent(
-                id: "claude-transcript-\(sessionId ?? "unknown")-\(toolUseId)",
-                source: .claudeCode,
-                eventType: .waitingUserInput,
-                severity: .warning,
-                projectName: cwd.flatMap { projectName(from: $0) },
-                cwd: cwd,
-                sessionId: sessionId,
-                taskTitle: "\(toolName) confirmation",
-                message: message,
-                rawSnippet: snippet,
-                createdAt: timestamp,
-                detectedAt: now,
-                requiresUserAction: true,
-                canResolveOnMac: true,
-                canNotifyPhone: true
-            )
+        if messageContent(from: latestObject).contains(where: { stringValue($0["type"]) == "tool_use" }) {
+            return nil
         }
 
         if let text = assistantText(from: latestObject) {
@@ -244,22 +219,27 @@ final class ClaudeTranscriptMonitor {
 
     private static func isWaitingForUserChoice(_ text: String) -> Bool {
         let lowercased = text.lowercased()
-        let promptPhrases = [
-            "请选择",
-            "请选择处理方式",
-            "你想用哪种",
-            "你希望",
-            "是否继续",
-            "要继续吗",
-            "do you want",
-            "do you want to proceed",
-            "which option",
-            "please choose",
-            "choose an option",
-            "how would you like"
+
+        // Binary yes/no questions: no numbered list required
+        let binaryPrompts = [
+            "是否继续", "要继续吗", "是否要", "确认吗", "是否",
+            "(y/n)", "y/n", "yes or no",
         ]
-        let hasPromptPhrase = promptPhrases.contains { lowercased.contains($0) }
-        return hasPromptPhrase && hasNumberedOptions(text)
+        if binaryPrompts.contains(where: { lowercased.contains($0) }) {
+            return true
+        }
+
+        // Multi-choice phrases require at least two numbered/lettered options
+        let choicePhrases = [
+            "请选择", "你想用哪种", "你希望", "您想", "哪种方式",
+            "如何处理", "选择哪种", "哪个方案", "选择一种", "选择方式",
+            "do you want", "which option", "please choose", "choose an option",
+            "how would you like", "would you like", "which approach",
+            "which would you prefer", "let me know which", "what would you like",
+            "pick one", "select one",
+        ]
+        let hasChoicePhrase = choicePhrases.contains { lowercased.contains($0) }
+        return hasChoicePhrase && hasNumberedOptions(text)
     }
 
     private static func hasNumberedOptions(_ text: String) -> Bool {
@@ -300,20 +280,6 @@ final class ClaudeTranscriptMonitor {
             return date
         }
         return ISO8601DateFormatter().date(from: timestamp)
-    }
-
-    private static func commandSnippet(from input: [String: Any]?) -> String? {
-        guard let input else { return nil }
-        if let command = stringValue(input["command"]) {
-            return command
-        }
-        if let filePath = stringValue(input["file_path"]) {
-            return filePath
-        }
-        if let path = stringValue(input["path"]) {
-            return path
-        }
-        return nil
     }
 
     private static func projectName(from path: String) -> String {

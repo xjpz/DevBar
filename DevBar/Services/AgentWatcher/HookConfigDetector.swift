@@ -28,6 +28,7 @@ class HookConfigDetector {
     private static let claudePermissionCommand = "curl -s -X POST http://127.0.0.1:49321/agent/claude/permission-request -H 'Content-Type: application/json' -d @-"
     private static let claudeNotificationCommand = "curl -s -X POST http://127.0.0.1:49321/agent/claude/notification -H 'Content-Type: application/json' -d @-"
     private static let claudeStopCommand = "curl -s -X POST http://127.0.0.1:49321/agent/claude/stop -H 'Content-Type: application/json' -d @-"
+    private static let claudePreToolUseCommand = "curl -s -X POST http://127.0.0.1:49321/agent/claude/pre-tool-use -H 'Content-Type: application/json' -d @-"
     private static let codexPermissionCommand = "curl -s -X POST http://127.0.0.1:49321/agent/codex/permission-request -H 'Content-Type: application/json' -d @-"
     private static let codexSessionStartCommand = "curl -s -X POST http://127.0.0.1:49321/agent/codex/session-start -H 'Content-Type: application/json' -d @-"
     private static let codexStopCommand = "curl -s -X POST http://127.0.0.1:49321/agent/codex/stop -H 'Content-Type: application/json' -d @-"
@@ -111,6 +112,17 @@ class HookConfigDetector {
         return """
         {
           "hooks": {
+            "PreToolUse": [
+              {
+                "matcher": "",
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "curl -s -X POST http://127.0.0.1:49321/agent/claude/pre-tool-use -H 'Content-Type: application/json' -d @-"
+                  }
+                ]
+              }
+            ],
             "PermissionRequest": [
               {
                 "matcher": "",
@@ -221,6 +233,7 @@ class HookConfigDetector {
     static func mergingClaudeHooks(into config: [String: Any]) -> [String: Any] {
         var config = config
         var hooks = config["hooks"] as? [String: Any] ?? [:]
+        appendHook(command: claudePreToolUseCommand, eventName: "PreToolUse", to: &hooks)
         appendHook(command: claudePermissionCommand, eventName: "PermissionRequest", to: &hooks)
         appendHook(command: claudeNotificationCommand, eventName: "Notification", to: &hooks)
         appendHook(command: claudeStopCommand, eventName: "Stop", to: &hooks)

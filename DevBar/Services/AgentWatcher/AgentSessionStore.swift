@@ -284,6 +284,8 @@ class AgentSessionStore: ObservableObject {
             return .waitingInput
         case .loginRequired:
             return .loginRequired
+        case .preToolUse:
+            return .running
         case .taskCompleted:
             return .completed
         case .taskFailed:
@@ -293,7 +295,7 @@ class AgentSessionStore: ObservableObject {
         case .sessionStart:
             return .running
         case .stop:
-            return currentState == .running ? .completed : currentState
+            return .completed
         default:
             return currentState
         }

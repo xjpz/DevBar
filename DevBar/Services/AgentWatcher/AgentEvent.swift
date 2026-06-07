@@ -236,6 +236,7 @@ struct ToolInput: Codable {
 struct ClaudeHookPayload: Codable {
     let sessionId: String?
     let cwd: String?
+    let transcriptPath: String?
     let hookEventName: String?
     let permissionMode: String?
     let toolName: String?
@@ -248,6 +249,7 @@ struct ClaudeHookPayload: Codable {
     enum CodingKeys: String, CodingKey {
         case sessionId = "session_id"
         case cwd
+        case transcriptPath = "transcript_path"
         case hookEventName = "hook_event_name"
         case permissionMode = "permission_mode"
         case toolName = "tool_name"

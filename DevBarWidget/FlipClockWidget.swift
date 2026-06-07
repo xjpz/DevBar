@@ -22,10 +22,16 @@ struct FlipClockTimelineProvider: TimelineProvider {
         entriesFrom now: Date,
         makeEntry: (Date) -> Entry
     ) -> Timeline<Entry> {
-        let calendar = Calendar.current
-        let refreshDate = calendar.date(byAdding: .hour, value: 1, to: now)
-            ?? now.addingTimeInterval(3_600)
-        return Timeline(entries: [makeEntry(now)], policy: .after(refreshDate))
+        let refreshDate = now.addingTimeInterval(30 * 60)
+        var dates: [Date] = [now]
+        var nextDate = now.addingTimeInterval(10)
+
+        while nextDate <= refreshDate {
+            dates.append(nextDate)
+            nextDate = nextDate.addingTimeInterval(10)
+        }
+
+        return Timeline(entries: dates.map(makeEntry), policy: .atEnd)
     }
 }
 
@@ -35,31 +41,29 @@ struct FlipClockWidgetView: View {
     @Environment(\.widgetFamily) private var family
 
     var body: some View {
-        TimelineView(.periodic(from: entry.date, by: 1)) { context in
-            GeometryReader { proxy in
-                let layout = FlipClockLayout(family: family, size: proxy.size)
+        GeometryReader { proxy in
+            let layout = FlipClockLayout(family: family, size: proxy.size)
 
-                VStack(spacing: layout.verticalSpacing) {
-                    Spacer(minLength: 0)
+            VStack(spacing: layout.verticalSpacing) {
+                Spacer(minLength: 0)
 
-                    HStack(spacing: layout.cardSpacing) {
-                        flipCard(text: hourText(for: context.date), layout: layout)
-                        flipCard(text: minuteText(for: context.date), layout: layout)
-                    }
-
-                    datePill(date: context.date, layout: layout)
-
-                    Spacer(minLength: 0)
+                HStack(spacing: layout.cardSpacing) {
+                    flipCard(text: hourText, layout: layout)
+                    flipCard(text: minuteText, layout: layout)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay {
-                    if family == .systemLarge {
-                        largeDecoration
-                    }
+
+                datePill(date: entry.date, layout: layout)
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay {
+                if family == .systemLarge {
+                    largeDecoration
                 }
-                .transaction { transaction in
-                    transaction.animation = nil
-                }
+            }
+            .transaction { transaction in
+                transaction.animation = nil
             }
         }
     }
@@ -82,7 +86,6 @@ struct FlipClockWidgetView: View {
                 .monospacedDigit()
                 .foregroundStyle(.white)
                 .shadow(color: .black.opacity(0.16), radius: 3, y: 2)
-
         }
         .frame(width: layout.cardWidth, height: layout.cardHeight)
     }
@@ -115,12 +118,12 @@ struct FlipClockWidgetView: View {
             .padding(7)
     }
 
-    private func hourText(for date: Date) -> String {
-        String(format: "%02d", Calendar.current.component(.hour, from: date))
+    private var hourText: String {
+        String(format: "%02d", Calendar.current.component(.hour, from: entry.date))
     }
 
-    private func minuteText(for date: Date) -> String {
-        String(format: "%02d", Calendar.current.component(.minute, from: date))
+    private var minuteText: String {
+        String(format: "%02d", Calendar.current.component(.minute, from: entry.date))
     }
 }
 

@@ -150,4 +150,10 @@ public actor AgentWatcherLiveActivityManager {
         return activity.pushToken
     }
 }
+
+private extension Data {
+    var hexString: String {
+        map { String(format: "%02x", $0) }.joined()
+    }
+}
 #endif

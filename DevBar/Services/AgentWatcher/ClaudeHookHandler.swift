@@ -4,6 +4,7 @@ import Foundation
 
 class ClaudeHookHandler {
     private weak var sessionStore: AgentSessionStore?
+    var onSessionTracked: ((String) -> Void)?
 
     init(sessionStore: AgentSessionStore) {
         self.sessionStore = sessionStore
@@ -21,6 +22,7 @@ class ClaudeHookHandler {
             let event = createPermissionEvent(from: payload)
 
             if let sessionId = payload.sessionId {
+                onSessionTracked?(sessionId)
                 Task { @MainActor in
                     sessionStore?.getOrCreateSession(
                         for: .claudeCode,
@@ -38,6 +40,50 @@ class ClaudeHookHandler {
         }
     }
 
+    // MARK: - Handle PreToolUse Hook
+
+    func handlePreToolUse(request: HTTPRequest) -> HTTPResponse {
+        guard let body = request.body else {
+            return HTTPResponse(statusCode: 400, json: ["error": "Missing body"])
+        }
+
+        do {
+            let payload = try JSONDecoder().decode(ClaudeHookPayload.self, from: body)
+
+            if let sessionId = payload.sessionId {
+                onSessionTracked?(sessionId)
+                let event = AgentEvent(
+                    source: .claudeCode,
+                    eventType: .preToolUse,
+                    severity: .info,
+                    projectName: payload.cwd.flatMap { extractProjectName(from: $0) },
+                    cwd: payload.cwd,
+                    sessionId: sessionId,
+                    taskTitle: payload.toolName.map { "工具: \($0)" },
+                    message: "正在执行 \(payload.toolName ?? "工具")",
+                    rawSnippet: payload.toolInput?.command,
+                    requiresUserAction: false,
+                    canResolveOnMac: false,
+                    canNotifyPhone: false,
+                    canNotifyUser: false
+                )
+                Task { @MainActor in
+                    sessionStore?.getOrCreateSession(
+                        for: .claudeCode,
+                        sessionId: sessionId,
+                        cwd: payload.cwd
+                    )
+                    sessionStore?.updateSession(sessionId, with: event)
+                }
+            }
+
+            return HTTPResponse(statusCode: 200, json: ["status": "ok"])
+        } catch {
+            print("[ClaudeHookHandler] Failed to parse pre-tool-use: \(error)")
+            return HTTPResponse(statusCode: 400, json: ["error": "Invalid payload"])
+        }
+    }
+
     // MARK: - Handle Notification Hook
 
     func handleNotification(request: HTTPRequest) -> HTTPResponse {
@@ -50,6 +96,7 @@ class ClaudeHookHandler {
             let event = createEvent(from: payload, eventType: .notification)
 
             if let sessionId = payload.sessionId {
+                onSessionTracked?(sessionId)
                 Task { @MainActor in
                     sessionStore?.getOrCreateSession(
                         for: .claudeCode,
@@ -79,6 +126,7 @@ class ClaudeHookHandler {
             let event = createEvent(from: payload, eventType: .taskCompleted)
 
             if let sessionId = payload.sessionId {
+                onSessionTracked?(sessionId)
                 Task { @MainActor in
                     sessionStore?.getOrCreateSession(
                         for: .claudeCode,
@@ -108,6 +156,7 @@ class ClaudeHookHandler {
             let event = createEvent(from: payload, eventType: .taskFailed)
 
             if let sessionId = payload.sessionId {
+                onSessionTracked?(sessionId)
                 Task { @MainActor in
                     sessionStore?.getOrCreateSession(
                         for: .claudeCode,

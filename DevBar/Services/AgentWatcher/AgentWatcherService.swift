@@ -23,6 +23,8 @@ class AgentWatcherService: ObservableObject {
     // Relay 集成，用于 iPhone 推送
     weak var relayManager: DeviceRelayManager?
 
+    private var hookManagedSessionIds: Set<String> = []
+
     @Published var isServerRunning = false
     @Published var lastError: String?
     @Published var waitingCount: Int = 0
@@ -49,8 +51,15 @@ class AgentWatcherService: ObservableObject {
 
     private func setupHandlers() {
         claudeHandler = ClaudeHookHandler(sessionStore: sessionStore)
+        claudeHandler?.onSessionTracked = { [weak self] sessionId in
+            Task { @MainActor [weak self] in
+                self?.hookManagedSessionIds.insert(sessionId)
+            }
+        }
         codexHandler = CodexHookHandler(sessionStore: sessionStore)
-        claudeTranscriptMonitor = ClaudeTranscriptMonitor { [weak self] event in
+        claudeTranscriptMonitor = ClaudeTranscriptMonitor(
+            hookManagedSessionIds: { [weak self] in self?.hookManagedSessionIds ?? [] }
+        ) { [weak self] event in
             Task { @MainActor [weak self] in
                 guard let self, self.settings.claudeEnabled else { return }
                 let sessionId = event.sessionId ?? event.id
@@ -167,6 +176,12 @@ class AgentWatcherService: ObservableObject {
         httpServer.registerRoute("POST", "/agent/claude/error") { [weak self] request in
             guard self?.settings.claudeEnabled == true else { return HTTPResponse(statusCode: 204) }
             return self?.claudeHandler?.handleError(request: request) ??
+                HTTPResponse(statusCode: 503, json: ["error": "Service unavailable"])
+        }
+
+        httpServer.registerRoute("POST", "/agent/claude/pre-tool-use") { [weak self] request in
+            guard self?.settings.claudeEnabled == true else { return HTTPResponse(statusCode: 204) }
+            return self?.claudeHandler?.handlePreToolUse(request: request) ??
                 HTTPResponse(statusCode: 503, json: ["error": "Service unavailable"])
         }
 

@@ -66,6 +66,7 @@ final class AppViewModel: ObservableObject {
     let agentWatcherService = AgentWatcherService.shared
     private var statusTextUpdateTask: Task<Void, Never>?
     private var antiSleepStatusCancellable: AnyCancellable?
+    private var childObservers = Set<AnyCancellable>()
     /// Prevents duplicate handleLoginSuccess calls
     private var isHandlingLogin = false
     private var settingsWindow: NSWindow?
@@ -73,6 +74,7 @@ final class AppViewModel: ObservableObject {
     private var previousOpenAINotificationItems: [NotificationQuotaItem]?
     private var hasLaunched = false
     private var handledRelayRequestIDs: Set<String> = []
+    private var recentSMSAlertDedupKeys: [String: Date] = [:]
     private var mimoCookieRenewalTimer: Timer?
     weak var languageManager: LanguageManager?
 
@@ -287,8 +289,22 @@ final class AppViewModel: ObservableObject {
                 UserDefaults.standard.bool(forKey: DevBarCoreConstants.Defaults.relayMacEnabledKey)
             if relayEnabled {
                 await self.deviceRelayManager.setup(deviceType: .mac, deviceName: Self.currentDeviceName)
+                await MacPushNotificationCoordinator.shared.syncRegistration(
+                    relayDeviceToken: self.deviceRelayManager.deviceToken
+                )
             }
         }
+
+        NotificationCenter.default.publisher(for: .macAPNsTokenChanged)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    await MacPushNotificationCoordinator.shared.syncRegistration(
+                        relayDeviceToken: self.deviceRelayManager.deviceToken
+                    )
+                }
+            }
+            .store(in: &childObservers)
 
         // 启动 Agent Watcher 服务
         Task { @MainActor [weak self] in
@@ -344,9 +360,105 @@ final class AppViewModel: ObservableObject {
             }
         case .systemStatusRequest:
             await handleRelayStatusRequest(message)
+        case .smsAlert:
+            await handleRelaySMSAlert(message)
         default:
             return
         }
+    }
+
+    private func handleRelaySMSAlert(_ message: DeviceRelayMessage) async {
+        if let targetDeviceId = message.targetDeviceId,
+           targetDeviceId != deviceRelayManager.localDeviceID {
+            return
+        }
+        guard let sourceDeviceId = message.fromDeviceId else { return }
+
+        let messageText = message.payload["messageText"]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !messageText.isEmpty else {
+            await sendRelaySMSAlertAck(
+                requestId: message.requestId,
+                targetDeviceId: sourceDeviceId,
+                status: "ignored",
+                detail: "短信内容为空"
+            )
+            return
+        }
+
+        let dedupKey = message.payload["dedupKey"] ?? message.requestId ?? "\(sourceDeviceId)-\(message.timestamp)"
+        guard !isDuplicateSMSAlert(dedupKey: dedupKey) else {
+            await sendRelaySMSAlertAck(
+                requestId: message.requestId,
+                targetDeviceId: sourceDeviceId,
+                status: "duplicate",
+                detail: "重复短信提醒已忽略"
+            )
+            return
+        }
+        recordSMSAlertDedupKey(dedupKey)
+
+        let sender = message.payload["sender"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let customTitle = message.payload["notificationTitle"]?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title: String
+        if let customTitle, !customTitle.isEmpty {
+            title = customTitle
+        } else {
+            title = sender?.isEmpty == false ? "短信提醒 · \(sender!)" : "短信提醒"
+        }
+        let summary = DeviceRelaySMSAlert.summary(for: messageText)
+        notificationService.send(title: title, body: summary)
+
+        let safeKey = String(dedupKey.prefix(8))
+        print("[DevBar:SMSAlert] shown sender=\(sender ?? "-") length=\(messageText.count) dedup=\(safeKey)")
+        await sendRelaySMSAlertAck(
+            requestId: message.requestId,
+            targetDeviceId: sourceDeviceId,
+            status: "shown",
+            detail: "Mac 已提醒"
+        )
+    }
+
+    private func sendRelaySMSAlertAck(
+        requestId: String?,
+        targetDeviceId: String,
+        status: String,
+        detail: String
+    ) async {
+        guard let localDeviceID = deviceRelayManager.localDeviceID else { return }
+        do {
+            try await deviceRelayManager.send(
+                DeviceRelayManager.makeSMSAlertAckMessage(
+                    localDeviceID: localDeviceID,
+                    targetDeviceId: targetDeviceId,
+                    requestId: requestId,
+                    status: status,
+                    detail: detail
+                )
+            )
+        } catch {
+            print("[DevBar:SMSAlert] ack send failed: \(error)")
+        }
+    }
+
+    private func isDuplicateSMSAlert(dedupKey: String) -> Bool {
+        pruneSMSAlertDedupKeys()
+        return recentSMSAlertDedupKeys[dedupKey] != nil
+    }
+
+    private func recordSMSAlertDedupKey(_ dedupKey: String) {
+        pruneSMSAlertDedupKeys()
+        recentSMSAlertDedupKeys[dedupKey] = Date()
+        if recentSMSAlertDedupKeys.count > 100 {
+            let sortedKeys = recentSMSAlertDedupKeys.sorted { $0.value < $1.value }.map(\.key)
+            for key in sortedKeys.prefix(recentSMSAlertDedupKeys.count - 100) {
+                recentSMSAlertDedupKeys.removeValue(forKey: key)
+            }
+        }
+    }
+
+    private func pruneSMSAlertDedupKeys() {
+        let cutoff = Date().addingTimeInterval(-300)
+        recentSMSAlertDedupKeys = recentSMSAlertDedupKeys.filter { $0.value >= cutoff }
     }
 
     private func handleRelayAgentCommand(_ message: DeviceRelayMessage) async {
