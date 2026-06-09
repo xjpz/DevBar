@@ -41,13 +41,13 @@ public struct PushNotificationPreferences: Codable, Sendable, Equatable {
     public init(
         relayDeviceId: String? = nil,
         pushEnabled: Bool = true,
-        agentWatcherEnabled: Bool = true,
+        agentWatcherEnabled: Bool = DevBarCoreConstants.Features.agentWatcherEnabled,
         summaryEnabled: Bool = true,
         iconUrl: String? = nil
     ) {
         self.relayDeviceId = relayDeviceId
         self.pushEnabled = pushEnabled
-        self.agentWatcherEnabled = agentWatcherEnabled
+        self.agentWatcherEnabled = DevBarCoreConstants.Features.agentWatcherEnabled && agentWatcherEnabled
         self.summaryEnabled = summaryEnabled
         self.iconUrl = iconUrl
     }

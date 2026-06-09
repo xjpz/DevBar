@@ -38,12 +38,16 @@ class AgentWatcherService: ObservableObject {
     private var escalationTasks: [String: Task<Void, Never>] = [:]
 
     var isEnabled: Bool {
-        settings.isEnabled
+        DevBarCoreConstants.Features.agentWatcherEnabled && settings.isEnabled
     }
 
     // MARK: - Initialization
 
     private init() {
+        guard DevBarCoreConstants.Features.agentWatcherEnabled else {
+            settings.isEnabled = false
+            return
+        }
         setupHandlers()
         setupNotifications()
         requestNotificationPermission()
@@ -107,7 +111,7 @@ class AgentWatcherService: ObservableObject {
     // MARK: - Server Management
 
     func startServer() {
-        guard settings.isEnabled, httpServer == nil else { return }
+        guard DevBarCoreConstants.Features.agentWatcherEnabled, settings.isEnabled, httpServer == nil else { return }
 
         httpServer = LocalHTTPServer(port: serverPort)
         httpServer?.onStateChange = { [weak self] state in
@@ -335,6 +339,7 @@ class AgentWatcherService: ObservableObject {
     // MARK: - iPhone Push via Relay
 
     func sendRelayNotification(for event: AgentEvent) {
+        guard DevBarCoreConstants.Features.agentWatcherEnabled else { return }
         guard let relayManager = relayManager else { return }
         guard event.canNotifyUser else { return }
         guard event.canNotifyPhone else { return }
@@ -483,6 +488,7 @@ class AgentWatcherService: ObservableObject {
     }
 
     private func updateWidgetData() {
+        guard DevBarCoreConstants.Features.agentWatcherEnabled else { return }
         let waitingSessions = sessionStore.waitingSessions
         let sessionInfos = waitingSessions.map { session in
             AgentWatcherSessionInfo(
@@ -514,6 +520,7 @@ class AgentWatcherService: ObservableObject {
 
     #if os(iOS)
     private func updateLiveActivity(waitingSessions: [AgentSession]) async {
+        guard DevBarCoreConstants.Features.agentWatcherEnabled else { return }
         let manager = AgentWatcherLiveActivityManager.shared
 
         if waitingSessions.isEmpty {

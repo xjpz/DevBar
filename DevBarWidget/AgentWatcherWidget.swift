@@ -2,6 +2,8 @@ import WidgetKit
 import SwiftUI
 import DevBarCore
 
+#if os(macOS)
+
 // MARK: - Timeline Provider
 
 struct AgentWatcherTimelineProvider: AppIntentTimelineProvider {
@@ -322,3 +324,5 @@ struct AgentWatcherWidget: Widget {
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
+
+#endif

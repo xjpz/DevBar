@@ -306,23 +306,23 @@ final class AppViewModel: ObservableObject {
             }
             .store(in: &childObservers)
 
-        // 启动 Agent Watcher 服务
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.agentWatcherService.relayManager = self.deviceRelayManager
-            if self.agentWatcherService.isEnabled {
-                self.agentWatcherService.startServer()
-            }
-        }
-
-        // 监听 Agent Watcher 状态变化，更新菜单栏
-        NotificationCenter.default.addObserver(
-            forName: .agentWatcherStatusChanged,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
+        if DevBarCoreConstants.Features.agentWatcherEnabled {
             Task { @MainActor [weak self] in
-                self?.updateMenuBarBadge(from: notification)
+                guard let self else { return }
+                self.agentWatcherService.relayManager = self.deviceRelayManager
+                if self.agentWatcherService.isEnabled {
+                    self.agentWatcherService.startServer()
+                }
+            }
+
+            NotificationCenter.default.addObserver(
+                forName: .agentWatcherStatusChanged,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                Task { @MainActor [weak self] in
+                    self?.updateMenuBarBadge(from: notification)
+                }
             }
         }
     }
@@ -881,6 +881,7 @@ final class AppViewModel: ObservableObject {
     }
 
     private func checkAndNotify() {
+        guard DevBarCoreConstants.Features.notificationRemindersEnabled else { return }
         if let limits = quotaViewModel.quotaData?.limits {
             let glmItems = limits.map {
                 NotificationQuotaItem(

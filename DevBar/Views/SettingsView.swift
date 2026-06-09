@@ -17,7 +17,7 @@ struct SettingsView: View {
         VStack(spacing: 0) {
             // Tab 图标栏
             HStack(spacing: 0) {
-                ForEach(SettingsTab.allCases, id: \.self) { tab in
+                ForEach(SettingsTab.visibleCases, id: \.self) { tab in
                     Button {
                         selectedTab = tab
                     } label: {
@@ -43,7 +43,7 @@ struct SettingsView: View {
             .padding(.top, 12)
             .padding(.bottom, 8)
 
-            switch selectedTab {
+            switch selectedTabContent {
             case .general:
                 SettingsGeneral()
             case .notifications:
@@ -60,5 +60,9 @@ struct SettingsView: View {
             }
         }
         .frame(width: 340, height: 480)
+    }
+
+    private var selectedTabContent: SettingsTab {
+        SettingsTab.visibleCases.contains(selectedTab) ? selectedTab : .general
     }
 }

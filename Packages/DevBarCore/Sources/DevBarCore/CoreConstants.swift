@@ -1,6 +1,13 @@
 import Foundation
 
 public enum DevBarCoreConstants {
+    public enum Features {
+        public static let agentWatcherEnabled = false
+        public static let flipClockWidgetEnabled = true
+        public static let iPhoneWidgetsEnabled = false
+        public static let notificationRemindersEnabled = false
+    }
+
     public enum API {
         public static let baseURL = "https://bigmodel.cn"
         public static let loginURL = "\(baseURL)/login"

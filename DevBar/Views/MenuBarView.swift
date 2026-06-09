@@ -146,27 +146,28 @@ private struct LoggedInContentView: View {
                     .controlSize(.small)
             }
 
-            // Agent Watcher 按钮
-            Button(action: {
-                showAgentWatcher.toggle()
-            }) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "eye")
-                    if appViewModel.agentWatcherService.waitingCount > 0 {
-                        Text("\(appViewModel.agentWatcherService.waitingCount)")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(2)
-                            .background(Color.red)
-                            .clipShape(Circle())
-                            .offset(x: 6, y: -6)
+            if DevBarCoreConstants.Features.agentWatcherEnabled {
+                Button(action: {
+                    showAgentWatcher.toggle()
+                }) {
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "eye")
+                        if appViewModel.agentWatcherService.waitingCount > 0 {
+                            Text("\(appViewModel.agentWatcherService.waitingCount)")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(.white)
+                                .padding(2)
+                                .background(Color.red)
+                                .clipShape(Circle())
+                                .offset(x: 6, y: -6)
+                        }
                     }
                 }
-            }
-            .buttonStyle(.borderless)
-            .help("Agent Watcher")
-            .popover(isPresented: $showAgentWatcher) {
-                AgentWatcherView()
+                .buttonStyle(.borderless)
+                .help("Agent Watcher")
+                .popover(isPresented: $showAgentWatcher) {
+                    AgentWatcherView()
+                }
             }
 
             Button(action: {

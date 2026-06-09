@@ -86,6 +86,11 @@ final class IOSAppViewModel: ObservableObject {
     }
     @Published var pushNotificationPreferences: PushNotificationPreferences {
         didSet {
+            if !DevBarCoreConstants.Features.agentWatcherEnabled,
+               pushNotificationPreferences.agentWatcherEnabled {
+                pushNotificationPreferences.agentWatcherEnabled = false
+                return
+            }
             Task {
                 await IOSPushNotificationCoordinator.shared.syncPreferences(
                     pushNotificationPreferences,
@@ -150,7 +155,11 @@ final class IOSAppViewModel: ObservableObject {
         self.refreshInterval = UserDefaults.standard.double(forKey: DevBarCoreConstants.Defaults.refreshIntervalKey)
             .nonZero ?? DevBarCoreConstants.Defaults.defaultRefreshInterval
         self.liveActivitySettings = liveActivitySettingsStore.load()
-        self.pushNotificationPreferences = IOSPushNotificationCoordinator.shared.loadPreferences()
+        var pushPreferences = IOSPushNotificationCoordinator.shared.loadPreferences()
+        if !DevBarCoreConstants.Features.agentWatcherEnabled {
+            pushPreferences.agentWatcherEnabled = false
+        }
+        self.pushNotificationPreferences = pushPreferences
         let relayDeviceName = Self.loadRelayDeviceName()
         self.relayDeviceName = relayDeviceName
         self.macThemeWidgetUserName = Self.loadMacThemeWidgetUserName()
@@ -781,6 +790,7 @@ final class IOSAppViewModel: ObservableObject {
     private func handleRelayMessage(_ message: DeviceRelayMessage) {
         switch message.type {
         case .approvalRequest:
+            guard DevBarCoreConstants.Features.agentWatcherEnabled else { return }
             handleApprovalRequest(message)
         default:
             break

@@ -40,7 +40,7 @@ struct ConfigurationAppIntent: WidgetConfigurationIntent {
     @Parameter(title: "Provider", default: .glm)
     var provider: WidgetProviderSelection
 }
-
+#if os(macOS)
 enum AgentWatcherContentSelection: String, AppEnum {
     case waiting
     case overview
@@ -64,6 +64,7 @@ struct AgentWatcherConfigurationIntent: WidgetConfigurationIntent {
     @Parameter(title: "显示内容", default: .waiting)
     var content: AgentWatcherContentSelection
 }
+#endif
 
 enum MacThemeWidgetPageSelection: String, AppEnum {
     case quota

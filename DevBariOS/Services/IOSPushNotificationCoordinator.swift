@@ -258,6 +258,7 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse
     ) async {
+        guard DevBarCoreConstants.Features.agentWatcherEnabled else { return }
         await MainActor.run {
             NotificationCenter.default.post(
                 name: .iosAgentWatcherNotificationOpened,

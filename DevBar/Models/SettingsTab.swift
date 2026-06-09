@@ -2,6 +2,7 @@
 // DevBar
 
 import Foundation
+import DevBarCore
 
 enum SettingsTab: String, CaseIterable {
     case general
@@ -9,6 +10,17 @@ enum SettingsTab: String, CaseIterable {
     case finder
     case accounts
     case weChat
+
+    static var visibleCases: [SettingsTab] {
+        allCases.filter { tab in
+            switch tab {
+            case .notifications:
+                return DevBarCoreConstants.Features.notificationRemindersEnabled
+            default:
+                return true
+            }
+        }
+    }
 
     var localizedName: String {
         switch self {
