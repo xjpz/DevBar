@@ -4,6 +4,8 @@
 <dict>
     <key>CFBundleDisplayName</key>
     <string>DevBar Finder Extension</string>
+    <key>LSUIElement</key>
+    <true/>
     <key>NSExtension</key>
     <dict>
         <key>NSExtensionAttributes</key>
