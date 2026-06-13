@@ -148,14 +148,36 @@ struct MacThemeLargeWidgetView: View {
     private var quotaContent: some View {
         let providers = visibleProviders
         let density = quotaDensity(for: providers.count)
+        let layout = layoutConfig(for: providers.count)
 
         return VStack(spacing: 0) {
-            VStack(spacing: density.cardSpacing) {
-                ForEach(Array(providers.enumerated()), id: \.offset) { _, provider in
-                    providerQuotaCard(provider, density: density)
+            if layout.columnCount == 1 {
+                // 单列布局（3个以内）
+                VStack(spacing: density.cardSpacing) {
+                    ForEach(Array(providers.enumerated()), id: \.offset) { _, provider in
+                        providerQuotaCard(provider, density: density)
+                    }
                 }
+                .layoutPriority(0)
+            } else {
+                // 多列布局（4个以上）
+                Grid(horizontalSpacing: density.cardSpacing, verticalSpacing: density.cardSpacing) {
+                    let rows = Array(stride(from: 0, to: providers.count, by: layout.columnCount))
+                    ForEach(rows, id: \.self) { rowIndex in
+                        GridRow {
+                            ForEach(0..<layout.columnCount, id: \.self) { colIndex in
+                                let index = rowIndex + colIndex
+                                if index < providers.count {
+                                    providerQuotaCard(providers[index], density: density)
+                                } else {
+                                    Color.clear
+                                }
+                            }
+                        }
+                    }
+                }
+                .layoutPriority(0)
             }
-            .layoutPriority(0)
 
             Spacer(minLength: density.summarySpacing)
 
@@ -163,6 +185,17 @@ struct MacThemeLargeWidgetView: View {
                 .layoutPriority(1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func layoutConfig(for providerCount: Int) -> (columnCount: Int, rowCount: Int) {
+        switch providerCount {
+        case 0...3:
+            return (columnCount: 1, rowCount: providerCount)
+        case 4:
+            return (columnCount: 2, rowCount: 2)
+        default:
+            return (columnCount: 2, rowCount: 3)
+        }
     }
 
     private var visibleProviders: [WidgetProviderSelection] {
@@ -187,8 +220,10 @@ struct MacThemeLargeWidgetView: View {
             return .regular
         case 3:
             return .compact
+        case 4:
+            return .gridRegular
         default:
-            return .dense
+            return .gridDense
         }
     }
 
@@ -203,26 +238,27 @@ struct MacThemeLargeWidgetView: View {
         )
 
         return VStack(alignment: .leading, spacing: density.contentSpacing) {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Circle()
                     .fill(providerColor(provider))
-                    .frame(width: 6, height: 6)
+                    .frame(width: 5.5, height: 5.5)
                 Text(provider.displayName)
                     .font(.system(size: density.titleFontSize, weight: .heavy, design: .rounded))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                Spacer()
+                    .minimumScaleFactor(0.65)
+                Spacer(minLength: 2)
                 Text(headerDetail)
                     .font(.system(size: density.levelFontSize, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.64))
+                    .foregroundStyle(.white.opacity(0.62))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                    .minimumScaleFactor(0.65)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if limits.isEmpty {
                 Text("等待额度同步")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.58))
+                    .font(.system(size: 8.5, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.56))
                     .lineLimit(1)
             } else {
                 ForEach(limits) { limit in
@@ -242,21 +278,21 @@ struct MacThemeLargeWidgetView: View {
         density: QuotaCardDensity
     ) -> some View {
         VStack(alignment: .leading, spacing: density.lineSpacing) {
-            HStack(spacing: 6) {
+            HStack(spacing: 4) {
                 Text(quotaMarker(for: limit, provider: provider))
                     .font(.system(size: density.markerFontSize, weight: .black, design: .rounded))
                     .foregroundStyle(limitColor(limit.percentage))
-                    .frame(width: 10, alignment: .leading)
+                    .frame(width: 8, alignment: .leading)
 
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(.white.opacity(0.13))
+                        Capsule().fill(.white.opacity(0.12))
                         Capsule()
                             .fill(limitColor(limit.percentage))
                             .frame(width: proxy.size.width * CGFloat(clampedPercentage(limit.percentage)) / 100)
                     }
                 }
-                .frame(height: 5)
+                .frame(height: 4.5)
 
                 Text("\(limit.percentage)%")
                     .font(.system(size: density.percentFontSize, weight: .heavy, design: .rounded))
@@ -268,20 +304,21 @@ struct MacThemeLargeWidgetView: View {
                    !reset.isEmpty {
                     Text("\(reset)重置")
                         .font(.system(size: density.detailFontSize, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.58))
+                        .foregroundStyle(.white.opacity(0.56))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.64)
+                        .minimumScaleFactor(0.6)
                         .frame(width: density.inlineResetWidth, alignment: .trailing)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if density.showsDetail, let detail = quotaDetail(for: limit) {
                 Text(detail)
                     .font(.system(size: density.detailFontSize, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.56))
+                    .foregroundStyle(.white.opacity(0.54))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .padding(.leading, 16)
+                    .minimumScaleFactor(0.65)
+                    .padding(.leading, 12)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -534,6 +571,54 @@ struct MacThemeLargeWidgetView: View {
             summaryHorizontalPadding: 7,
             summaryVerticalPadding: 4
         )
+
+        // 4个 Provider - 一行2个，2行，相对完整信息
+        static let gridRegular = QuotaCardDensity(
+            maxVisibleLimits: 2,
+            cardSpacing: 5,
+            summarySpacing: 5,
+            contentSpacing: 4,
+            horizontalPadding: 8,
+            verticalPadding: 6,
+            titleFontSize: 10,
+            levelFontSize: 8,
+            markerFontSize: 8,
+            percentFontSize: 9,
+            percentWidth: 28,
+            detailFontSize: 7.5,
+            lineSpacing: 2,
+            showsDetail: true,
+            showsInlineReset: false,
+            inlineResetWidth: 0,
+            summaryFontSize: 8,
+            summaryIconSpacing: 5,
+            summaryHorizontalPadding: 7,
+            summaryVerticalPadding: 5
+        )
+
+        // 5个以上 Provider - 一行2个，3行，仅显示主要信息
+        static let gridDense = QuotaCardDensity(
+            maxVisibleLimits: 1,
+            cardSpacing: 4,
+            summarySpacing: 4,
+            contentSpacing: 3,
+            horizontalPadding: 7,
+            verticalPadding: 5,
+            titleFontSize: 9.5,
+            levelFontSize: 7.5,
+            markerFontSize: 8,
+            percentFontSize: 9,
+            percentWidth: 26,
+            detailFontSize: 7,
+            lineSpacing: 1,
+            showsDetail: false,
+            showsInlineReset: true,
+            inlineResetWidth: 44,
+            summaryFontSize: 7.5,
+            summaryIconSpacing: 4,
+            summaryHorizontalPadding: 6,
+            summaryVerticalPadding: 4
+        )
     }
 
     private var isOnline: Bool {
@@ -584,7 +669,7 @@ struct MacThemeLargeWidgetView: View {
         }
     }
 
-    private static let maxVisibleProviderCount = 6
+    private static let maxVisibleProviderCount = 6 // 3行 × 2列
 }
 
 private struct MacThemeClockPill: View {
