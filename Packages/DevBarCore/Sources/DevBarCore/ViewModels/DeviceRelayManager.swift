@@ -704,6 +704,98 @@ public final class DeviceRelayManager: ObservableObject {
         )
     }
 
+    public static func makeProviderQuotaSnapshotMessage(
+        localDeviceID: String,
+        targetDeviceId: String,
+        snapshot: ProviderQuotaSnapshot
+    ) throws -> DeviceRelayMessage {
+        try makeProviderSyncMessage(
+            type: .providerQuotaSnapshot,
+            localDeviceID: localDeviceID,
+            targetDeviceId: targetDeviceId,
+            accountID: snapshot.accountID,
+            provider: snapshot.provider,
+            revision: snapshot.revision,
+            encodedPayload: DeviceRelayProviderSyncPayloadCodec.encode(snapshot)
+        )
+    }
+
+    public static func makeProviderCredentialUpdateMessage(
+        localDeviceID: String,
+        targetDeviceId: String,
+        credential: ProviderCredentialEnvelope
+    ) throws -> DeviceRelayMessage {
+        try makeProviderSyncMessage(
+            type: .providerCredentialUpdate,
+            localDeviceID: localDeviceID,
+            targetDeviceId: targetDeviceId,
+            accountID: credential.accountID,
+            provider: credential.provider,
+            revision: credential.revision,
+            encodedPayload: DeviceRelayProviderSyncPayloadCodec.encode(credential)
+        )
+    }
+
+    public static func makeProviderAccountUpsertMessage(
+        localDeviceID: String,
+        targetDeviceId: String,
+        account: ProviderAccount
+    ) throws -> DeviceRelayMessage {
+        try makeProviderSyncMessage(
+            type: .providerAccountUpsert,
+            localDeviceID: localDeviceID,
+            targetDeviceId: targetDeviceId,
+            accountID: account.id,
+            provider: account.provider,
+            revision: Int(account.updatedAt.timeIntervalSince1970),
+            encodedPayload: DeviceRelayProviderSyncPayloadCodec.encode(account)
+        )
+    }
+
+    public static func makeProviderSyncAckMessage(
+        localDeviceID: String,
+        targetDeviceId: String,
+        requestId: String?,
+        ack: DeviceRelayProviderSyncAck
+    ) throws -> DeviceRelayMessage {
+        try makeProviderSyncMessage(
+            type: .providerSyncAck,
+            localDeviceID: localDeviceID,
+            targetDeviceId: targetDeviceId,
+            requestId: requestId,
+            accountID: ack.accountID,
+            provider: ack.provider,
+            revision: ack.revision,
+            encodedPayload: DeviceRelayProviderSyncPayloadCodec.encode(ack)
+        )
+    }
+
+    private static func makeProviderSyncMessage(
+        type: DeviceRelayMessageType,
+        localDeviceID: String,
+        targetDeviceId: String,
+        requestId: String? = nil,
+        accountID: String,
+        provider: QuotaProvider,
+        revision: Int,
+        encodedPayload: String
+    ) -> DeviceRelayMessage {
+        DeviceRelayMessage(
+            type: type,
+            requestId: requestId ?? "provider-\(UUID().uuidString.lowercased())",
+            fromDeviceId: localDeviceID,
+            targetDeviceId: targetDeviceId,
+            payload: [
+                "payloadVersion": "1",
+                "accountID": accountID,
+                "provider": provider.rawValue,
+                "revision": "\(revision)",
+                "updatedAt": "\(Int64(Date().timeIntervalSince1970 * 1000))",
+                "encodedPayload": encodedPayload,
+            ]
+        )
+    }
+
     private func handle(_ message: DeviceRelayMessage) {
         switch message.type {
         case .relayConnected:

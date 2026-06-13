@@ -58,6 +58,7 @@ final class AppViewModel: ObservableObject {
     let quotaViewModel = QuotaViewModel()
     let openAIQuotaViewModel = OpenAIQuotaViewModel()
     let mimoQuotaViewModel = MimoQuotaViewModel()
+    let deepSeekQuotaViewModel = DeepSeekQuotaViewModel()
     let updateViewModel = UpdateViewModel()
     let notificationService = NotificationService()
     let weChatViewModel = WeChatViewModel()
@@ -83,8 +84,30 @@ final class AppViewModel: ObservableObject {
     @Published var accountConfigs: [AccountConfig] {
         didSet {
             saveAccountConfigs()
+            WidgetDataManager.shared.saveEnabledProviders(enabledProviders)
         }
     }
+    @Published var providerAccounts: [ProviderAccount] {
+        didSet {
+            accountSettingsStore.saveProviderAccounts(providerAccounts)
+            // Rebuild via normalizedConfigs so this path matches init() exactly,
+            // keeping accountConfigs (menu bar) in lockstep with providerAccounts
+            // (settings list).
+            accountConfigs = UserDefaultsAccountSettingsStore.normalizedConfigs(
+                providerAccounts
+                    .reduce(into: [QuotaProvider: AccountConfig]()) { result, account in
+                        if result[account.provider] == nil {
+                            result[account.provider] = account.legacyConfig
+                        }
+                    }
+                    .values
+                    .map { $0 }
+            )
+        }
+    }
+
+    private let accountSettingsStore = UserDefaultsAccountSettingsStore()
+    private var lastProviderSnapshotPushByPeer: [String: Date] = [:]
 
     private func saveAccountConfigs() {
         if let data = try? JSONEncoder().encode(accountConfigs) {
@@ -99,6 +122,12 @@ final class AppViewModel: ObservableObject {
             .map(\.provider)
     }
 
+    var enabledProviderAccounts: [ProviderAccount] {
+        providerAccounts
+            .filter(\.isEnabled)
+            .sorted { $0.order < $1.order }
+    }
+
     func hasAuthenticatedSession(for provider: QuotaProvider) -> Bool {
         switch provider {
         case .glm:
@@ -109,6 +138,14 @@ final class AppViewModel: ObservableObject {
         case .mimo:
             let token = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
             return token?.isEmpty == false
+        case .deepseek:
+            return providerAccounts.contains { account in
+                guard account.provider == .deepseek,
+                      let credential = KeychainService.shared.loadProviderCredential(for: account) else {
+                    return false
+                }
+                return (credential.token?.isEmpty == false) && (credential.cookieString?.isEmpty == false)
+            }
         }
     }
 
@@ -136,8 +173,52 @@ final class AppViewModel: ObservableObject {
         accountConfigs.first(where: { $0.provider == provider })?.isEnabled ?? false
     }
 
+    func providerDisplayTitle(for provider: QuotaProvider) -> String {
+        guard let account = providerAccounts
+            .filter({ $0.provider == provider && $0.isEnabled })
+            .sorted(by: { $0.order < $1.order })
+            .first else {
+            return provider.localizedName
+        }
+
+        let label = account.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !label.isEmpty, label != provider.localizedName else {
+            return provider.localizedName
+        }
+        return "\(provider.localizedName)(\(label))"
+    }
+
+    func providerDisplayTitle(for account: ProviderAccount) -> String {
+        let label = account.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !label.isEmpty, label != account.provider.localizedName {
+            return "\(account.provider.localizedName)(\(label))"
+        }
+
+        let siblingAccounts = enabledProviderAccounts.filter { $0.provider == account.provider }
+        if siblingAccounts.count > 1,
+           let index = siblingAccounts.firstIndex(where: { $0.id == account.id }) {
+            return "\(account.provider.localizedName) \(index + 1)"
+        }
+
+        return account.provider.localizedName
+    }
+
     func updateAccountConfig(provider: QuotaProvider, isEnabled: Bool) {
-        if let idx = accountConfigs.firstIndex(where: { $0.provider == provider }) {
+        // `providerAccounts` is the source of truth; its didSet rebuilds and
+        // persists `accountConfigs`. Writing only `accountConfigs` here would let
+        // the two diverge — the settings toggle reads `providerAccounts` while the
+        // menu bar reads `accountConfigs`.
+        let updatedAccounts = providerAccounts.map { account -> ProviderAccount in
+            guard account.provider == provider, account.isEnabled != isEnabled else { return account }
+            var updated = account
+            updated.isEnabled = isEnabled
+            updated.updatedAt = Date()
+            return updated
+        }
+        if updatedAccounts != providerAccounts {
+            providerAccounts = updatedAccounts
+        } else if let idx = accountConfigs.firstIndex(where: { $0.provider == provider }) {
+            // Fallback for providers without a backing account record.
             accountConfigs[idx].isEnabled = isEnabled
         }
         syncAuthState()
@@ -145,6 +226,52 @@ final class AppViewModel: ObservableObject {
         if provider == .mimo {
             updateMimoCookieRenewalTimer()
         }
+    }
+
+    func updateProviderAccountEnabled(id accountID: String, isEnabled: Bool) {
+        guard let index = providerAccounts.firstIndex(where: { $0.id == accountID }) else { return }
+        providerAccounts[index].isEnabled = isEnabled
+        providerAccounts[index].updatedAt = Date()
+        syncAuthState()
+        updateStatusText()
+        if providerAccounts[index].provider == .mimo {
+            updateMimoCookieRenewalTimer()
+        }
+    }
+
+    func updateProviderAccountDisplayName(id accountID: String, displayName: String) {
+        guard let index = providerAccounts.firstIndex(where: { $0.id == accountID }) else { return }
+        let trimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        providerAccounts[index].displayName = trimmed.isEmpty
+            ? providerAccounts[index].provider.localizedName
+            : trimmed
+        providerAccounts[index].updatedAt = Date()
+    }
+
+    @discardableResult
+    func saveCredential(
+        for accountID: String,
+        token: String?,
+        cookieString: String?,
+        accountIdentifier: String?
+    ) -> ProviderAccount? {
+        guard let account = providerAccounts.first(where: { $0.id == accountID }) else { return nil }
+        let currentRevision = KeychainService.shared.loadProviderCredential(for: account)?.revision ?? 0
+        let credential = ProviderCredentialEnvelope(
+            accountID: account.id,
+            provider: account.provider,
+            token: token,
+            cookieString: cookieString,
+            accountIdentifier: accountIdentifier,
+            revision: currentRevision + 1
+        )
+        guard KeychainService.shared.saveProviderCredential(credential, for: account) else {
+            return nil
+        }
+        broadcastCredentialIfPossible(for: account.provider)
+        syncAuthState()
+        updateStatusText()
+        return account
     }
 
     weak var statusBarButton: NSStatusBarButton?
@@ -207,12 +334,29 @@ final class AppViewModel: ObservableObject {
 
     init() {
         // Load account configs
-        if let data = UserDefaults.standard.data(forKey: Constants.Defaults.accountConfigsKey),
-           let configs = try? JSONDecoder().decode([AccountConfig].self, from: data) {
-            accountConfigs = UserDefaultsAccountSettingsStore.normalizedConfigs(configs)
-        } else {
-            accountConfigs = UserDefaultsAccountSettingsStore.defaultConfigs
+        let restoredProviders = Self.providersWithLegacyStoredCredentials()
+        let loadedAccounts = accountSettingsStore.loadProviderAccounts(restoringEnabledProviders: restoredProviders)
+        for account in loadedAccounts {
+            KeychainService.shared.migrateLegacyCredentialIfNeeded(for: account)
         }
+        let configs = UserDefaultsAccountSettingsStore.normalizedConfigs(
+            loadedAccounts
+                .reduce(into: [QuotaProvider: AccountConfig]()) { result, account in
+                    if result[account.provider] == nil {
+                        result[account.provider] = account.legacyConfig
+                    }
+                }
+                .values
+                .map { $0 }
+        )
+        providerAccounts = loadedAccounts
+        accountConfigs = configs
+        WidgetDataManager.shared.saveEnabledProviders(
+            configs
+                .filter(\.isEnabled)
+                .sorted { $0.order < $1.order }
+                .map(\.provider)
+        )
 
         menuBarIcon = UserDefaults.standard.string(forKey: Constants.Defaults.menuBarIconKey)
             ?? Constants.Defaults.defaultMenuBarIcon
@@ -277,6 +421,23 @@ final class AppViewModel: ObservableObject {
         }
         updateMimoCookieRenewalTimer()
 
+        // Load DeepSeek data if enabled
+        if isProviderEnabled(.deepseek) {
+            if let account = providerAccounts.first(where: { $0.provider == .deepseek }),
+               let credential = KeychainService.shared.loadProviderCredential(for: account),
+               let token = credential.token, !token.isEmpty,
+               let cookie = credential.cookieString, !cookie.isEmpty {
+                Task { @MainActor [weak self] in
+                    await self?.deepSeekQuotaViewModel.fetchUsage(
+                        token: token,
+                        cookieString: cookie,
+                        silent: true
+                    )
+                    self?.checkAndNotify()
+                }
+            }
+        }
+
         // Setup WeChat service if enabled
         Task { @MainActor [weak self] in
             guard let self else { return }
@@ -327,6 +488,59 @@ final class AppViewModel: ObservableObject {
         }
     }
 
+    private static func providersWithLegacyStoredCredentials() -> Set<QuotaProvider> {
+        var providers: Set<QuotaProvider> = []
+        let keychain = KeychainService.shared
+        if keychain.load(key: DevBarCoreConstants.Keychain.tokenKey)?.isEmpty == false {
+            providers.insert(.glm)
+        }
+        if keychain.load(key: DevBarCoreConstants.Keychain.openAIAccessTokenKey)?.isEmpty == false {
+            providers.insert(.openai)
+        }
+        if keychain.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)?.isEmpty == false {
+            providers.insert(.mimo)
+        }
+        return providers
+    }
+
+    func addProviderAccount(provider: QuotaProvider) -> ProviderAccount {
+        let nextOrder = (providerAccounts.map(\.order).max() ?? -1) + 1
+        let sameProviderCount = providerAccounts.filter { $0.provider == provider }.count
+        let account = ProviderAccount(
+            provider: provider,
+            displayName: sameProviderCount == 0 ? provider.localizedName : "\(provider.localizedName) \(sameProviderCount + 1)",
+            isEnabled: true,
+            order: nextOrder
+        )
+        providerAccounts.append(account)
+        return account
+    }
+
+    func removeProviderAccount(id accountID: String) {
+        guard let account = providerAccounts.first(where: { $0.id == accountID }) else { return }
+        KeychainService.shared.deleteProviderCredential(for: account)
+        WidgetDataManager.shared.clearQuotaSnapshot(accountID: accountID)
+        providerAccounts.removeAll { $0.id == accountID }
+        normalizeProviderAccountOrders()
+        refreshAuthenticationState()
+    }
+
+    func updateProviderAccount(_ account: ProviderAccount) {
+        if let index = providerAccounts.firstIndex(where: { $0.id == account.id }) {
+            providerAccounts[index] = account
+            providerAccounts[index].updatedAt = Date()
+        } else {
+            providerAccounts.append(account)
+        }
+    }
+
+    private func normalizeProviderAccountOrders() {
+        providerAccounts.sort { $0.order < $1.order }
+        for index in providerAccounts.indices {
+            providerAccounts[index].order = index
+        }
+    }
+
     private func updateMenuBarBadge(from notification: Notification) {
         guard let userInfo = notification.userInfo,
               let waitingCount = userInfo["waitingCount"] as? Int else {
@@ -360,8 +574,11 @@ final class AppViewModel: ObservableObject {
             }
         case .systemStatusRequest:
             await handleRelayStatusRequest(message)
+            await sendCurrentProviderSnapshotsIfNeeded(to: message.fromDeviceId)
         case .smsAlert:
             await handleRelaySMSAlert(message)
+        case .relayPaired, .relayHeartbeat, .relayPing:
+            await sendCurrentProviderSnapshotsIfNeeded(to: message.fromDeviceId)
         default:
             return
         }
@@ -676,6 +893,12 @@ final class AppViewModel: ObservableObject {
             return
         }
         self.credentials = credentials
+        upsertCredentialForPrimaryAccount(
+            provider: .glm,
+            token: credentials.token,
+            cookieString: credentials.cookieString,
+            accountIdentifier: nil
+        )
         syncAuthState()
         print("[DevBar] ⑥① authState set to loggedIn")
 
@@ -710,8 +933,18 @@ final class AppViewModel: ObservableObject {
         case .mimo:
             mimoQuotaViewModel.resetForLogout()
             KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
+            for account in providerAccounts where account.provider == .mimo {
+                KeychainService.shared.deleteProviderCredential(for: account)
+                WidgetDataManager.shared.clearQuotaSnapshot(accountID: account.id)
+            }
             mimoCookieRenewalState = .idle
             updateMimoCookieRenewalTimer()
+        case .deepseek:
+            deepSeekQuotaViewModel.resetForLogout()
+            for account in providerAccounts where account.provider == .deepseek {
+                KeychainService.shared.deleteProviderCredential(for: account)
+                WidgetDataManager.shared.clearQuotaSnapshot(accountID: account.id)
+            }
         }
         refreshAuthenticationState()
     }
@@ -730,8 +963,39 @@ final class AppViewModel: ObservableObject {
             ProviderTransferCredentials(token: nil, cookieString: $0)
         }
         let openAIAccountId = UserDefaults.standard.string(forKey: Constants.OpenAI.accountIdKey)
+        let primaryMimoAccountID = providerAccounts
+            .filter { $0.provider == .mimo }
+            .sorted { $0.order < $1.order }
+            .first?.id
+
+        let accounts = providerAccounts.sorted { $0.order < $1.order }.map { account in
+            let credential = KeychainService.shared.loadProviderCredential(for: account)
+            let accountCredentials: ProviderTransferCredentials?
+            if account.provider == .mimo, account.id == primaryMimoAccountID {
+                accountCredentials = Self.transferCredentials(
+                    token: credential?.token,
+                    cookieString: mimoServiceToken ?? credential?.cookieString
+                )
+            } else {
+                accountCredentials = Self.transferCredentials(
+                    token: credential?.token,
+                    cookieString: credential?.cookieString
+                )
+            }
+            return ProviderAccountTransferPayload(
+                id: account.id,
+                provider: account.provider,
+                displayName: account.displayName,
+                isEnabled: account.isEnabled,
+                order: account.order,
+                credentials: accountCredentials,
+                accountIdentifier: credential?.accountIdentifier ?? account.providerAccountIdentifier,
+                credentialRevision: credential?.revision ?? 1
+            )
+        }
 
         return TransferPayload(
+            schemaVersion: 2,
             exportedAt: exportedAt,
             expiresAt: exportedAt.addingTimeInterval(expirationInterval),
             deviceName: Host.current().localizedName,
@@ -744,8 +1008,45 @@ final class AppViewModel: ObservableObject {
                     accountId: openAIAccountId
                 ),
                 ProviderTransferPayload(provider: .mimo, credentials: mimoCredentials),
-            ]
+            ],
+            accounts: accounts
         )
+    }
+
+    private static func transferCredentials(token: String?, cookieString: String?) -> ProviderTransferCredentials? {
+        let trimmedToken = token?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCookie = cookieString?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedToken?.isEmpty == false || trimmedCookie?.isEmpty == false else {
+            return nil
+        }
+        return ProviderTransferCredentials(token: trimmedToken, cookieString: trimmedCookie)
+    }
+
+    @discardableResult
+    func upsertCredentialForPrimaryAccount(
+        provider: QuotaProvider,
+        token: String?,
+        cookieString: String?,
+        accountIdentifier: String?
+    ) -> ProviderAccount {
+        let account: ProviderAccount
+        if let existing = providerAccounts.first(where: { $0.provider == provider }) {
+            account = existing
+        } else {
+            account = addProviderAccount(provider: provider)
+        }
+        let currentRevision = KeychainService.shared.loadProviderCredential(for: account)?.revision ?? 0
+        let credential = ProviderCredentialEnvelope(
+            accountID: account.id,
+            provider: provider,
+            token: token,
+            cookieString: cookieString,
+            accountIdentifier: accountIdentifier,
+            revision: currentRevision + 1
+        )
+        _ = KeychainService.shared.saveProviderCredential(credential, for: account)
+        broadcastCredentialIfPossible(for: provider)
+        return account
     }
 
     func makeTransferURL(expirationInterval: TimeInterval = 300) throws -> URL {
@@ -767,6 +1068,7 @@ final class AppViewModel: ObservableObject {
     func refreshQuota(silent: Bool = false) async {
         if isProviderEnabled(.glm), hasAuthenticatedSession(for: .glm) {
             await quotaViewModel.fetchQuota(credentials: credentials, silent: silent)
+            await broadcastQuotaSnapshotIfPossible(for: .glm)
             updateStatusText(after: .milliseconds(200))
             if quotaViewModel.errorMessage == String(localized: "login_expired") {
                 authState = hasAuthenticatedSession(for: .openai) ? .loggedIn : .expired
@@ -776,10 +1078,26 @@ final class AppViewModel: ObservableObject {
 
         if isProviderEnabled(.openai), hasAuthenticatedSession(for: .openai) {
             await openAIQuotaViewModel.fetchUsage(silent: true)
+            await broadcastQuotaSnapshotIfPossible(for: .openai)
         }
 
         if isProviderEnabled(.mimo), hasAuthenticatedSession(for: .mimo) {
             await refreshMimoQuotaWithAutoRenew(silent: silent)
+            await broadcastQuotaSnapshotIfPossible(for: .mimo)
+        }
+
+        if isProviderEnabled(.deepseek), hasAuthenticatedSession(for: .deepseek) {
+            if let account = providerAccounts.first(where: { $0.provider == .deepseek }),
+               let credential = KeychainService.shared.loadProviderCredential(for: account),
+               let token = credential.token, !token.isEmpty,
+               let cookie = credential.cookieString, !cookie.isEmpty {
+                await deepSeekQuotaViewModel.fetchUsage(
+                    token: token,
+                    cookieString: cookie,
+                    silent: silent
+                )
+                await broadcastQuotaSnapshotIfPossible(for: .deepseek)
+            }
         }
 
         checkAndNotify()
@@ -818,6 +1136,12 @@ final class AppViewModel: ObservableObject {
             mimoCookieRenewalState = .idle
         case .renewed(let cookie), .unchanged(let cookie):
             mimoCookieRenewalState = .renewed(Date())
+            upsertCredentialForPrimaryAccount(
+                provider: .mimo,
+                token: nil,
+                cookieString: cookie,
+                accountIdentifier: nil
+            )
             guard retryUsage else { return }
             do {
                 _ = try await mimoQuotaViewModel.fetchUsage(serviceToken: cookie, silent: silent)
@@ -862,6 +1186,195 @@ final class AppViewModel: ObservableObject {
         let result = await mimoCookieRenewalService.renewIfNeeded(reason: reason)
         if result != .skipped {
             await handleMimoCookieRenewalResult(result, retryUsage: false, silent: true)
+        }
+    }
+
+    private func broadcastQuotaSnapshotIfPossible(for provider: QuotaProvider) async {
+        guard let account = providerAccounts.first(where: { $0.provider == provider && $0.syncPolicy.quotaSyncEnabled }),
+              let snapshot = makeQuotaSnapshot(for: account) else {
+            return
+        }
+
+        WidgetDataManager.shared.saveQuotaSnapshot(snapshot)
+
+        let peers = await providerSyncIPhonePeers()
+        guard let localDeviceID = deviceRelayManager.localDeviceID else { return }
+
+        for peer in peers {
+            await sendProviderQuotaSnapshot(snapshot, account: account, to: peer, localDeviceID: localDeviceID)
+        }
+    }
+
+    private func broadcastCredentialIfPossible(for provider: QuotaProvider) {
+        guard let account = providerAccounts.first(where: { $0.provider == provider && $0.syncPolicy.credentialSyncEnabled }),
+              let credential = KeychainService.shared.loadProviderCredential(for: account) else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let peers = await self.providerSyncIPhonePeers()
+            guard let localDeviceID = self.deviceRelayManager.localDeviceID else { return }
+
+            for peer in peers {
+                do {
+                    let accountMessage = try DeviceRelayManager.makeProviderAccountUpsertMessage(
+                        localDeviceID: localDeviceID,
+                        targetDeviceId: peer.deviceId,
+                        account: account
+                    )
+                    try await self.deviceRelayManager.send(accountMessage)
+
+                    let message = try DeviceRelayManager.makeProviderCredentialUpdateMessage(
+                        localDeviceID: localDeviceID,
+                        targetDeviceId: peer.deviceId,
+                        credential: credential
+                    )
+                    try await self.deviceRelayManager.send(message)
+                } catch {
+                    print("[DevBar:ProviderSync] credential send failed peer=\(peer.deviceId) account=\(credential.accountID.suffix(6)) \(error)")
+                }
+            }
+        }
+    }
+
+    private func providerSyncIPhonePeers() async -> [DeviceRelayDevice] {
+        if deviceRelayManager.localDeviceID == nil || deviceRelayManager.deviceToken == nil {
+            await deviceRelayManager.setup(deviceType: .mac, deviceName: Self.currentDeviceName)
+        } else {
+            await deviceRelayManager.resumeConnectivity(deviceType: .mac, deviceName: Self.currentDeviceName)
+        }
+
+        let peers = deviceRelayManager.peers.filter { $0.deviceType == .iPhone }
+        if peers.isEmpty {
+            print("[DevBar:ProviderSync] no iPhone peers available after refresh")
+        }
+        return peers
+    }
+
+    private func sendCurrentProviderSnapshotsIfNeeded(to peerDeviceID: String?) async {
+        guard let peerDeviceID,
+              peerDeviceID != deviceRelayManager.localDeviceID,
+              let peer = deviceRelayManager.peers.first(where: { $0.deviceId == peerDeviceID && $0.deviceType == .iPhone }),
+              let localDeviceID = deviceRelayManager.localDeviceID else {
+            return
+        }
+
+        let now = Date()
+        if let lastPushed = lastProviderSnapshotPushByPeer[peerDeviceID],
+           now.timeIntervalSince(lastPushed) < 20 {
+            return
+        }
+        lastProviderSnapshotPushByPeer[peerDeviceID] = now
+
+        for account in providerAccounts
+            .filter({ $0.isEnabled && $0.syncPolicy.quotaSyncEnabled })
+            .sorted(by: { $0.order < $1.order }) {
+            guard let snapshot = makeQuotaSnapshot(for: account)
+                ?? WidgetDataManager.shared.loadQuotaSnapshot(accountID: account.id) else {
+                continue
+            }
+            await sendProviderQuotaSnapshot(snapshot, account: account, to: peer, localDeviceID: localDeviceID)
+        }
+    }
+
+    private func sendProviderQuotaSnapshot(
+        _ snapshot: ProviderQuotaSnapshot,
+        account: ProviderAccount,
+        to peer: DeviceRelayDevice,
+        localDeviceID: String
+    ) async {
+        do {
+            let accountMessage = try DeviceRelayManager.makeProviderAccountUpsertMessage(
+                localDeviceID: localDeviceID,
+                targetDeviceId: peer.deviceId,
+                account: account
+            )
+            try await deviceRelayManager.send(accountMessage)
+
+            let message = try DeviceRelayManager.makeProviderQuotaSnapshotMessage(
+                localDeviceID: localDeviceID,
+                targetDeviceId: peer.deviceId,
+                snapshot: snapshot
+            )
+            try await deviceRelayManager.send(message)
+        } catch {
+            print("[DevBar:ProviderSync] quota send failed peer=\(peer.deviceId) account=\(snapshot.accountID.suffix(6)) \(error)")
+        }
+    }
+
+    private func makeQuotaSnapshot(for account: ProviderAccount) -> ProviderQuotaSnapshot? {
+        switch account.provider {
+        case .glm:
+            guard let limits = quotaViewModel.quotaData?.limits else { return nil }
+            return ProviderQuotaSnapshot(
+                accountID: account.id,
+                provider: .glm,
+                displayName: account.displayName,
+                limits: limits.map { $0.toWidgetLimit() },
+                level: quotaViewModel.quotaData?.level,
+                subscriptionName: quotaViewModel.subscription?.productName,
+                subscriptionExpireDate: quotaViewModel.subscription?.formattedNextRenewDate,
+                sourceDeviceID: deviceRelayManager.localDeviceID
+            )
+        case .openai:
+            return ProviderQuotaSnapshot(
+                accountID: account.id,
+                provider: .openai,
+                displayName: account.displayName,
+                limits: openAIQuotaViewModel.quotaRows.map {
+                    WidgetQuotaLimit(
+                        type: $0.name,
+                        displayName: $0.name,
+                        percentage: $0.percentage,
+                        unitDescription: $0.unitDescription,
+                        formattedResetTime: $0.resetTime
+                    )
+                },
+                level: openAIQuotaViewModel.planType,
+                subscriptionName: nil,
+                subscriptionExpireDate: nil,
+                sourceDeviceID: deviceRelayManager.localDeviceID
+            )
+        case .mimo:
+            return ProviderQuotaSnapshot(
+                accountID: account.id,
+                provider: .mimo,
+                displayName: account.displayName,
+                limits: mimoQuotaViewModel.quotaRows.map {
+                    WidgetQuotaLimit(
+                        type: $0.name,
+                        displayName: $0.name,
+                        percentage: $0.percentage,
+                        unitDescription: $0.unitDescription,
+                        formattedResetTime: $0.resetTime
+                    )
+                },
+                level: mimoQuotaViewModel.planName,
+                subscriptionName: mimoQuotaViewModel.planName,
+                subscriptionExpireDate: mimoQuotaViewModel.planDetail?.currentPeriodEnd,
+                sourceDeviceID: deviceRelayManager.localDeviceID
+            )
+        case .deepseek:
+            guard let data = deepSeekQuotaViewModel.usageData else { return nil }
+            return ProviderQuotaSnapshot(
+                accountID: account.id,
+                provider: .deepseek,
+                displayName: account.displayName,
+                limits: data.quotaRows.map {
+                    WidgetQuotaLimit(
+                        type: $0.name,
+                        displayName: $0.name,
+                        percentage: $0.percentage,
+                        unitDescription: $0.unitDescription,
+                        formattedResetTime: nil
+                    )
+                },
+                level: nil,
+                subscriptionName: nil,
+                subscriptionExpireDate: nil,
+                sourceDeviceID: deviceRelayManager.localDeviceID
+            )
         }
     }
 
@@ -1012,6 +1525,7 @@ final class AppViewModel: ObservableObject {
             .environmentObject(quotaViewModel)
             .environmentObject(openAIQuotaViewModel)
             .environmentObject(mimoQuotaViewModel)
+            .environmentObject(deepSeekQuotaViewModel)
             .environmentObject(updateViewModel)
             .environmentObject(notificationService)
 

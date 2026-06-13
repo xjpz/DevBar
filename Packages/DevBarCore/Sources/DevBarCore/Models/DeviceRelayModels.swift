@@ -160,6 +160,11 @@ public enum DeviceRelayMessageType: String, Codable, Sendable, Equatable {
     case localChallenge = "local.challenge"
     case localAuth = "local.auth"
     case localReady = "local.ready"
+    case providerAccountUpsert = "provider.account.upsert"
+    case providerAccountDelete = "provider.account.delete"
+    case providerQuotaSnapshot = "provider.quota.snapshot"
+    case providerCredentialUpdate = "provider.credential.update"
+    case providerSyncAck = "provider.sync.ack"
 }
 
 public enum DeviceRelayCommandType: String, Codable, Sendable, Equatable {
@@ -214,6 +219,39 @@ public struct DeviceRelayMessage: Codable, Sendable, Equatable, Identifiable {
         self.targetDeviceId = targetDeviceId
         self.timestamp = timestamp
         self.payload = payload
+    }
+}
+
+public enum DeviceRelayProviderSyncPayloadCodec {
+    public static func encode<Value: Encodable>(_ value: Value) throws -> String {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(value).base64URLEncodedString()
+    }
+
+    public static func decode<Value: Decodable>(_ type: Value.Type, from value: String) throws -> Value {
+        guard let data = Data(base64URLEncoded: value) else {
+            throw DeviceRelayError.invalidRelayResponse
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(type, from: data)
+    }
+}
+
+public struct DeviceRelayProviderSyncAck: Codable, Sendable, Equatable {
+    public let accountID: String
+    public let provider: QuotaProvider
+    public let status: String
+    public let revision: Int
+    public let message: String?
+
+    public init(accountID: String, provider: QuotaProvider, status: String, revision: Int, message: String? = nil) {
+        self.accountID = accountID
+        self.provider = provider
+        self.status = status
+        self.revision = revision
+        self.message = message
     }
 }
 

@@ -7,6 +7,7 @@ public enum APIError: Error, LocalizedError {
     case unauthorized
     case openAIUnauthorized
     case mimoCookieExpired
+    case deepseekUnauthorized
     case providerMessage(String)
     case decodingError(Error)
 
@@ -24,6 +25,8 @@ public enum APIError: Error, LocalizedError {
             return CoreL10n.text("openai_token_invalid")
         case .mimoCookieExpired:
             return CoreL10n.text("mimo_cookie_expired")
+        case .deepseekUnauthorized:
+            return CoreL10n.text("deepseek_token_invalid")
         case .providerMessage(let message):
             return message
         case .decodingError(let error):

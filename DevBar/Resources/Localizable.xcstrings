@@ -80,6 +80,9 @@
     "%@ 会立即回到登录窗口。" : {
 
     },
+    "%@重置" : {
+
+    },
     "%lld" : {
 
     },
@@ -1071,6 +1074,9 @@
     "Base64" : {
 
     },
+    "Bearer xxx" : {
+
+    },
     "browser_login" : {
       "localizations" : {
         "en" : {
@@ -1249,6 +1255,9 @@
     "Convert to Date" : {
 
     },
+    "Cookie" : {
+
+    },
     "credentials_local_only" : {
       "localizations" : {
         "en" : {
@@ -1278,6 +1287,161 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "数据解析失败: %@"
+          }
+        }
+      }
+    },
+    "DeepSeek" : {
+
+    },
+    "DeepSeek 额度" : {
+
+    },
+    "deepseek_authorization_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Get the Authorization token and Cookie from the DeepSeek platform web console (F12 → Network). Both are required."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 DeepSeek 平台 Web 控制台获取 Authorization 令牌和 Cookie（F12 → Network），两者均为必填。"
+          }
+        }
+      }
+    },
+    "deepseek_configure_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configure DeepSeek credentials in Settings to view usage."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在设置中配置 DeepSeek 凭证以查看用量。"
+          }
+        }
+      }
+    },
+    "deepseek_cookie_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste the Cookie header from the browser. Required for API access."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴浏览器中的 Cookie 头，API 访问必填。"
+          }
+        }
+      }
+    },
+    "deepseek_cost_usage" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cost Usage"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "费用用量"
+          }
+        }
+      }
+    },
+    "deepseek_credential_required" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek credentials required"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要 DeepSeek 凭证"
+          }
+        }
+      }
+    },
+    "deepseek_rate_limited" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek rate limit exceeded"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek 请求频率超限"
+          }
+        }
+      }
+    },
+    "deepseek_server_error" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek server error"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek 服务器错误"
+          }
+        }
+      }
+    },
+    "deepseek_token_invalid" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek token invalid or expired"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek 令牌无效或已过期"
+          }
+        }
+      }
+    },
+    "deepseek_token_usage" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token Usage"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Token 用量"
           }
         }
       }
@@ -2225,6 +2389,22 @@
         }
       }
     },
+    "ios_accounts_remove_deepseek" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除"
+          }
+        }
+      }
+    },
     "ios_accounts_remove_glm" : {
       "localizations" : {
         "en" : {
@@ -2367,6 +2547,54 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "确定"
+          }
+        }
+      }
+    },
+    "ios_dashboard_deepseek_configure_prompt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configure DeepSeek credentials in Accounts to load usage."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在账号中配置 DeepSeek 凭证以加载用量。"
+          }
+        }
+      }
+    },
+    "ios_dashboard_deepseek_loading" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading DeepSeek usage…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载 DeepSeek 用量…"
+          }
+        }
+      }
+    },
+    "ios_dashboard_deepseek_no_usage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No DeepSeek usage data yet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无 DeepSeek 用量数据。"
           }
         }
       }
@@ -9022,6 +9250,9 @@
     "切换小组件页面" : {
 
     },
+    "删除账号" : {
+
+    },
     "刷新" : {
 
     },
@@ -9187,6 +9418,9 @@
     "深色" : {
 
     },
+    "添加 Provider 账号" : {
+
+    },
     "添加到桌面后，可编辑并选择 Provider 额度、Agent Watcher、Mac 主题或翻页时钟。" : {
 
     },
@@ -9209,6 +9443,9 @@
 
     },
     "用 iPhone DevBar 扫描二维码完成配对。二维码不包含设备密钥，过期后请重新生成。" : {
+
+    },
+    "用于区分同一个 Provider 下的多个账号" : {
 
     },
     "电脑" : {

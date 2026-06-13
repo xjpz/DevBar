@@ -288,7 +288,7 @@ private enum TransferPayloadRelayCrypto {
         decoder.dateDecodingStrategy = .iso8601
         let payload = try decoder.decode(TransferPayload.self, from: data)
 
-        guard payload.schemaVersion == 1 else {
+        guard [1, 2].contains(payload.schemaVersion) else {
             throw TransferPayloadError.unsupportedSchemaVersion(payload.schemaVersion)
         }
 

@@ -17,6 +17,7 @@ enum DesktopStyledWidgetContentSelection: String, AppEnum {
     case glmQuota
     case openAIQuota
     case mimoQuota
+    case deepSeekQuota
     #if os(macOS)
     case agentWatcher
     #endif
@@ -33,6 +34,7 @@ enum DesktopStyledWidgetContentSelection: String, AppEnum {
             .glmQuota: DisplayRepresentation(title: "GLM 额度"),
             .openAIQuota: DisplayRepresentation(title: "OpenAI 额度"),
             .mimoQuota: DisplayRepresentation(title: "MiMo 额度"),
+            .deepSeekQuota: DisplayRepresentation(title: "DeepSeek 额度"),
             .agentWatcher: DisplayRepresentation(title: "Agent Watcher"),
             .macTheme: DisplayRepresentation(title: "Mac 主题"),
             .flipClock: DisplayRepresentation(title: "翻页时钟")
@@ -42,6 +44,7 @@ enum DesktopStyledWidgetContentSelection: String, AppEnum {
             .glmQuota: DisplayRepresentation(title: "GLM 额度"),
             .openAIQuota: DisplayRepresentation(title: "OpenAI 额度"),
             .mimoQuota: DisplayRepresentation(title: "MiMo 额度"),
+            .deepSeekQuota: DisplayRepresentation(title: "DeepSeek 额度"),
             .macTheme: DisplayRepresentation(title: "Mac 主题"),
             .flipClock: DisplayRepresentation(title: "翻页时钟")
         ]
@@ -122,7 +125,7 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
         content: DesktopStyledWidgetContentSelection
     ) -> DesktopStyledWidgetEntry {
         switch content {
-        case .glmQuota, .openAIQuota, .mimoQuota:
+        case .glmQuota, .openAIQuota, .mimoQuota, .deepSeekQuota:
             let provider = content.quotaProvider ?? .glm
             let quotaData = QuotaTimelineProvider.loadSharedData(for: provider) ?? .placeholder
             let dataByProvider = Dictionary(
@@ -207,12 +210,22 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
                 ],
                 date: date
             )
+        case .deepseek:
+            return previewData(
+                provider: .deepseek,
+                level: nil,
+                limits: [
+                    previewLimit(type: "DEEPSEEK_COST", name: "费用额度", percentage: 31),
+                    previewLimit(type: "DEEPSEEK_TOKENS", name: "Token 用量", percentage: 44)
+                ],
+                date: date
+            )
         }
     }
 
     private static func previewData(
         provider: WidgetProvider,
-        level: String,
+        level: String?,
         limits: [WidgetQuotaLimit],
         date: Date
     ) -> WidgetSharedData {
@@ -262,6 +275,7 @@ private extension DesktopStyledWidgetContentSelection {
         case .glmQuota: return .glm
         case .openAIQuota: return .openai
         case .mimoQuota: return .mimo
+        case .deepSeekQuota: return .deepseek
         #if os(macOS)
         case .agentWatcher: return nil
         #endif
@@ -304,7 +318,10 @@ private struct DesktopStyledQuotaLargeView: View {
     let visualStyle: WidgetVisualStyle
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        let providers = visibleProviders
+        let density = quotaDensity(for: providers.count)
+
+        VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Label("AI 额度", systemImage: "chart.pie.fill")
                     .font(.headline.weight(.bold))
@@ -314,9 +331,9 @@ private struct DesktopStyledQuotaLargeView: View {
                     .foregroundStyle(secondaryTextColor)
             }
 
-            VStack(spacing: 8) {
-                ForEach(WidgetProviderSelection.allCases, id: \.self) { provider in
-                    providerCard(provider)
+            VStack(spacing: density.cardSpacing) {
+                ForEach(Array(providers.enumerated()), id: \.offset) { _, provider in
+                    providerCard(provider, density: density)
                 }
             }
 
@@ -336,8 +353,8 @@ private struct DesktopStyledQuotaLargeView: View {
             }
             .font(.caption2.weight(.semibold))
             .foregroundStyle(secondaryTextColor)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity)
             .background(cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay {
@@ -348,21 +365,54 @@ private struct DesktopStyledQuotaLargeView: View {
         .foregroundStyle(primaryTextColor)
     }
 
-    private func providerCard(_ provider: WidgetProviderSelection) -> some View {
-        let data = dataByProvider[provider]
-        let limits = visibleQuotaLimits(in: data)
+    private var visibleProviders: [WidgetProviderSelection] {
+        let enabledSelections = WidgetProviderSelection.enabledSelectionsFromAppGroup
+        if !enabledSelections.isEmpty {
+            return Array(enabledSelections.prefix(Self.maxVisibleProviderCount))
+        }
 
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 7) {
+        let providersWithData = WidgetProviderSelection.allCases.filter { provider in
+            guard let data = dataByProvider[provider] else { return false }
+            return data.lastUpdated != .distantPast
+        }
+        let candidates = providersWithData.isEmpty ? WidgetProviderSelection.allCases : providersWithData
+        return Array(candidates.prefix(Self.maxVisibleProviderCount))
+    }
+
+    private func quotaDensity(for providerCount: Int) -> QuotaCardDensity {
+        switch providerCount {
+        case 0...1: return .comfortable
+        case 2: return .regular
+        case 3: return .compact
+        default: return .dense
+        }
+    }
+
+    private func providerCard(_ provider: WidgetProviderSelection, density: QuotaCardDensity) -> some View {
+        let data = dataByProvider[provider]
+        let limits = visibleQuotaLimits(in: data, maxCount: density.maxVisibleLimits)
+        let headerDetail = quotaHeaderDetail(
+            in: limits,
+            provider: provider,
+            fallbackLevel: data?.level,
+            canShowResetInBody: density.showsDetail
+        )
+
+        return VStack(alignment: .leading, spacing: density.contentSpacing) {
+            HStack(spacing: 5) {
                 Circle()
                     .fill(providerColor(provider))
-                    .frame(width: 7, height: 7)
+                    .frame(width: 6, height: 6)
                 Text(provider.displayName)
-                    .font(.subheadline.weight(.bold))
+                    .font(.system(size: density.titleFontSize, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 Spacer()
-                Text(data?.level?.capitalized ?? "--")
-                    .font(.caption2.weight(.bold))
+                Text(headerDetail)
+                    .font(.system(size: density.levelFontSize, weight: .bold))
                     .foregroundStyle(secondaryTextColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
 
             if limits.isEmpty {
@@ -371,12 +421,12 @@ private struct DesktopStyledQuotaLargeView: View {
                     .foregroundStyle(secondaryTextColor)
             } else {
                 ForEach(limits) { limit in
-                    quotaLine(limit)
+                    quotaLine(limit, provider: provider, density: density)
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, density.horizontalPadding)
+        .padding(.vertical, density.verticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay {
@@ -385,11 +435,15 @@ private struct DesktopStyledQuotaLargeView: View {
         }
     }
 
-    private func quotaLine(_ limit: WidgetQuotaLimit) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+    private func quotaLine(
+        _ limit: WidgetQuotaLimit,
+        provider: WidgetProviderSelection,
+        density: QuotaCardDensity
+    ) -> some View {
+        VStack(alignment: .leading, spacing: density.lineSpacing) {
             HStack(spacing: 7) {
-                Text(quotaMarker(for: limit))
-                    .font(.caption2.weight(.black))
+                Text(quotaMarker(for: limit, provider: provider))
+                    .font(.system(size: density.markerFontSize, weight: .black, design: .rounded))
                     .foregroundStyle(limitColor(limit.percentage))
                     .frame(width: 10, alignment: .leading)
 
@@ -404,14 +458,25 @@ private struct DesktopStyledQuotaLargeView: View {
                 .frame(height: 5)
 
                 Text("\(limit.percentage)%")
-                    .font(.caption2.weight(.bold))
+                    .font(.system(size: density.percentFontSize, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .frame(width: 34, alignment: .trailing)
+                    .frame(width: density.percentWidth, alignment: .trailing)
+
+                if density.showsInlineReset,
+                   let reset = limit.formattedResetTime,
+                   !reset.isEmpty {
+                    Text("\(reset)重置")
+                        .font(.system(size: density.detailFontSize, weight: .semibold))
+                        .foregroundStyle(secondaryTextColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.64)
+                        .frame(width: density.inlineResetWidth, alignment: .trailing)
+                }
             }
 
-            if let detail = quotaDetail(for: limit) {
+            if density.showsDetail, let detail = quotaDetail(for: limit) {
                 Text(detail)
-                    .font(.system(size: 8, weight: .semibold))
+                    .font(.system(size: density.detailFontSize, weight: .semibold))
                     .foregroundStyle(secondaryTextColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -456,53 +521,109 @@ private struct DesktopStyledQuotaLargeView: View {
         case .glm: return .green
         case .openai: return .blue
         case .mimo: return .orange
+        case .deepseek: return .indigo
         }
     }
 
-    private func quotaMarker(for limit: WidgetQuotaLimit) -> String {
-        let lowercased = "\(limit.type) \(limit.displayName)".lowercased()
-        if limit.type == "OPENAI_SESSION"
-            || lowercased.contains("5h")
-            || lowercased.contains("5 h")
-            || lowercased.contains("5小时")
-            || lowercased.contains("hour") {
-            return "H"
-        }
-        if lowercased.contains("monthly")
-            || lowercased.contains("month")
-            || lowercased.contains("每月")
-            || lowercased.contains("月") {
-            return "M"
-        }
-        if limit.type == "OPENAI_WEEKLY"
-            || lowercased.contains("weekly")
-            || lowercased.contains("week")
-            || lowercased.contains("每周")
-            || lowercased.contains("周") {
-            return "W"
-        }
-        return "Q"
+    private func quotaMarker(for limit: WidgetQuotaLimit, provider: WidgetProviderSelection) -> String {
+        WidgetQuotaPresentation.marker(for: limit, provider: WidgetProvider(rawValue: provider.rawValue))
     }
 
-    private func visibleQuotaLimits(in data: WidgetSharedData?) -> [WidgetQuotaLimit] {
-        Array((data?.limits ?? [])
-            .enumerated()
-            .sorted { lhs, rhs in
-                let lhsPriority = quotaPriority(for: lhs.element)
-                let rhsPriority = quotaPriority(for: rhs.element)
-                return lhsPriority == rhsPriority ? lhs.offset < rhs.offset : lhsPriority < rhsPriority
-            }
-            .prefix(2)
-            .map(\.element))
+    private func visibleQuotaLimits(in data: WidgetSharedData?, maxCount: Int = 2) -> [WidgetQuotaLimit] {
+        Array(WidgetQuotaPresentation.sortedLimits(
+            data?.limits ?? [],
+            provider: data?.provider
+        ).prefix(maxCount))
     }
 
-    private func quotaPriority(for limit: WidgetQuotaLimit) -> Int {
-        switch quotaMarker(for: limit) {
-        case "H": return 0
-        case "M": return 1
-        case "W": return 2
-        default: return 3
-        }
+    private struct QuotaCardDensity {
+        let maxVisibleLimits: Int
+        let cardSpacing: CGFloat
+        let contentSpacing: CGFloat
+        let horizontalPadding: CGFloat
+        let verticalPadding: CGFloat
+        let titleFontSize: CGFloat
+        let levelFontSize: CGFloat
+        let markerFontSize: CGFloat
+        let percentFontSize: CGFloat
+        let percentWidth: CGFloat
+        let detailFontSize: CGFloat
+        let lineSpacing: CGFloat
+        let showsDetail: Bool
+        let showsInlineReset: Bool
+        let inlineResetWidth: CGFloat
+
+        static let comfortable = QuotaCardDensity(
+            maxVisibleLimits: 2,
+            cardSpacing: 8,
+            contentSpacing: 6,
+            horizontalPadding: 10,
+            verticalPadding: 8,
+            titleFontSize: 13,
+            levelFontSize: 10,
+            markerFontSize: 10,
+            percentFontSize: 10.5,
+            percentWidth: 34,
+            detailFontSize: 8,
+            lineSpacing: 3,
+            showsDetail: true,
+            showsInlineReset: false,
+            inlineResetWidth: 0
+        )
+
+        static let regular = QuotaCardDensity(
+            maxVisibleLimits: 2,
+            cardSpacing: 7,
+            contentSpacing: 5,
+            horizontalPadding: 10,
+            verticalPadding: 7,
+            titleFontSize: 12,
+            levelFontSize: 9,
+            markerFontSize: 9.5,
+            percentFontSize: 10,
+            percentWidth: 34,
+            detailFontSize: 8,
+            lineSpacing: 3,
+            showsDetail: true,
+            showsInlineReset: false,
+            inlineResetWidth: 0
+        )
+
+        static let compact = QuotaCardDensity(
+            maxVisibleLimits: 2,
+            cardSpacing: 6,
+            contentSpacing: 4,
+            horizontalPadding: 9,
+            verticalPadding: 6,
+            titleFontSize: 11.5,
+            levelFontSize: 8.5,
+            markerFontSize: 9,
+            percentFontSize: 10,
+            percentWidth: 34,
+            detailFontSize: 8,
+            lineSpacing: 3,
+            showsDetail: true,
+            showsInlineReset: false,
+            inlineResetWidth: 0
+        )
+
+        static let dense = QuotaCardDensity(
+            maxVisibleLimits: 1,
+            cardSpacing: 3,
+            contentSpacing: 2,
+            horizontalPadding: 7,
+            verticalPadding: 4,
+            titleFontSize: 11,
+            levelFontSize: 8,
+            markerFontSize: 8.5,
+            percentFontSize: 9,
+            percentWidth: 28,
+            detailFontSize: 7.5,
+            lineSpacing: 1,
+            showsDetail: false,
+            showsInlineReset: true,
+            inlineResetWidth: 58
+        )
     }
 
     private func quotaDetail(for limit: WidgetQuotaLimit) -> String? {
@@ -513,6 +634,20 @@ private struct DesktopStyledQuotaLargeView: View {
             return unit
         }
         return nil
+    }
+
+    private func quotaHeaderDetail(
+        in limits: [WidgetQuotaLimit],
+        provider: WidgetProviderSelection,
+        fallbackLevel: String?,
+        canShowResetInBody: Bool
+    ) -> String {
+        if !canShowResetInBody,
+           let resetLimit = limits.first(where: { $0.formattedResetTime?.isEmpty == false }),
+           let reset = resetLimit.formattedResetTime {
+            return "\(quotaMarker(for: resetLimit, provider: provider)) \(reset)重置"
+        }
+        return fallbackLevel?.capitalized ?? "--"
     }
 
     private func clampedPercentage(_ percentage: Int) -> Int {
@@ -526,6 +661,8 @@ private struct DesktopStyledQuotaLargeView: View {
         default: return .orange
         }
     }
+
+    private static let maxVisibleProviderCount = 6
 }
 
 // MARK: - Styled Widget Definitions

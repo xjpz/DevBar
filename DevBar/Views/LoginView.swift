@@ -5,6 +5,7 @@
 
 import SwiftUI
 import WebKit
+import Combine
 import DevBarCore
 
 struct LoginView: View {
@@ -18,6 +19,14 @@ struct LoginView: View {
     @State private var glmAPIKey = ""
     @State private var openAIToken = ""
     @State private var mimoCookie = ""
+    @State private var deepseekToken = ""
+    @State private var deepseekCookie = ""
+
+    // DeepSeek webview login state
+    @State private var deepSeekLoginWebView: WKWebView?
+    @State private var deepSeekLoginWindow: NSWindow?
+    @StateObject private var deepSeekTokenStore = DeepSeekTokenStore()
+    @State private var deepSeekPollTimer: Timer?
 
     var body: some View {
         VStack(spacing: 16) {
@@ -33,6 +42,8 @@ struct LoginView: View {
                     openAILoginCard
                 case .mimo:
                     mimoLoginCard
+                case .deepseek:
+                    deepSeekLoginCard
                 }
             }
 
@@ -48,6 +59,11 @@ struct LoginView: View {
             if let token = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey),
                !token.isEmpty {
                 mimoCookie = token
+            }
+            if let account = appViewModel.providerAccounts.first(where: { $0.provider == .deepseek }),
+               let credential = KeychainService.shared.loadProviderCredential(for: account) {
+                deepseekToken = credential.token ?? ""
+                deepseekCookie = credential.cookieString ?? ""
             }
         }
     }
@@ -159,6 +175,65 @@ private extension LoginView {
             separatorView
 
             mimoCookieSection
+        }
+        .padding(16)
+        .background(cardBackground)
+    }
+
+    var deepSeekLoginCard: some View {
+        VStack(spacing: 12) {
+            Button(action: openDeepSeekLoginWindow) {
+                Text("browser_login")
+            }
+            .buttonStyle(DevBarButtonStyle(isPrimary: true))
+            .disabled(isValidating)
+
+            separatorView
+
+            VStack(spacing: 10) {
+                SecureField("Bearer xxx", text: $deepseekToken)
+                    .textFieldStyle(.plain)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color(NSColor.textBackgroundColor))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Color.gray.opacity(0.2))
+                    )
+                    .font(.system(size: 12, design: .monospaced))
+
+                SecureField("Cookie", text: $deepseekCookie)
+                    .textFieldStyle(.plain)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color(NSColor.textBackgroundColor))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(Color.gray.opacity(0.2))
+                    )
+                    .font(.system(size: 12, design: .monospaced))
+
+                Text("deepseek_authorization_hint")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button(action: loginWithDeepSeekToken) {
+                    HStack {
+                        if isValidating {
+                            ProgressView()
+                                .controlSize(.mini)
+                        }
+                        Text("accounts_done_editing")
+                    }
+                }
+                .buttonStyle(DevBarButtonStyle(isPrimary: true))
+                .disabled(deepseekToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || deepseekCookie.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isValidating)
+            }
         }
         .padding(16)
         .background(cardBackground)
@@ -482,6 +557,176 @@ private extension LoginView {
         controller.show()
     }
 
+    func openDeepSeekLoginWindow() {
+        loginError = nil
+
+        // Create WKWebView with network interception to capture the Bearer token
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default()
+
+        let contentController = WKUserContentController()
+        let captureScript = WKUserScript(
+            source: """
+            (function() {
+                var origFetch = window.fetch;
+                window.fetch = function() {
+                    var req = arguments[0];
+                    var opts = arguments[1] || {};
+                    var auth = (typeof req === 'object' && req.headers) ? req.headers.get('Authorization') : (opts.headers && (opts.headers['Authorization'] || opts.headers['authorization']));
+                    if (auth && auth.indexOf('Bearer ') === 0) {
+                        window.webkit.messageHandlers.deepSeekTokenCapture.postMessage(auth.substring(7));
+                    }
+                    return origFetch.apply(this, arguments);
+                };
+                var origOpen = XMLHttpRequest.prototype.open;
+                var origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+                XMLHttpRequest.prototype.open = function() {
+                    this._authHeader = null;
+                    return origOpen.apply(this, arguments);
+                };
+                XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+                    if (name.toLowerCase() === 'authorization' && value.indexOf('Bearer ') === 0) {
+                        this._authHeader = value.substring(7);
+                    }
+                    return origSetHeader.apply(this, arguments);
+                };
+                var origSend = XMLHttpRequest.prototype.send;
+                XMLHttpRequest.prototype.send = function() {
+                    if (this._authHeader) {
+                        window.webkit.messageHandlers.deepSeekTokenCapture.postMessage(this._authHeader);
+                    }
+                    return origSend.apply(this, arguments);
+                };
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        contentController.addUserScript(captureScript)
+        contentController.add(DeepSeekTokenMessageHandler(store: deepSeekTokenStore), name: "deepSeekTokenCapture")
+        config.userContentController = contentController
+
+        let webView = WKWebView(frame: .zero, configuration: config)
+        let hostingView = NSHostingView(rootView: LoginWebViewWrapper(webView: webView))
+
+        let win = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 700),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        win.contentView = hostingView
+        win.title = "DeepSeek Platform"
+        win.center()
+        win.level = .floating
+        win.isReleasedWhenClosed = false
+        win.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        deepSeekLoginWebView = webView
+        deepSeekLoginWindow = win
+        deepSeekTokenStore.capturedToken = nil
+
+        if let url = URL(string: DevBarCoreConstants.DeepSeek.dashboardURL) {
+            webView.load(URLRequest(url: url))
+        }
+
+        deepSeekPollTimer?.invalidate()
+        deepSeekPollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            Task { @MainActor in
+                await tryDeepSeekLoginExtract(webView: webView)
+            }
+        }
+    }
+
+    @MainActor
+    private func tryDeepSeekLoginExtract(webView: WKWebView) async {
+        guard let bearerToken = deepSeekTokenStore.capturedToken, !bearerToken.isEmpty else { return }
+
+        let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
+        let cookieString = cookies
+            .filter { $0.domain.contains("deepseek.com") }
+            .map { "\($0.name)=\($0.value)" }
+            .joined(separator: "; ")
+
+        guard !cookieString.isEmpty else { return }
+
+        deepSeekPollTimer?.invalidate()
+        deepSeekPollTimer = nil
+        deepSeekLoginWindow?.close()
+        deepSeekLoginWindow = nil
+        deepSeekLoginWebView = nil
+
+        isValidating = true
+        defer { isValidating = false }
+
+        do {
+            let apiClient = DeepSeekAPIClient()
+            _ = try await apiClient.fetchUsage(token: bearerToken, cookieString: cookieString)
+
+            appViewModel.upsertCredentialForPrimaryAccount(
+                provider: .deepseek,
+                token: bearerToken,
+                cookieString: cookieString,
+                accountIdentifier: nil
+            )
+            deepseekToken = bearerToken
+            deepseekCookie = cookieString
+            appViewModel.updateAccountConfig(provider: .deepseek, isEnabled: true)
+            appViewModel.refreshAuthenticationState()
+
+            await appViewModel.deepSeekQuotaViewModel.fetchUsage(
+                token: bearerToken,
+                cookieString: cookieString,
+                silent: true
+            )
+        } catch let error as APIError {
+            loginError = error.errorDescription
+        } catch {
+            loginError = error.localizedDescription
+        }
+    }
+
+    func loginWithDeepSeekToken() {
+        let trimmedToken = deepseekToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCookie = deepseekCookie.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedToken.isEmpty, !trimmedCookie.isEmpty else { return }
+
+        loginError = nil
+        isValidating = true
+
+        Task { @MainActor in
+            defer { isValidating = false }
+
+            do {
+                let apiClient = DeepSeekAPIClient()
+                _ = try await apiClient.fetchUsage(
+                    token: trimmedToken,
+                    cookieString: trimmedCookie
+                )
+
+                appViewModel.upsertCredentialForPrimaryAccount(
+                    provider: .deepseek,
+                    token: trimmedToken,
+                    cookieString: trimmedCookie,
+                    accountIdentifier: nil
+                )
+                appViewModel.updateAccountConfig(provider: .deepseek, isEnabled: true)
+                appViewModel.refreshAuthenticationState()
+
+                await appViewModel.deepSeekQuotaViewModel.fetchUsage(
+                    token: trimmedToken,
+                    cookieString: trimmedCookie,
+                    silent: true
+                )
+            } catch let error as APIError {
+                loginError = error.errorDescription
+            } catch {
+                loginError = error.localizedDescription
+            }
+        }
+    }
+
     func loadOpenAITokenFromCodexConfig() {
         loginError = nil
 
@@ -586,9 +831,11 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
 
     private let loginURL: String
     private let windowTitle: String
-    private let targetCookieName: String
+    private let candidateCookieNames: [String]
+    private let cookieDomain: String
     private let onTokenExtracted: (_ token: String, _ cookies: [HTTPCookie]) -> Bool
 
+    /// Single cookie name convenience init (backward compatible).
     init(
         loginURL: String,
         windowTitle: String,
@@ -597,7 +844,24 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
     ) {
         self.loginURL = loginURL
         self.windowTitle = windowTitle
-        self.targetCookieName = targetCookieName
+        self.candidateCookieNames = [targetCookieName]
+        self.cookieDomain = ""
+        self.onTokenExtracted = onTokenExtracted
+        super.init()
+    }
+
+    /// Multi-candidate init: tries each cookie name in order.
+    init(
+        loginURL: String,
+        windowTitle: String,
+        candidateCookieNames: [String],
+        cookieDomain: String,
+        onTokenExtracted: @escaping (_ token: String, _ cookies: [HTTPCookie]) -> Bool
+    ) {
+        self.loginURL = loginURL
+        self.windowTitle = windowTitle
+        self.candidateCookieNames = candidateCookieNames
+        self.cookieDomain = cookieDomain
         self.onTokenExtracted = onTokenExtracted
         super.init()
     }
@@ -607,14 +871,19 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         config.websiteDataStore = .default()
 
         let contentController = WKUserContentController()
-        let cookieName = targetCookieName
+        let names = candidateCookieNames
+        let namesJSArray = names.map { "'\($0)'" }.joined(separator: ",")
         let script = WKUserScript(
             source: """
             (function() {
+                var targets = [\(namesJSArray)];
                 function checkCookie() {
                     var cookies = document.cookie;
-                    if (cookies.indexOf('\(cookieName)=') !== -1) {
-                        window.webkit.messageHandlers.loginDetector.postMessage('found');
+                    for (var i = 0; i < targets.length; i++) {
+                        if (cookies.indexOf(targets[i] + '=') !== -1) {
+                            window.webkit.messageHandlers.loginDetector.postMessage('found');
+                            return;
+                        }
                     }
                 }
                 setInterval(checkCookie, 1000);
@@ -658,32 +927,48 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
             webView.load(URLRequest(url: url))
         }
 
-        let cookieTarget = targetCookieName
+        startPolling()
+    }
+
+    private func startPolling() {
         pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, !self.didExtract, let webView = self.webView else { return }
+                await self.tryExtractToken(from: webView)
+            }
+        }
+    }
 
-                let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
+    @MainActor
+    private func tryExtractToken(from webView: WKWebView) async {
+        let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
 
-                if let token = cookies.first(where: { $0.name == cookieTarget }),
-                   !token.value.isEmpty {
-                    self.handleLoginSuccess(token: token.value, cookies: cookies)
-                    return
-                }
+        // Try each candidate cookie name
+        for name in candidateCookieNames {
+            if let token = cookies.first(where: { $0.name == name }),
+               !token.value.isEmpty {
+                self.handleLoginSuccess(token: token.value, cookies: cookies)
+                return
+            }
+        }
 
-                if let jsToken = await self.extractCookieViaJS(webView: webView, name: cookieTarget) {
-                    var enriched = cookies
-                    if enriched.allSatisfy({ $0.name != cookieTarget }),
-                       let synth = HTTPCookie(properties: [
-                           .name: cookieTarget,
-                           .value: jsToken,
-                           .domain: "platform.xiaomimimo.com",
-                           .path: "/",
-                       ]) {
+        // Try JS extraction for each candidate
+        for name in candidateCookieNames {
+            if let jsToken = await self.extractCookieViaJS(webView: webView, name: name) {
+                var enriched = cookies
+                if enriched.allSatisfy({ $0.name != name }) {
+                    let domain = cookieDomain.isEmpty ? URL(string: loginURL)?.host ?? "" : cookieDomain
+                    if let synth = HTTPCookie(properties: [
+                        .name: name,
+                        .value: jsToken,
+                        .domain: domain,
+                        .path: "/",
+                    ]) {
                         enriched.append(synth)
                     }
-                    self.handleLoginSuccess(token: jsToken, cookies: enriched)
                 }
+                self.handleLoginSuccess(token: jsToken, cookies: enriched)
+                return
             }
         }
     }
@@ -709,28 +994,7 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
 
         Task { @MainActor [weak self] in
             guard let self, !self.didExtract, let webView = self.webView else { return }
-
-            let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
-
-            if let token = cookies.first(where: { $0.name == self.targetCookieName }),
-               !token.value.isEmpty {
-                self.handleLoginSuccess(token: token.value, cookies: cookies)
-                return
-            }
-
-            if let jsToken = await self.extractCookieViaJS(webView: webView, name: self.targetCookieName) {
-                var enriched = cookies
-                if enriched.allSatisfy({ $0.name != self.targetCookieName }),
-                   let synth = HTTPCookie(properties: [
-                       .name: self.targetCookieName,
-                       .value: jsToken,
-                       .domain: "platform.xiaomimimo.com",
-                       .path: "/",
-                   ]) {
-                    enriched.append(synth)
-                }
-                self.handleLoginSuccess(token: jsToken, cookies: enriched)
-            }
+            await self.tryExtractToken(from: webView)
         }
     }
 
@@ -757,13 +1021,10 @@ final class LoginWindowController: NSObject, WKNavigationDelegate, WKScriptMessa
         """
         guard let value = try? await webView.evaluateJavaScript(js) as? String,
               !value.isEmpty else {
-            #if DEBUG
-            print("[MiMo:Login] JS extract \(name) failed or empty")
-            #endif
             return nil
         }
         #if DEBUG
-        print("[MiMo:Login] JS extract \(name) = \(value.prefix(40))...")
+        print("[LoginWindow] JS extract \(name) = \(value.prefix(40))...")
         #endif
         return value
     }
@@ -788,15 +1049,36 @@ extension LoginWindowController {
             print("[LoginWindowController] cookies after navigation: \(names)")
             #endif
 
-            if let token = cookies.first(where: { $0.name == self.targetCookieName }),
-               !token.value.isEmpty {
-                self.handleLoginSuccess(token: token.value, cookies: cookies)
+            for name in candidateCookieNames {
+                if let token = cookies.first(where: { $0.name == name }),
+                   !token.value.isEmpty {
+                    self.handleLoginSuccess(token: token.value, cookies: cookies)
+                    return
+                }
             }
         }
     }
 }
 
-private struct LoginWebViewWrapper: NSViewRepresentable {
+/// Shared storage for DeepSeek login webview token capture.
+final class DeepSeekTokenStore: ObservableObject {
+    @Published var capturedToken: String?
+}
+
+/// Lightweight message handler for capturing DeepSeek Bearer token from webview JS.
+private final class DeepSeekTokenMessageHandler: NSObject, WKScriptMessageHandler {
+    let store: DeepSeekTokenStore
+    init(store: DeepSeekTokenStore) { self.store = store }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "deepSeekTokenCapture",
+              let token = message.body as? String, !token.isEmpty else { return }
+        Task { @MainActor in
+            store.capturedToken = token
+        }
+    }
+}
+
+struct LoginWebViewWrapper: NSViewRepresentable {
     let webView: WKWebView
 
     func makeNSView(context: Context) -> WKWebView { webView }

@@ -4,6 +4,7 @@ public enum WidgetProvider: String, CaseIterable, Codable, Sendable {
     case glm
     case openai
     case mimo
+    case deepseek
 }
 
 public struct WidgetSharedData: Codable, Sendable, Equatable {
@@ -71,6 +72,66 @@ public struct WidgetQuotaLimit: Codable, Sendable, Identifiable, Equatable {
         self.percentage = percentage
         self.unitDescription = unitDescription
         self.formattedResetTime = formattedResetTime
+    }
+}
+
+public struct ProviderQuotaSnapshot: Codable, Sendable, Identifiable, Equatable {
+    public var id: String { accountID }
+
+    public let accountID: String
+    public let provider: QuotaProvider
+    public let displayName: String
+    public let limits: [WidgetQuotaLimit]
+    public let level: String?
+    public let subscriptionName: String?
+    public let subscriptionExpireDate: String?
+    public let fetchedAt: Date
+    public let sourceDeviceID: String?
+    public let revision: Int
+
+    public init(
+        accountID: String,
+        provider: QuotaProvider,
+        displayName: String,
+        limits: [WidgetQuotaLimit],
+        level: String?,
+        subscriptionName: String?,
+        subscriptionExpireDate: String?,
+        fetchedAt: Date = Date(),
+        sourceDeviceID: String? = nil,
+        revision: Int = 1
+    ) {
+        self.accountID = accountID
+        self.provider = provider
+        self.displayName = displayName
+        self.limits = limits
+        self.level = level
+        self.subscriptionName = subscriptionName
+        self.subscriptionExpireDate = subscriptionExpireDate
+        self.fetchedAt = fetchedAt
+        self.sourceDeviceID = sourceDeviceID
+        self.revision = revision
+    }
+
+    public var widgetData: WidgetSharedData {
+        WidgetSharedData(
+            provider: WidgetProvider(rawValue: provider.rawValue),
+            schemaVersion: WidgetSharedData.currentSchemaVersion,
+            limits: limits,
+            level: level,
+            subscriptionName: subscriptionName,
+            subscriptionPrice: nil,
+            subscriptionExpireDate: subscriptionExpireDate,
+            lastUpdated: fetchedAt
+        )
+    }
+
+    public func shouldReplace(_ existing: ProviderQuotaSnapshot?) -> Bool {
+        guard let existing else { return true }
+        if revision != existing.revision {
+            return revision > existing.revision
+        }
+        return fetchedAt >= existing.fetchedAt
     }
 }
 

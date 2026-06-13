@@ -5,12 +5,14 @@ public enum QuotaProvider: String, CaseIterable, Codable, Sendable {
     case glm
     case openai
     case mimo
+    case deepseek
 
     public var localizedName: String {
         switch self {
         case .glm: return "GLM"
         case .openai: return "OpenAI"
-        case .mimo: return "MiMo"
+        case .mimo: return "MiMO"
+        case .deepseek: return "DeepSeek"
         }
     }
 
@@ -19,6 +21,7 @@ public enum QuotaProvider: String, CaseIterable, Codable, Sendable {
         case .glm: return "sparkles"
         case .openai: return "circle.hexagon"
         case .mimo: return "bolt.hexagon"
+        case .deepseek: return "waveform.path.ecg"
         }
     }
 
@@ -27,6 +30,7 @@ public enum QuotaProvider: String, CaseIterable, Codable, Sendable {
         case .glm: return "GLM"
         case .openai: return "OpenAI"
         case .mimo: return "MiMO"
+        case .deepseek: return "DeepSeek"
         }
     }
 
@@ -35,6 +39,7 @@ public enum QuotaProvider: String, CaseIterable, Codable, Sendable {
         case .glm: return Color(red: 0.14, green: 0.59, blue: 0.93)
         case .openai: return Color(red: 0.12, green: 0.69, blue: 0.54)
         case .mimo: return Color(red: 1.0, green: 0.42, blue: 0.08)
+        case .deepseek: return Color(red: 0.35, green: 0.43, blue: 0.98)
         }
     }
 }
@@ -50,6 +55,118 @@ public struct AccountConfig: Codable, Sendable, Identifiable, Equatable {
         self.provider = provider
         self.isEnabled = isEnabled
         self.order = order
+    }
+}
+
+public struct ProviderCredentialRef: Codable, Sendable, Equatable {
+    public let namespace: String
+    public let keychainAccount: String
+
+    public init(namespace: String = "providerAccount", keychainAccount: String) {
+        self.namespace = namespace
+        self.keychainAccount = keychainAccount
+    }
+}
+
+public struct ProviderAccountSyncPolicy: Codable, Sendable, Equatable {
+    public var quotaSyncEnabled: Bool
+    public var credentialSyncEnabled: Bool
+
+    public init(quotaSyncEnabled: Bool = true, credentialSyncEnabled: Bool = false) {
+        self.quotaSyncEnabled = quotaSyncEnabled
+        self.credentialSyncEnabled = credentialSyncEnabled
+    }
+}
+
+public struct ProviderAccount: Codable, Sendable, Identifiable, Equatable {
+    public let id: String
+    public var provider: QuotaProvider
+    public var displayName: String
+    public var isEnabled: Bool
+    public var order: Int
+    public var credentialRef: ProviderCredentialRef
+    public var providerAccountIdentifier: String?
+    public var syncPolicy: ProviderAccountSyncPolicy
+    public var createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: String = UUID().uuidString.lowercased(),
+        provider: QuotaProvider,
+        displayName: String? = nil,
+        isEnabled: Bool,
+        order: Int,
+        credentialRef: ProviderCredentialRef? = nil,
+        providerAccountIdentifier: String? = nil,
+        syncPolicy: ProviderAccountSyncPolicy = ProviderAccountSyncPolicy(),
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.provider = provider
+        self.displayName = displayName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            ?? provider.localizedName
+        self.isEnabled = isEnabled
+        self.order = order
+        self.credentialRef = credentialRef ?? ProviderCredentialRef(
+            keychainAccount: DevBarCoreConstants.Keychain.providerAccountCredentialKey(for: id)
+        )
+        self.providerAccountIdentifier = providerAccountIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.syncPolicy = syncPolicy
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    public var legacyConfig: AccountConfig {
+        AccountConfig(provider: provider, isEnabled: isEnabled, order: order)
+    }
+
+    public static func migratedID(for provider: QuotaProvider) -> String {
+        "legacy-\(provider.rawValue)"
+    }
+}
+
+public struct ProviderCredentialEnvelope: Codable, Sendable, Equatable {
+    public let accountID: String
+    public let provider: QuotaProvider
+    public var token: String?
+    public var cookieString: String?
+    public var accountIdentifier: String?
+    public var issuedAt: Date?
+    public var expiresAt: Date?
+    public var revision: Int
+    public var updatedAt: Date
+
+    public init(
+        accountID: String,
+        provider: QuotaProvider,
+        token: String? = nil,
+        cookieString: String? = nil,
+        accountIdentifier: String? = nil,
+        issuedAt: Date? = nil,
+        expiresAt: Date? = nil,
+        revision: Int = 1,
+        updatedAt: Date = Date()
+    ) {
+        self.accountID = accountID
+        self.provider = provider
+        self.token = token?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.cookieString = cookieString?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.accountIdentifier = accountIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.issuedAt = issuedAt
+        self.expiresAt = expiresAt
+        self.revision = revision
+        self.updatedAt = updatedAt
+    }
+
+    public var hasCredential: Bool {
+        token?.isEmpty == false || cookieString?.isEmpty == false
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }
 

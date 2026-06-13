@@ -168,6 +168,8 @@ struct IOSDashboardView: View {
                 openAIContent
             case .mimo:
                 mimoContent
+            case .deepseek:
+                deepSeekContent
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -179,11 +181,29 @@ struct IOSDashboardView: View {
     private func providerBadge(for provider: QuotaProvider) -> some View {
         let text: String? = switch provider {
         case .glm:
-            appViewModel.quotaViewModel.quotaData?.level
+            if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .glm, localLastUpdated: appViewModel.quotaViewModel.lastUpdated) {
+                snapshot.level
+            } else {
+                appViewModel.quotaViewModel.quotaData?.level ?? appViewModel.syncedQuotaSnapshot(for: .glm)?.level
+            }
         case .openai:
-            appViewModel.openAIQuotaViewModel.planType.map { $0.capitalized }
+            if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .openai, localLastUpdated: appViewModel.openAIQuotaViewModel.lastUpdated) {
+                snapshot.level
+            } else {
+                appViewModel.openAIQuotaViewModel.planType.map { $0.capitalized } ?? appViewModel.syncedQuotaSnapshot(for: .openai)?.level
+            }
         case .mimo:
-            appViewModel.mimoQuotaViewModel.planName
+            if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .mimo, localLastUpdated: appViewModel.mimoQuotaViewModel.lastUpdated) {
+                snapshot.subscriptionName
+            } else {
+                appViewModel.mimoQuotaViewModel.planName ?? appViewModel.syncedQuotaSnapshot(for: .mimo)?.subscriptionName
+            }
+        case .deepseek:
+            if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .deepseek, localLastUpdated: appViewModel.deepSeekQuotaViewModel.lastUpdated) {
+                snapshot.subscriptionName
+            } else {
+                appViewModel.deepSeekQuotaViewModel.balanceText ?? appViewModel.syncedQuotaSnapshot(for: .deepseek)?.subscriptionName
+            }
         }
         if let text {
             badge(text)
@@ -204,14 +224,19 @@ struct IOSDashboardView: View {
     }
 
     private func lastRefreshText(for provider: QuotaProvider) -> String {
-        let date: Date? = switch provider {
+        let localDate: Date? = switch provider {
         case .glm:
             appViewModel.quotaViewModel.lastUpdated
         case .openai:
             appViewModel.openAIQuotaViewModel.lastUpdated
         case .mimo:
             appViewModel.mimoQuotaViewModel.lastUpdated
+        case .deepseek:
+            appViewModel.deepSeekQuotaViewModel.lastUpdated
         }
+        let date = appViewModel.preferredSyncedQuotaSnapshot(for: provider, localLastUpdated: localDate)?.fetchedAt
+            ?? localDate
+            ?? appViewModel.syncedQuotaSnapshot(for: provider)?.fetchedAt
 
         guard let date else {
             return localized("ios_dashboard_no_refresh")
@@ -225,11 +250,11 @@ struct IOSDashboardView: View {
 
     @ViewBuilder
     private var glmContent: some View {
-        if !appViewModel.hasAuthenticatedSession(for: .glm) {
-            configurePrompt(localized("ios_dashboard_glm_configure_prompt"))
+        if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .glm, localLastUpdated: appViewModel.quotaViewModel.lastUpdated) {
+            syncedQuotaContent(snapshot)
         } else if appViewModel.quotaViewModel.hasValidSubscription,
-                  let limits = appViewModel.quotaViewModel.quotaData?.limits,
-                  !limits.isEmpty {
+           let limits = appViewModel.quotaViewModel.quotaData?.limits,
+           !limits.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 if let error = appViewModel.quotaViewModel.errorMessage {
                     refreshWarning(error)
@@ -246,6 +271,10 @@ struct IOSDashboardView: View {
             }
         } else if appViewModel.quotaViewModel.isLoading && appViewModel.quotaViewModel.quotaData == nil {
             ProgressView("ios_dashboard_glm_loading")
+        } else if let snapshot = appViewModel.syncedQuotaSnapshot(for: .glm), !snapshot.limits.isEmpty {
+            syncedQuotaContent(snapshot)
+        } else if !appViewModel.hasAuthenticatedSession(for: .glm) {
+            configurePrompt(localized("ios_dashboard_glm_configure_prompt"))
         } else if let error = appViewModel.quotaViewModel.errorMessage {
             errorState(error)
         } else if !appViewModel.quotaViewModel.hasValidSubscription {
@@ -259,8 +288,8 @@ struct IOSDashboardView: View {
 
     @ViewBuilder
     private var openAIContent: some View {
-        if !appViewModel.hasAuthenticatedSession(for: .openai) {
-            configurePrompt(localized("ios_dashboard_openai_configure_prompt"))
+        if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .openai, localLastUpdated: appViewModel.openAIQuotaViewModel.lastUpdated) {
+            syncedQuotaContent(snapshot)
         } else if !appViewModel.openAIQuotaViewModel.quotaRows.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 if let error = appViewModel.openAIQuotaViewModel.errorMessage {
@@ -278,6 +307,10 @@ struct IOSDashboardView: View {
             }
         } else if appViewModel.openAIQuotaViewModel.isLoading && appViewModel.openAIQuotaViewModel.usageResponse == nil {
             ProgressView("ios_dashboard_openai_loading")
+        } else if let snapshot = appViewModel.syncedQuotaSnapshot(for: .openai), !snapshot.limits.isEmpty {
+            syncedQuotaContent(snapshot)
+        } else if !appViewModel.hasAuthenticatedSession(for: .openai) {
+            configurePrompt(localized("ios_dashboard_openai_configure_prompt"))
         } else if let error = appViewModel.openAIQuotaViewModel.errorMessage {
             errorState(error)
         } else {
@@ -288,8 +321,8 @@ struct IOSDashboardView: View {
 
     @ViewBuilder
     private var mimoContent: some View {
-        if !appViewModel.hasAuthenticatedSession(for: .mimo) {
-            configurePrompt(localized("ios_dashboard_mimo_configure_prompt"))
+        if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .mimo, localLastUpdated: appViewModel.mimoQuotaViewModel.lastUpdated) {
+            syncedQuotaContent(snapshot)
         } else if !appViewModel.mimoQuotaViewModel.quotaRows.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 if let error = appViewModel.mimoQuotaViewModel.errorMessage {
@@ -314,11 +347,75 @@ struct IOSDashboardView: View {
             }
         } else if appViewModel.mimoQuotaViewModel.isLoading && appViewModel.mimoQuotaViewModel.usageResponse == nil {
             ProgressView("ios_dashboard_mimo_loading")
+        } else if let snapshot = appViewModel.syncedQuotaSnapshot(for: .mimo), !snapshot.limits.isEmpty {
+            syncedQuotaContent(snapshot)
+        } else if !appViewModel.hasAuthenticatedSession(for: .mimo) {
+            configurePrompt(localized("ios_dashboard_mimo_configure_prompt"))
         } else if let error = appViewModel.mimoQuotaViewModel.errorMessage {
             errorState(error)
         } else {
             Text("ios_dashboard_mimo_no_usage")
                 .foregroundStyle(theme.textSecondary)
+        }
+    }
+
+    @ViewBuilder
+    private var deepSeekContent: some View {
+        if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .deepseek, localLastUpdated: appViewModel.deepSeekQuotaViewModel.lastUpdated) {
+            syncedQuotaContent(snapshot)
+        } else if !appViewModel.deepSeekQuotaViewModel.quotaRows.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                if let error = appViewModel.deepSeekQuotaViewModel.errorMessage {
+                    refreshWarning(error)
+                }
+
+                if let balance = appViewModel.deepSeekQuotaViewModel.balanceText {
+                    Text(balance)
+                        .font(theme.captionFont)
+                        .foregroundStyle(theme.textSecondary)
+                }
+
+                ForEach(appViewModel.deepSeekQuotaViewModel.quotaRows) { row in
+                    UsageLimitRow(
+                        title: row.name,
+                        percentage: row.percentage,
+                        resetText: row.resetTime,
+                        detailText: row.unitDescription,
+                        locale: languageManager.currentLocale
+                    )
+                }
+            }
+        } else if appViewModel.deepSeekQuotaViewModel.isLoading && appViewModel.deepSeekQuotaViewModel.usageResponse == nil {
+            ProgressView("ios_dashboard_deepseek_loading")
+        } else if let snapshot = appViewModel.syncedQuotaSnapshot(for: .deepseek), !snapshot.limits.isEmpty {
+            syncedQuotaContent(snapshot)
+        } else if !appViewModel.hasAuthenticatedSession(for: .deepseek) {
+            configurePrompt(localized("ios_dashboard_deepseek_configure_prompt"))
+        } else if let error = appViewModel.deepSeekQuotaViewModel.errorMessage {
+            errorState(error)
+        } else {
+            Text("ios_dashboard_deepseek_no_usage")
+                .foregroundStyle(theme.textSecondary)
+        }
+    }
+
+    private func syncedQuotaContent(_ snapshot: ProviderQuotaSnapshot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let subscriptionExpireDate = snapshot.subscriptionExpireDate {
+                Text(subscriptionExpireDate)
+                    .font(theme.captionFont)
+                    .foregroundStyle(theme.textSecondary)
+            }
+
+            ForEach(snapshot.limits) { limit in
+                UsageLimitRow(
+                    title: limit.displayName,
+                    percentage: limit.percentage,
+                    resetText: limit.formattedResetTime,
+                    detailText: limit.unitDescription,
+                    locale: languageManager.currentLocale
+                )
+            }
         }
     }
 

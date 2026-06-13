@@ -110,6 +110,8 @@ struct IOSTransferImportPreviewSheet: View {
             case .clearExisting:
                 credentialDescription = String(localized: "ios_transfer_mimo_clear")
             }
+        case .deepseek:
+            credentialDescription = "DeepSeek 账号配置"
         }
 
         let configDescription: String

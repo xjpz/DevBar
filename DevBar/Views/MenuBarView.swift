@@ -53,11 +53,23 @@ private struct LoggedInContentView: View {
     @EnvironmentObject private var openAIQuotaViewModel: OpenAIQuotaViewModel
     @EnvironmentObject private var mimoQuotaViewModel: MimoQuotaViewModel
     @EnvironmentObject private var updateViewModel: UpdateViewModel
-    @State private var selectedProvider: QuotaProvider = .glm
+    @State private var selectedAccountID: String?
     @State private var showAgentWatcher = false
 
-    private var enabledProviders: [QuotaProvider] {
-        appViewModel.enabledProviders
+    private var enabledAccounts: [ProviderAccount] {
+        appViewModel.enabledProviderAccounts
+    }
+
+    private var selectedAccount: ProviderAccount? {
+        if let selectedAccountID,
+           let account = enabledAccounts.first(where: { $0.id == selectedAccountID }) {
+            return account
+        }
+        return enabledAccounts.first
+    }
+
+    private var selectedProvider: QuotaProvider {
+        selectedAccount?.provider ?? .glm
     }
 
     var body: some View {
@@ -67,7 +79,7 @@ private struct LoggedInContentView: View {
                 .padding(.vertical, 8)
 
             // Provider tabs (only show if multiple providers enabled)
-            if enabledProviders.count > 1 {
+            if enabledAccounts.count > 1 {
                 providerTabs
                     .padding(.horizontal)
                     .padding(.bottom, 4)
@@ -83,6 +95,8 @@ private struct LoggedInContentView: View {
                 openAIContent
             case .mimo:
                 mimoContent
+            case .deepseek:
+                deepSeekContent
             }
 
             Divider()
@@ -92,15 +106,17 @@ private struct LoggedInContentView: View {
                 .padding(.vertical, 6)
         }
         .onAppear {
-            // Default to first enabled provider
-            if let first = enabledProviders.first {
-                selectedProvider = first
+            // Default to first enabled account
+            if selectedAccount == nil {
+                selectedAccountID = enabledAccounts.first?.id
             }
         }
-        .onChange(of: enabledProviders) { _, newProviders in
-            if !newProviders.contains(selectedProvider), let first = newProviders.first {
-                selectedProvider = first
+        .onChange(of: enabledAccounts) { _, newAccounts in
+            if let selectedAccountID,
+               newAccounts.contains(where: { $0.id == selectedAccountID }) {
+                return
             }
+            selectedAccountID = newAccounts.first?.id
         }
     }
 
@@ -108,15 +124,15 @@ private struct LoggedInContentView: View {
 
     private var providerTabs: some View {
         HStack(spacing: 8) {
-            ForEach(enabledProviders, id: \.self) { provider in
-                Button(action: { selectedProvider = provider }) {
-                    Text(provider.localizedName)
+            ForEach(enabledAccounts) { account in
+                Button(action: { selectedAccountID = account.id }) {
+                    Text(appViewModel.providerDisplayTitle(for: account))
                         .font(.caption)
-                        .fontWeight(selectedProvider == provider ? .semibold : .regular)
-                        .foregroundStyle(selectedProvider == provider ? .primary : .secondary)
+                        .fontWeight(selectedAccountID == account.id ? .semibold : .regular)
+                        .foregroundStyle(selectedAccountID == account.id ? .primary : .secondary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(selectedProvider == provider ? Color.accentColor.opacity(0.1) : Color.clear)
+                        .background(selectedAccountID == account.id ? Color.accentColor.opacity(0.1) : Color.clear)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
                 .buttonStyle(.plain)
@@ -133,8 +149,8 @@ private struct LoggedInContentView: View {
                 Text("DevBar")
                     .font(.headline)
 
-                if enabledProviders.count == 1 {
-                    Text(selectedProvider.localizedName)
+                if enabledAccounts.count == 1, let selectedAccount {
+                    Text(appViewModel.providerDisplayTitle(for: selectedAccount))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -204,6 +220,8 @@ private struct LoggedInContentView: View {
             return openAIQuotaViewModel.isLoading
         case .mimo:
             return mimoQuotaViewModel.isLoading || mimoQuotaViewModel.isLoadingDetail
+        case .deepseek:
+            return deepSeekQuotaViewModel.isLoading
         }
     }
 
@@ -339,6 +357,58 @@ private struct LoggedInContentView: View {
             }
 
             ForEach(mimoQuotaViewModel.quotaRows) { row in
+                QuotaRowItemView(item: row)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    // MARK: - DeepSeek Content
+
+    private var deepSeekContent: some View {
+        Group {
+            if !appViewModel.hasAuthenticatedSession(for: .deepseek) {
+                providerConfigureView(
+                    icon: "waveform.path.ecg",
+                    hint: String(localized: "deepseek_configure_hint")
+                )
+            } else if deepSeekQuotaViewModel.isLoading && deepSeekQuotaViewModel.usageResponse == nil {
+                ProgressView("fetching_usage")
+                    .padding()
+            } else if !deepSeekQuotaViewModel.quotaRows.isEmpty {
+                deepSeekQuotaListView
+            } else if let error = deepSeekQuotaViewModel.errorMessage {
+                errorView(error)
+            } else {
+                Text("no_data")
+                    .foregroundStyle(.secondary)
+                    .padding()
+            }
+        }
+    }
+
+    private var deepSeekQuotaViewModel: DeepSeekQuotaViewModel {
+        appViewModel.deepSeekQuotaViewModel
+    }
+
+    private var deepSeekQuotaListView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let balance = deepSeekQuotaViewModel.balanceText {
+                levelBadge(balance)
+            }
+
+            if let error = deepSeekQuotaViewModel.errorMessage {
+                HStack {
+                    Image(systemName: "arrow.triangle.2.circlepath.circle")
+                    Text(error)
+                }
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+
+            ForEach(deepSeekQuotaViewModel.quotaRows) { row in
                 QuotaRowItemView(item: row)
             }
         }

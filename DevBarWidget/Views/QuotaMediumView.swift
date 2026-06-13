@@ -16,18 +16,11 @@ struct QuotaMediumView: View {
     var visualStyle: WidgetVisualStyle = .liquidGlass
 
     private var featuredLimit: WidgetQuotaLimit? {
-        sortedLimits.first(where: isFiveHourLimit) ?? sortedLimits.first
+        sortedLimits.first(where: WidgetQuotaPresentation.isFiveHourLimit) ?? sortedLimits.first
     }
 
     private var sortedLimits: [WidgetQuotaLimit] {
-        limits.sorted { a, b in
-            let lhsOrder = priority(for: a)
-            let rhsOrder = priority(for: b)
-            if lhsOrder != rhsOrder {
-                return lhsOrder < rhsOrder
-            }
-            return a.displayName.localizedCompare(b.displayName) == .orderedAscending
-        }
+        WidgetQuotaPresentation.sortedLimits(limits, provider: provider)
     }
 
     var body: some View {
@@ -241,14 +234,13 @@ struct QuotaMediumView: View {
         title != "GLM" && title != "MiMo"
     }
 
-    private func priority(for limit: WidgetQuotaLimit) -> Int {
-        if isFiveHourLimit(limit) {
-            return 0
-        }
-        switch limit.type {
-        case "OPENAI_SESSION", "TIME_LIMIT": return 1
-        case "TOKENS_LIMIT", "MCP_MONTHLY": return 2
-        default: return 3
+    private var provider: WidgetProvider? {
+        switch title.lowercased() {
+        case "glm": return .glm
+        case "openai": return .openai
+        case "mimo": return .mimo
+        case "deepseek": return .deepseek
+        default: return nil
         }
     }
 
@@ -260,42 +252,9 @@ struct QuotaMediumView: View {
         min(max(percentage, 0), 100)
     }
 
-    private func isFiveHourLimit(_ limit: WidgetQuotaLimit) -> Bool {
-        let value = "\(limit.type) \(limit.displayName)".lowercased()
-        return value.contains("5h")
-            || value.contains("5 h")
-            || value.contains("5小时")
-            || value.contains("5 小时")
-            || value.contains("five hour")
-    }
-
     private func shortLimitLabel(for limit: WidgetQuotaLimit) -> String {
-        let type = limit.type.lowercased()
-        let name = limit.displayName.lowercased()
-        let value = "\(type) \(name)"
-
-        if isFiveHourLimit(limit) {
-            return "5小时额度"
-        }
-        if value.contains("weekly") || value.contains("每周") || value.contains("周") {
-            return "每周额度"
-        }
-        if value.contains("monthly")
-            || value.contains("month")
-            || value.contains("token")
-            || value.contains("每月")
-            || value.contains("月度")
-            || value.contains("月")
-        {
-            return "月度额度"
-        }
-        if value.contains("time") || value.contains("session") || value.contains("时段") {
-            return "时段额度"
-        }
-        if limit.displayName.count <= 8 {
-            return limit.displayName
-        }
-        return "其他额度"
+        let label = WidgetQuotaPresentation.shortLabel(for: limit, provider: provider)
+        return label.count <= 8 ? label : "其他额度"
     }
 
     private func limitColor(forRemaining remaining: Int) -> Color {

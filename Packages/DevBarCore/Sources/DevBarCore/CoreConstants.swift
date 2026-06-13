@@ -26,6 +26,10 @@ public enum DevBarCoreConstants {
         public static let relayDeviceTokenKey = "relay_device_token"
         public static let relayLocalPairSecretPrefix = "relay_local_pair_secret_"
         public static let relayPendingLocalPairSecretPrefix = "relay_pending_local_pair_secret_"
+
+        public static func providerAccountCredentialKey(for accountID: String) -> String {
+            "provider_account_\(accountID)_credential"
+        }
     }
 
     public enum OpenAI {
@@ -37,6 +41,12 @@ public enum DevBarCoreConstants {
         public static let dashboardURL = "https://platform.xiaomimimo.com"
         public static let platformUsageURL = "\(dashboardURL)/api/v1/tokenPlan/usage"
         public static let platformPlanDetailURL = "\(dashboardURL)/api/v1/tokenPlan/detail"
+    }
+
+    public enum DeepSeek {
+        public static let dashboardURL = "https://platform.deepseek.com"
+        public static let platformAPIBase = "\(dashboardURL)/api/v0"
+        public static let userSummaryURL = "\(platformAPIBase)/users/get_user_summary"
     }
 
     public enum TransferRelay {
@@ -80,9 +90,14 @@ public enum DevBarCoreConstants {
         public static let macThemeWidgetAvatarFileName = "mac-theme-widget-avatar.jpg"
         public static let liveActivitySelectedProviderKey = "live_activity_selected_provider"
         public static let agentWatcherWidgetKey = "agent_watcher_widget_data"
+        public static let enabledWidgetProvidersKey = "enabled_widget_providers"
 
         public static func sharedDataKey(for provider: String) -> String {
             "widget_shared_data_\(provider)"
+        }
+
+        public static func quotaSnapshotKey(for accountID: String) -> String {
+            "quota_snapshot_\(accountID)"
         }
     }
 
@@ -90,9 +105,11 @@ public enum DevBarCoreConstants {
         public static let refreshIntervalKey = "refresh_interval"
         public static let defaultRefreshInterval: TimeInterval = 300
         public static let accountConfigsKey = "account_configs"
+        public static let providerAccountsKey = "provider_accounts_v2"
         public static let glmQuotaCacheKey = "glm_quota_cache"
         public static let openAIQuotaCacheKey = "openai_quota_cache"
         public static let mimoQuotaCacheKey = "mimo_quota_cache"
+        public static let deepseekQuotaCacheKey = "deepseek_quota_cache"
         public static let mimoCookieLastRenewedAtKey = "mimo_cookie_last_renewed_at"
         public static let mimoCookieLastRenewFailedAtKey = "mimo_cookie_last_renew_failed_at"
         public static let mimoCookieAutoRenewEnabledKey = "mimo_cookie_auto_renew_enabled"

@@ -146,35 +146,77 @@ struct MacThemeLargeWidgetView: View {
     }
 
     private var quotaContent: some View {
-        VStack(spacing: 0) {
-            VStack(spacing: 7) {
-                ForEach(WidgetProviderSelection.allCases, id: \.self) { provider in
-                    providerQuotaCard(provider)
+        let providers = visibleProviders
+        let density = quotaDensity(for: providers.count)
+
+        return VStack(spacing: 0) {
+            VStack(spacing: density.cardSpacing) {
+                ForEach(Array(providers.enumerated()), id: \.offset) { _, provider in
+                    providerQuotaCard(provider, density: density)
                 }
             }
+            .layoutPriority(0)
 
-            Spacer(minLength: 7)
+            Spacer(minLength: density.summarySpacing)
 
-            quotaSyncSummary
+            quotaSyncSummary(density: density)
+                .layoutPriority(1)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func providerQuotaCard(_ provider: WidgetProviderSelection) -> some View {
-        let data = entry.quotaDataByProvider[provider]
-        let limits = visibleQuotaLimits(in: data)
+    private var visibleProviders: [WidgetProviderSelection] {
+        let enabledSelections = WidgetProviderSelection.enabledSelectionsFromAppGroup
+        if !enabledSelections.isEmpty {
+            return Array(enabledSelections.prefix(Self.maxVisibleProviderCount))
+        }
 
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 7) {
+        let providersWithData = WidgetProviderSelection.allCases.filter { provider in
+            guard let data = entry.quotaDataByProvider[provider] else { return false }
+            return data.lastUpdated != .distantPast
+        }
+        let candidates = providersWithData.isEmpty ? WidgetProviderSelection.allCases : providersWithData
+        return Array(candidates.prefix(Self.maxVisibleProviderCount))
+    }
+
+    private func quotaDensity(for providerCount: Int) -> QuotaCardDensity {
+        switch providerCount {
+        case 0...1:
+            return .comfortable
+        case 2:
+            return .regular
+        case 3:
+            return .compact
+        default:
+            return .dense
+        }
+    }
+
+    private func providerQuotaCard(_ provider: WidgetProviderSelection, density: QuotaCardDensity) -> some View {
+        let data = entry.quotaDataByProvider[provider]
+        let limits = visibleQuotaLimits(in: data, maxCount: density.maxVisibleLimits)
+        let headerDetail = quotaHeaderDetail(
+            in: limits,
+            provider: provider,
+            fallbackLevel: data?.level,
+            canShowResetInBody: density.showsDetail
+        )
+
+        return VStack(alignment: .leading, spacing: density.contentSpacing) {
+            HStack(spacing: 5) {
                 Circle()
                     .fill(providerColor(provider))
-                    .frame(width: 7, height: 7)
+                    .frame(width: 6, height: 6)
                 Text(provider.displayName)
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .font(.system(size: density.titleFontSize, weight: .heavy, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
                 Spacer()
-                Text(data?.level?.capitalized ?? "--")
-                    .font(.system(size: 9, weight: .bold))
+                Text(headerDetail)
+                    .font(.system(size: density.levelFontSize, weight: .bold))
                     .foregroundStyle(.white.opacity(0.64))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
 
             if limits.isEmpty {
@@ -184,21 +226,25 @@ struct MacThemeLargeWidgetView: View {
                     .lineLimit(1)
             } else {
                 ForEach(limits) { limit in
-                    quotaLine(limit)
+                    quotaLine(limit, provider: provider, density: density)
                 }
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, density.horizontalPadding)
+        .padding(.vertical, density.verticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
     }
 
-    private func quotaLine(_ limit: WidgetQuotaLimit) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+    private func quotaLine(
+        _ limit: WidgetQuotaLimit,
+        provider: WidgetProviderSelection,
+        density: QuotaCardDensity
+    ) -> some View {
+        VStack(alignment: .leading, spacing: density.lineSpacing) {
             HStack(spacing: 6) {
-                Text(quotaMarker(for: limit))
-                    .font(.system(size: 9, weight: .black, design: .rounded))
+                Text(quotaMarker(for: limit, provider: provider))
+                    .font(.system(size: density.markerFontSize, weight: .black, design: .rounded))
                     .foregroundStyle(limitColor(limit.percentage))
                     .frame(width: 10, alignment: .leading)
 
@@ -213,14 +259,25 @@ struct MacThemeLargeWidgetView: View {
                 .frame(height: 5)
 
                 Text("\(limit.percentage)%")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .font(.system(size: density.percentFontSize, weight: .heavy, design: .rounded))
                     .monospacedDigit()
-                    .frame(width: 34, alignment: .trailing)
+                    .frame(width: density.percentWidth, alignment: .trailing)
+
+                if density.showsInlineReset,
+                   let reset = limit.formattedResetTime,
+                   !reset.isEmpty {
+                    Text("\(reset)重置")
+                        .font(.system(size: density.detailFontSize, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.58))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.64)
+                        .frame(width: density.inlineResetWidth, alignment: .trailing)
+                }
             }
 
-            if let detail = quotaDetail(for: limit) {
+            if density.showsDetail, let detail = quotaDetail(for: limit) {
                 Text(detail)
-                    .font(.system(size: 8, weight: .semibold))
+                    .font(.system(size: density.detailFontSize, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.56))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -231,8 +288,8 @@ struct MacThemeLargeWidgetView: View {
         .accessibilityLabel("\(limit.displayName) \(limit.percentage)%")
     }
 
-    private var quotaSyncSummary: some View {
-        HStack(spacing: 6) {
+    private func quotaSyncSummary(density: QuotaCardDensity) -> some View {
+        HStack(spacing: density.summaryIconSpacing) {
             Label {
                 if let updatedAt = latestQuotaUpdatedAt {
                     Text("最近同步 \(updatedAt, format: .dateTime.hour().minute())")
@@ -247,10 +304,10 @@ struct MacThemeLargeWidgetView: View {
 
             Text("已同步 \(syncedProviderCount) 个 Provider")
         }
-        .font(.system(size: 8, weight: .semibold))
+        .font(.system(size: density.summaryFontSize, weight: .semibold))
         .foregroundStyle(.white.opacity(0.62))
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
+        .padding(.horizontal, density.summaryHorizontalPadding)
+        .padding(.vertical, density.summaryVerticalPadding)
         .frame(maxWidth: .infinity)
         .cardStyle()
     }
@@ -305,50 +362,15 @@ struct MacThemeLargeWidgetView: View {
         }
     }
 
-    private func visibleQuotaLimits(in data: WidgetSharedData?) -> [WidgetQuotaLimit] {
-        Array((data?.limits ?? [])
-            .enumerated()
-            .sorted { lhs, rhs in
-                let lhsPriority = quotaPriority(for: lhs.element)
-                let rhsPriority = quotaPriority(for: rhs.element)
-                return lhsPriority == rhsPriority ? lhs.offset < rhs.offset : lhsPriority < rhsPriority
-            }
-            .prefix(2)
-            .map(\.element))
+    private func visibleQuotaLimits(in data: WidgetSharedData?, maxCount: Int = 2) -> [WidgetQuotaLimit] {
+        Array(WidgetQuotaPresentation.sortedLimits(
+            data?.limits ?? [],
+            provider: data?.provider
+        ).prefix(maxCount))
     }
 
-    private func quotaPriority(for limit: WidgetQuotaLimit) -> Int {
-        switch quotaMarker(for: limit) {
-        case "H": return 0
-        case "M": return 1
-        case "W": return 2
-        default: return 3
-        }
-    }
-
-    private func quotaMarker(for limit: WidgetQuotaLimit) -> String {
-        let lowercased = "\(limit.type) \(limit.displayName)".lowercased()
-        if limit.type == "OPENAI_SESSION"
-            || lowercased.contains("5h")
-            || lowercased.contains("5 h")
-            || lowercased.contains("5小时")
-            || lowercased.contains("hour") {
-            return "H"
-        }
-        if lowercased.contains("monthly")
-            || lowercased.contains("month")
-            || lowercased.contains("每月")
-            || lowercased.contains("月") {
-            return "M"
-        }
-        if limit.type == "OPENAI_WEEKLY"
-            || lowercased.contains("weekly")
-            || lowercased.contains("week")
-            || lowercased.contains("每周")
-            || lowercased.contains("周") {
-            return "W"
-        }
-        return "Q"
+    private func quotaMarker(for limit: WidgetQuotaLimit, provider: WidgetProviderSelection) -> String {
+        WidgetQuotaPresentation.marker(for: limit, provider: WidgetProvider(rawValue: provider.rawValue))
     }
 
     private func clampedPercentage(_ percentage: Int) -> Int {
@@ -363,6 +385,20 @@ struct MacThemeLargeWidgetView: View {
             return unit
         }
         return nil
+    }
+
+    private func quotaHeaderDetail(
+        in limits: [WidgetQuotaLimit],
+        provider: WidgetProviderSelection,
+        fallbackLevel: String?,
+        canShowResetInBody: Bool
+    ) -> String {
+        if !canShowResetInBody,
+           let resetLimit = limits.first(where: { $0.formattedResetTime?.isEmpty == false }),
+           let reset = resetLimit.formattedResetTime {
+            return "\(quotaMarker(for: resetLimit, provider: provider)) \(reset)重置"
+        }
+        return fallbackLevel?.capitalized ?? "--"
     }
 
     private var latestQuotaUpdatedAt: Date? {
@@ -381,7 +417,123 @@ struct MacThemeLargeWidgetView: View {
         case .glm: return .green
         case .openai: return .blue
         case .mimo: return .orange
+        case .deepseek: return .indigo
         }
+    }
+
+    private struct QuotaCardDensity {
+        let maxVisibleLimits: Int
+        let cardSpacing: CGFloat
+        let summarySpacing: CGFloat
+        let contentSpacing: CGFloat
+        let horizontalPadding: CGFloat
+        let verticalPadding: CGFloat
+        let titleFontSize: CGFloat
+        let levelFontSize: CGFloat
+        let markerFontSize: CGFloat
+        let percentFontSize: CGFloat
+        let percentWidth: CGFloat
+        let detailFontSize: CGFloat
+        let lineSpacing: CGFloat
+        let showsDetail: Bool
+        let showsInlineReset: Bool
+        let inlineResetWidth: CGFloat
+        let summaryFontSize: CGFloat
+        let summaryIconSpacing: CGFloat
+        let summaryHorizontalPadding: CGFloat
+        let summaryVerticalPadding: CGFloat
+
+        static let comfortable = QuotaCardDensity(
+            maxVisibleLimits: 2,
+            cardSpacing: 7,
+            summarySpacing: 7,
+            contentSpacing: 6,
+            horizontalPadding: 10,
+            verticalPadding: 8,
+            titleFontSize: 12,
+            levelFontSize: 9,
+            markerFontSize: 9,
+            percentFontSize: 10,
+            percentWidth: 34,
+            detailFontSize: 8,
+            lineSpacing: 3,
+            showsDetail: true,
+            showsInlineReset: false,
+            inlineResetWidth: 0,
+            summaryFontSize: 8,
+            summaryIconSpacing: 6,
+            summaryHorizontalPadding: 8,
+            summaryVerticalPadding: 6
+        )
+
+        static let regular = QuotaCardDensity(
+            maxVisibleLimits: 2,
+            cardSpacing: 6,
+            summarySpacing: 6,
+            contentSpacing: 5,
+            horizontalPadding: 9,
+            verticalPadding: 7,
+            titleFontSize: 11.5,
+            levelFontSize: 8.5,
+            markerFontSize: 9,
+            percentFontSize: 10,
+            percentWidth: 34,
+            detailFontSize: 8,
+            lineSpacing: 3,
+            showsDetail: true,
+            showsInlineReset: false,
+            inlineResetWidth: 0,
+            summaryFontSize: 8,
+            summaryIconSpacing: 6,
+            summaryHorizontalPadding: 8,
+            summaryVerticalPadding: 5
+        )
+
+        static let compact = QuotaCardDensity(
+            maxVisibleLimits: 2,
+            cardSpacing: 5,
+            summarySpacing: 5,
+            contentSpacing: 4,
+            horizontalPadding: 8,
+            verticalPadding: 6,
+            titleFontSize: 11,
+            levelFontSize: 8.5,
+            markerFontSize: 9,
+            percentFontSize: 10,
+            percentWidth: 34,
+            detailFontSize: 8,
+            lineSpacing: 3,
+            showsDetail: true,
+            showsInlineReset: false,
+            inlineResetWidth: 0,
+            summaryFontSize: 8,
+            summaryIconSpacing: 6,
+            summaryHorizontalPadding: 8,
+            summaryVerticalPadding: 5
+        )
+
+        static let dense = QuotaCardDensity(
+            maxVisibleLimits: 1,
+            cardSpacing: 3,
+            summarySpacing: 3,
+            contentSpacing: 2,
+            horizontalPadding: 7,
+            verticalPadding: 4,
+            titleFontSize: 10.5,
+            levelFontSize: 8,
+            markerFontSize: 8.5,
+            percentFontSize: 9,
+            percentWidth: 28,
+            detailFontSize: 7.5,
+            lineSpacing: 1,
+            showsDetail: false,
+            showsInlineReset: true,
+            inlineResetWidth: 58,
+            summaryFontSize: 7.5,
+            summaryIconSpacing: 4,
+            summaryHorizontalPadding: 7,
+            summaryVerticalPadding: 4
+        )
     }
 
     private var isOnline: Bool {
@@ -431,6 +583,8 @@ struct MacThemeLargeWidgetView: View {
         default: return .orange
         }
     }
+
+    private static let maxVisibleProviderCount = 6
 }
 
 private struct MacThemeClockPill: View {

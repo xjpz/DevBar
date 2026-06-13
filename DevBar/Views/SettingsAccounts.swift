@@ -3,6 +3,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import WebKit
 import DevBarCore
 
 struct SettingsAccounts: View {
@@ -16,14 +17,28 @@ struct SettingsAccounts: View {
     @State private var mimoCookieInput: String = ""
     @State private var originalMimoCookieInput: String = ""
     @State private var showMimoCookie = false
+    @State private var deepseekTokenInput: String = ""
+    @State private var originalDeepseekTokenInput: String = ""
+    @State private var showDeepseekToken = false
+    @State private var deepseekCookieInput: String = ""
+    @State private var originalDeepseekCookieInput: String = ""
+    @State private var showDeepseekCookie = false
     @State private var editingProviders: Set<QuotaProvider> = []
+    @State private var editingAccountIDs: Set<String> = []
     @State private var draggedProvider: QuotaProvider?
+    @State private var accountDisplayNameInputs: [String: String] = [:]
+    @State private var deepseekTokenInputs: [String: String] = [:]
+    @State private var originalDeepseekTokenInputs: [String: String] = [:]
+    @State private var deepseekCookieInputs: [String: String] = [:]
+    @State private var originalDeepseekCookieInputs: [String: String] = [:]
     @State private var isValidatingGLM = false
     @State private var isValidatingOpenAI = false
     @State private var isValidatingMimo = false
+    @State private var isValidatingDeepseek = false
     @State private var glmLoginError: String?
     @State private var openAIImportError: String?
     @State private var mimoImportError: String?
+    @State private var deepseekImportError: String?
     @State private var transferSheetState: TransferSheetState?
     @State private var transferExportError: String?
     @State private var isGeneratingTransferQRCode = false
@@ -50,6 +65,10 @@ struct SettingsAccounts: View {
         appViewModel.accountConfigs.sorted { $0.order < $1.order }
     }
 
+    private var sortedProviderAccounts: [ProviderAccount] {
+        appViewModel.providerAccounts.sorted { $0.order < $1.order }
+    }
+
     private var savedMimoCookieValue: String {
         [originalMimoCookieInput, appViewModel.credentials?.token ?? ""]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -63,30 +82,20 @@ struct SettingsAccounts: View {
 
                 introCard
 
-                ForEach(sortedConfigs) { config in
-                    accountCard(for: config)
-                        .onDrag {
-                            draggedProvider = config.provider
-                            return NSItemProvider(object: config.provider.rawValue as NSString)
-                        }
-                        .onDrop(
-                            of: [UTType.plainText],
-                            delegate: AccountDropDelegate(
-                                target: config.provider,
-                                draggedProvider: $draggedProvider,
-                                moveAction: moveDraggedProvider(_:to:)
-                            )
-                        )
+                ForEach(sortedProviderAccounts) { account in
+                    providerAccountCard(for: account)
                 }
             }
             .padding(16)
         }
         .scrollIndicators(.hidden)
-        .task {
-            loadStoredOpenAIToken()
-            loadStoredGLMCredentials()
-            loadStoredMimoCookie()
-        }
+            .task {
+                loadStoredOpenAIToken()
+                loadStoredGLMCredentials()
+                loadStoredMimoCookie()
+                loadStoredDeepSeekCredentials()
+                loadAccountDisplayNames()
+            }
         .sheet(item: $transferSheetState) { state in
             TransferQRCodeSheet(payload: state.payload, url: state.url, mode: state.mode)
         }
@@ -134,7 +143,7 @@ struct SettingsAccounts: View {
 
                 Spacer()
 
-                Text(String(format: String(localized: "accounts_count_format"), sortedConfigs.count))
+                Text(String(format: String(localized: "accounts_count_format"), sortedProviderAccounts.count))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
             }
@@ -149,6 +158,26 @@ struct SettingsAccounts: View {
                 }
 
                 Spacer()
+
+                Menu {
+                    Button("GLM") {
+                        addProviderAccount(.glm)
+                    }
+                    Button("OpenAI") {
+                        addProviderAccount(.openai)
+                    }
+                    Button("MiMo") {
+                        addProviderAccount(.mimo)
+                    }
+                    Button("DeepSeek") {
+                        addProviderAccount(.deepseek)
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .frame(width: 28, height: 28)
+                }
+                .menuStyle(.borderlessButton)
+                .help("添加 Provider 账号")
 
                 Button {
                     Task {
@@ -183,22 +212,90 @@ struct SettingsAccounts: View {
         )
     }
 
+    private func addProviderAccount(_ provider: QuotaProvider) {
+        let account = appViewModel.addProviderAccount(provider: provider)
+        accountDisplayNameInputs[account.id] = account.displayName
+
+        if provider == .deepseek {
+            deepseekTokenInputs[account.id] = ""
+            originalDeepseekTokenInputs[account.id] = ""
+            deepseekCookieInputs[account.id] = ""
+            originalDeepseekCookieInputs[account.id] = ""
+            editingAccountIDs.insert(account.id)
+        }
+    }
+
+    private func clearLocalAccountState(_ account: ProviderAccount) {
+        editingAccountIDs.remove(account.id)
+        accountDisplayNameInputs.removeValue(forKey: account.id)
+        deepseekTokenInputs.removeValue(forKey: account.id)
+        originalDeepseekTokenInputs.removeValue(forKey: account.id)
+        deepseekCookieInputs.removeValue(forKey: account.id)
+        originalDeepseekCookieInputs.removeValue(forKey: account.id)
+    }
+
     @ViewBuilder
-    private func accountCard(for config: AccountConfig) -> some View {
+    private func providerAccountCard(for account: ProviderAccount) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            accountCard(for: account)
+
+            if !account.id.hasPrefix("legacy-") {
+                HStack(spacing: 8) {
+                    Spacer()
+                    Button(role: .destructive) {
+                        clearLocalAccountState(account)
+                        appViewModel.removeProviderAccount(id: account.id)
+                    } label: {
+                        Image(systemName: "trash")
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("删除账号")
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 8)
+            }
+        }
+        .onDrag {
+            draggedProvider = account.provider
+            return NSItemProvider(object: account.provider.rawValue as NSString)
+        }
+        .onDrop(of: [.text], delegate: AccountDropDelegate(
+            target: account.provider,
+            draggedProvider: $draggedProvider,
+            moveAction: moveDraggedProvider
+        ))
+    }
+
+    @ViewBuilder
+    private func accountCard(for account: ProviderAccount) -> some View {
+        let config = account.legacyConfig
+        let isEditing = account.provider == .deepseek
+            ? editingAccountIDs.contains(account.id)
+            : editingProviders.contains(account.provider)
+
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 providerArtwork(for: config.provider)
 
-                Text(config.provider.localizedName)
-                    .font(.system(size: 15, weight: .semibold))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(config.provider.localizedName)
+                        .font(.system(size: 15, weight: .semibold))
+
+                    if account.displayName != config.provider.localizedName {
+                        Text(account.displayName)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
 
                 Spacer(minLength: 8)
 
                 if QuotaProvider.allCases.contains(config.provider) {
                     Button {
-                        handleEditAction(for: config.provider)
+                        handleEditAction(for: account)
                     } label: {
-                        Text(editingProviders.contains(config.provider) ? String(localized: "accounts_done_editing") : String(localized: "accounts_edit_credentials"))
+                        Text(isEditing ? String(localized: "accounts_done_editing") : String(localized: "accounts_edit_credentials"))
                             .font(.caption.weight(.semibold))
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
@@ -213,16 +310,18 @@ struct SettingsAccounts: View {
 
                 Toggle("", isOn: Binding(
                     get: { config.isEnabled },
-                    set: { appViewModel.updateAccountConfig(provider: config.provider, isEnabled: $0) }
+                    set: { appViewModel.updateProviderAccountEnabled(id: account.id, isEnabled: $0) }
                 ))
                 .toggleStyle(.switch)
                 .labelsHidden()
                 .help(String(localized: config.isEnabled ? "accounts_disable" : "accounts_enable"))
             }
 
-            if editingProviders.contains(config.provider) {
+            if isEditing {
                 Divider()
                     .overlay(Color.primary.opacity(0.06))
+
+                accountMetadataEditor(for: account)
 
                 switch config.provider {
                 case .glm:
@@ -231,6 +330,8 @@ struct SettingsAccounts: View {
                     openAICredentialsEditor
                 case .mimo:
                     mimoCredentialsEditor
+                case .deepseek:
+                    deepseekCredentialsEditor(for: account)
                 }
             }
         }
@@ -249,6 +350,22 @@ struct SettingsAccounts: View {
             .scaledToFit()
             .frame(width: 24, height: 24)
             .frame(width: 32, height: 32)
+    }
+
+    private func accountMetadataEditor(for account: ProviderAccount) -> some View {
+        fieldBlock(title: "备注小标签") {
+            TextField(account.provider.localizedName, text: accountDisplayNameBinding(for: account))
+                .textFieldStyle(.roundedBorder)
+        } footer: {
+            Text("用于区分同一个 Provider 下的多个账号")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.035))
+        )
     }
 
     private var openAICredentialsEditor: some View {
@@ -409,6 +526,94 @@ struct SettingsAccounts: View {
         }
     }
 
+    private func deepseekCredentialsEditor(for account: ProviderAccount) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                openDeepSeekLoginWindow(account: account)
+            } label: {
+                Text("browser_login")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 7)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isValidatingDeepseek)
+
+            fieldBlock(title: "Authorization") {
+                HStack(spacing: 10) {
+                    Group {
+                        if showDeepseekToken {
+                            TextField("Bearer xxx", text: deepseekTokenBinding(for: account))
+                        } else {
+                            SecureField("Bearer xxx", text: deepseekTokenBinding(for: account))
+                        }
+                    }
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.body, design: .monospaced))
+
+                    Button {
+                        showDeepseekToken.toggle()
+                    } label: {
+                        Image(systemName: showDeepseekToken ? "eye.slash" : "eye")
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.borderless)
+                    .help(String(localized: showDeepseekToken ? "accounts_hide_token" : "accounts_show_token"))
+                }
+            } footer: {
+                Text("deepseek_authorization_hint")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.primary.opacity(0.035))
+            )
+
+            fieldBlock(title: "Cookie") {
+                HStack(spacing: 10) {
+                    Group {
+                        if showDeepseekCookie {
+                            TextField(String(localized: "mimo_cookie_placeholder"), text: deepseekCookieBinding(for: account))
+                        } else {
+                            SecureField(String(localized: "mimo_cookie_placeholder"), text: deepseekCookieBinding(for: account))
+                        }
+                    }
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.body, design: .monospaced))
+
+                    Button {
+                        showDeepseekCookie.toggle()
+                    } label: {
+                        Image(systemName: showDeepseekCookie ? "eye.slash" : "eye")
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.borderless)
+                    .help(String(localized: showDeepseekCookie ? "accounts_hide_token" : "accounts_show_token"))
+                }
+            } footer: {
+                Text("deepseek_cookie_hint")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.primary.opacity(0.035))
+            )
+
+            if let deepseekImportError {
+                Label(deepseekImportError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+        }
+    }
+
     private var sensitiveTokenField: some View {
         fieldBlock(title: "Access Token") {
             HStack(spacing: 10) {
@@ -458,6 +663,27 @@ struct SettingsAccounts: View {
         }
     }
 
+    private func accountDisplayNameBinding(for account: ProviderAccount) -> Binding<String> {
+        Binding(
+            get: { accountDisplayNameInputs[account.id] ?? account.displayName },
+            set: { accountDisplayNameInputs[account.id] = $0 }
+        )
+    }
+
+    private func deepseekTokenBinding(for account: ProviderAccount) -> Binding<String> {
+        Binding(
+            get: { deepseekTokenInputs[account.id] ?? "" },
+            set: { deepseekTokenInputs[account.id] = $0 }
+        )
+    }
+
+    private func deepseekCookieBinding(for account: ProviderAccount) -> Binding<String> {
+        Binding(
+            get: { deepseekCookieInputs[account.id] ?? "" },
+            set: { deepseekCookieInputs[account.id] = $0 }
+        )
+    }
+
     private func cardBackground(for config: AccountConfig) -> some View {
         RoundedRectangle(cornerRadius: 20, style: .continuous)
             .fill(Color(nsColor: .controlBackgroundColor))
@@ -504,7 +730,59 @@ struct SettingsAccounts: View {
         }
     }
 
-    private func handleEditAction(for provider: QuotaProvider) {
+    private func loadStoredDeepSeekCredentials() {
+        for account in appViewModel.providerAccounts where account.provider == .deepseek {
+            loadDeepSeekCredentials(for: account)
+        }
+    }
+
+    private func loadAccountDisplayNames() {
+        for account in appViewModel.providerAccounts {
+            accountDisplayNameInputs[account.id] = account.displayName
+        }
+    }
+
+    private func loadDeepSeekCredentials(for account: ProviderAccount) {
+        guard deepseekTokenInputs[account.id] == nil,
+              let credential = KeychainService.shared.loadProviderCredential(for: account) else { return }
+        let token = credential.token ?? ""
+        let cookie = credential.cookieString ?? ""
+        if !token.isEmpty {
+            deepseekTokenInputs[account.id] = token
+            originalDeepseekTokenInputs[account.id] = token
+        }
+        if !cookie.isEmpty {
+            deepseekCookieInputs[account.id] = cookie
+            originalDeepseekCookieInputs[account.id] = cookie
+        }
+    }
+
+    private func handleEditAction(for account: ProviderAccount) {
+        guard account.provider == .deepseek else {
+            if editingProviders.contains(account.provider) {
+                saveAccountDisplayName(for: account)
+            } else {
+                accountDisplayNameInputs[account.id] = account.displayName
+            }
+            handleProviderEditAction(for: account.provider)
+            return
+        }
+
+        if editingAccountIDs.contains(account.id) {
+            finishDeepSeekEditing(for: account)
+            return
+        }
+
+        accountDisplayNameInputs[account.id] = account.displayName
+
+        loadDeepSeekCredentials(for: account)
+        deepseekImportError = nil
+        originalDeepseekTokenInputs[account.id] = deepseekTokenInputs[account.id] ?? ""
+        originalDeepseekCookieInputs[account.id] = deepseekCookieInputs[account.id] ?? ""
+        editingAccountIDs.insert(account.id)
+    }
+
+    private func handleProviderEditAction(for provider: QuotaProvider) {
         if editingProviders.contains(provider) {
             switch provider {
             case .glm:
@@ -513,6 +791,8 @@ struct SettingsAccounts: View {
                 finishOpenAIEditing()
             case .mimo:
                 finishMimoEditing()
+            case .deepseek:
+                return
             }
             return
         }
@@ -532,6 +812,8 @@ struct SettingsAccounts: View {
         case .mimo:
             mimoImportError = nil
             originalMimoCookieInput = mimoCookieInput
+        case .deepseek:
+            return
         }
 
         editingProviders.insert(provider)
@@ -592,6 +874,40 @@ struct SettingsAccounts: View {
         }
 
         validateAndStoreMimoCookie(trimmed)
+    }
+
+    private func finishDeepSeekEditing(for account: ProviderAccount) {
+        saveAccountDisplayName(for: account)
+
+        let trimmedToken = (deepseekTokenInputs[account.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let originalTrimmedToken = (originalDeepseekTokenInputs[account.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCookie = (deepseekCookieInputs[account.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let originalTrimmedCookie = (originalDeepseekCookieInputs[account.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard trimmedToken != originalTrimmedToken || trimmedCookie != originalTrimmedCookie else {
+            editingAccountIDs.remove(account.id)
+            return
+        }
+
+        guard !trimmedToken.isEmpty, !trimmedCookie.isEmpty else {
+            if trimmedToken.isEmpty && trimmedCookie.isEmpty {
+                KeychainService.shared.deleteProviderCredential(for: account)
+                originalDeepseekTokenInputs[account.id] = ""
+                originalDeepseekCookieInputs[account.id] = ""
+                deepseekImportError = nil
+                editingAccountIDs.remove(account.id)
+            } else {
+                deepseekImportError = String(localized: "deepseek_credential_required")
+            }
+            return
+        }
+
+        validateAndStoreDeepSeekCredentials(account: account, token: trimmedToken, cookie: trimmedCookie)
+    }
+
+    private func saveAccountDisplayName(for account: ProviderAccount) {
+        let value = accountDisplayNameInputs[account.id] ?? account.displayName
+        appViewModel.updateProviderAccountDisplayName(id: account.id, displayName: value)
     }
 
     private func openGLMLoginWindow() {
@@ -701,6 +1017,12 @@ struct SettingsAccounts: View {
                     silent: true
                 )
                 KeychainService.shared.save(key: Constants.Keychain.openAIAccessTokenKey, value: token)
+                appViewModel.upsertCredentialForPrimaryAccount(
+                    provider: .openai,
+                    token: token,
+                    cookieString: nil,
+                    accountIdentifier: accountId
+                )
                 originalOpenAITokenInput = token
                 editingProviders.remove(.openai)
                 appViewModel.refreshAuthenticationState()
@@ -733,6 +1055,12 @@ struct SettingsAccounts: View {
                 KeychainService.shared.save(
                     key: DevBarCoreConstants.Keychain.mimoServiceTokenKey,
                     value: credential
+                )
+                appViewModel.upsertCredentialForPrimaryAccount(
+                    provider: .mimo,
+                    token: nil,
+                    cookieString: credential,
+                    accountIdentifier: nil
                 )
                 mimoCookieInput = credential
                 originalMimoCookieInput = credential
@@ -784,6 +1112,12 @@ struct SettingsAccounts: View {
                             key: DevBarCoreConstants.Keychain.mimoServiceTokenKey,
                             value: storedValue
                         )
+                        appViewModel.upsertCredentialForPrimaryAccount(
+                            provider: .mimo,
+                            token: nil,
+                            cookieString: storedValue,
+                            accountIdentifier: nil
+                        )
                         mimoCookieInput = storedValue
                         originalMimoCookieInput = storedValue
                         editingProviders.remove(.mimo)
@@ -804,6 +1138,208 @@ struct SettingsAccounts: View {
         )
 
         controller.show()
+    }
+
+    private func openDeepSeekLoginWindow(account: ProviderAccount) {
+        deepseekImportError = nil
+
+        // Create a WKWebView to capture the Authorization token from network requests
+        let config = WKWebViewConfiguration()
+        config.websiteDataStore = .default()
+
+        let contentController = WKUserContentController()
+        // Inject JS that intercepts fetch/XHR to capture the Authorization header
+        let captureScript = WKUserScript(
+            source: """
+            (function() {
+                var origFetch = window.fetch;
+                window.fetch = function() {
+                    var req = arguments[0];
+                    var opts = arguments[1] || {};
+                    var auth = (typeof req === 'object' && req.headers) ? req.headers.get('Authorization') : (opts.headers && (opts.headers['Authorization'] || opts.headers['authorization']));
+                    if (auth && auth.indexOf('Bearer ') === 0) {
+                        window.webkit.messageHandlers.deepSeekTokenCapture.postMessage(auth.substring(7));
+                    }
+                    return origFetch.apply(this, arguments);
+                };
+                var origOpen = XMLHttpRequest.prototype.open;
+                var origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+                XMLHttpRequest.prototype.open = function() {
+                    this._authHeader = null;
+                    return origOpen.apply(this, arguments);
+                };
+                XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+                    if (name.toLowerCase() === 'authorization' && value.indexOf('Bearer ') === 0) {
+                        this._authHeader = value.substring(7);
+                    }
+                    return origSetHeader.apply(this, arguments);
+                };
+                var origSend = XMLHttpRequest.prototype.send;
+                XMLHttpRequest.prototype.send = function() {
+                    if (this._authHeader) {
+                        window.webkit.messageHandlers.deepSeekTokenCapture.postMessage(this._authHeader);
+                    }
+                    return origSend.apply(this, arguments);
+                };
+            })();
+            """,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        )
+        contentController.addUserScript(captureScript)
+        contentController.add(DeepSeekSettingsTokenCapture(store: deepSeekTokenStore), name: "deepSeekTokenCapture")
+        config.userContentController = contentController
+
+        let webView = WKWebView(frame: .zero, configuration: config)
+        let hostingView = NSHostingView(rootView: LoginWebViewWrapper(webView: webView))
+
+        let win = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 700),
+            styleMask: [.titled, .closable],
+            backing: .buffered,
+            defer: false
+        )
+        win.contentView = hostingView
+        win.title = "DeepSeek Platform"
+        win.center()
+        win.level = .floating
+        win.isReleasedWhenClosed = false
+        win.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        deepSeekLoginWebView = webView
+        deepSeekLoginWindow = win
+        deepSeekLoginAccountID = account.id
+        deepSeekTokenStore.capturedToken = nil
+
+        if let url = URL(string: DevBarCoreConstants.DeepSeek.dashboardURL) {
+            webView.load(URLRequest(url: url))
+        }
+
+        // Poll for the token and cookies
+        deepSeekPollTimer?.invalidate()
+        deepSeekPollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { _ in
+            Task { @MainActor in
+                await tryDeepSeekExtract(webView: webView)
+            }
+        }
+    }
+
+    // DeepSeek webview login state
+    @State private var deepSeekLoginWebView: WKWebView?
+    @State private var deepSeekLoginWindow: NSWindow?
+    @State private var deepSeekLoginAccountID: String?
+    @StateObject private var deepSeekTokenStore = DeepSeekTokenStore()
+    @State private var deepSeekPollTimer: Timer?
+
+    @MainActor
+    private func tryDeepSeekExtract(webView: WKWebView) async {
+        // Check if we captured a Bearer token from network interception
+        guard let bearerToken = deepSeekTokenStore.capturedToken, !bearerToken.isEmpty else { return }
+
+        let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
+        let cookieString = cookies
+            .filter { $0.domain.contains("deepseek.com") }
+            .map { "\($0.name)=\($0.value)" }
+            .joined(separator: "; ")
+
+        guard !cookieString.isEmpty else { return }
+
+        // Stop polling
+        deepSeekPollTimer?.invalidate()
+        deepSeekPollTimer = nil
+
+        // Close the window
+        deepSeekLoginWindow?.close()
+        deepSeekLoginWindow = nil
+        deepSeekLoginWebView = nil
+
+        guard let accountID = deepSeekLoginAccountID else { return }
+        deepSeekLoginAccountID = nil
+        await validateAndStoreDeepSeekFromWebView(accountID: accountID, token: bearerToken, cookie: cookieString)
+    }
+
+    private func validateAndStoreDeepSeekFromWebView(accountID: String, token: String, cookie: String) async {
+        isValidatingDeepseek = true
+        deepseekImportError = nil
+        defer { isValidatingDeepseek = false }
+
+        let bearerToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCookie = cookie.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !bearerToken.isEmpty, !trimmedCookie.isEmpty else {
+            deepseekImportError = String(localized: "deepseek_credential_required")
+            return
+        }
+
+        do {
+            guard let account = appViewModel.providerAccounts.first(where: { $0.id == accountID }) else { return }
+            let apiClient = DeepSeekAPIClient()
+            _ = try await apiClient.fetchUsage(token: bearerToken, cookieString: trimmedCookie)
+
+            _ = appViewModel.saveCredential(
+                for: account.id,
+                token: bearerToken,
+                cookieString: trimmedCookie,
+                accountIdentifier: nil
+            )
+
+            deepseekTokenInputs[account.id] = bearerToken
+            originalDeepseekTokenInputs[account.id] = bearerToken
+            deepseekCookieInputs[account.id] = trimmedCookie
+            originalDeepseekCookieInputs[account.id] = trimmedCookie
+            editingAccountIDs.remove(account.id)
+            appViewModel.updateProviderAccountEnabled(id: account.id, isEnabled: true)
+            appViewModel.refreshAuthenticationState()
+
+            await appViewModel.deepSeekQuotaViewModel.fetchUsage(
+                token: bearerToken,
+                cookieString: trimmedCookie,
+                silent: true
+            )
+        } catch let error as APIError {
+            deepseekImportError = error.errorDescription
+        } catch {
+            deepseekImportError = error.localizedDescription
+        }
+    }
+
+    private func validateAndStoreDeepSeekCredentials(account: ProviderAccount, token: String, cookie: String) {
+        isValidatingDeepseek = true
+        deepseekImportError = nil
+
+        Task { @MainActor in
+            defer { isValidatingDeepseek = false }
+
+            do {
+                let apiClient = DeepSeekAPIClient()
+                _ = try await apiClient.fetchUsage(token: token, cookieString: cookie)
+
+                _ = appViewModel.saveCredential(
+                    for: account.id,
+                    token: token,
+                    cookieString: cookie,
+                    accountIdentifier: nil
+                )
+
+                deepseekTokenInputs[account.id] = token
+                originalDeepseekTokenInputs[account.id] = token
+                deepseekCookieInputs[account.id] = cookie
+                originalDeepseekCookieInputs[account.id] = cookie
+                editingAccountIDs.remove(account.id)
+                appViewModel.updateProviderAccountEnabled(id: account.id, isEnabled: true)
+                appViewModel.refreshAuthenticationState()
+
+                await appViewModel.deepSeekQuotaViewModel.fetchUsage(
+                    token: token,
+                    cookieString: cookie,
+                    silent: true
+                )
+            } catch let error as APIError {
+                deepseekImportError = error.errorDescription
+            } catch {
+                deepseekImportError = error.localizedDescription
+            }
+        }
     }
 
     private func validateGLMCookie(_ cookieString: String) async -> Bool {
@@ -904,5 +1440,18 @@ private struct AccountDropDelegate: DropDelegate {
 private extension Double {
     var nonZero: Double? {
         self > 0 ? self : nil
+    }
+}
+
+/// Message handler that forwards captured DeepSeek Bearer token.
+private final class DeepSeekSettingsTokenCapture: NSObject, WKScriptMessageHandler {
+    let store: DeepSeekTokenStore
+    init(store: DeepSeekTokenStore) { self.store = store }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "deepSeekTokenCapture",
+              let token = message.body as? String, !token.isEmpty else { return }
+        Task { @MainActor in
+            store.capturedToken = token
+        }
     }
 }

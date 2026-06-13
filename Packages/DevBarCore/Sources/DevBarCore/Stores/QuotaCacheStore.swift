@@ -41,6 +41,16 @@ public struct MimoQuotaCacheSnapshot: Codable, Sendable, Equatable {
     }
 }
 
+public struct DeepSeekQuotaCacheSnapshot: Codable, Sendable, Equatable {
+    public let usageResponse: DeepSeekUsageResponse?
+    public let lastUpdated: Date?
+
+    public init(usageResponse: DeepSeekUsageResponse?, lastUpdated: Date?) {
+        self.usageResponse = usageResponse
+        self.lastUpdated = lastUpdated
+    }
+}
+
 public protocol QuotaCacheStore {
     func loadGLMSnapshot() -> GLMQuotaCacheSnapshot?
     func saveGLMSnapshot(_ snapshot: GLMQuotaCacheSnapshot)
@@ -51,6 +61,9 @@ public protocol QuotaCacheStore {
     func loadMimoSnapshot() -> MimoQuotaCacheSnapshot?
     func saveMimoSnapshot(_ snapshot: MimoQuotaCacheSnapshot)
     func clearMimoSnapshot()
+    func loadDeepSeekSnapshot() -> DeepSeekQuotaCacheSnapshot?
+    func saveDeepSeekSnapshot(_ snapshot: DeepSeekQuotaCacheSnapshot)
+    func clearDeepSeekSnapshot()
 }
 
 public struct UserDefaultsQuotaCacheStore: QuotaCacheStore {
@@ -98,6 +111,18 @@ public struct UserDefaultsQuotaCacheStore: QuotaCacheStore {
 
     public func clearMimoSnapshot() {
         defaults.removeObject(forKey: DevBarCoreConstants.Defaults.mimoQuotaCacheKey)
+    }
+
+    public func loadDeepSeekSnapshot() -> DeepSeekQuotaCacheSnapshot? {
+        load(DeepSeekQuotaCacheSnapshot.self, forKey: DevBarCoreConstants.Defaults.deepseekQuotaCacheKey)
+    }
+
+    public func saveDeepSeekSnapshot(_ snapshot: DeepSeekQuotaCacheSnapshot) {
+        save(snapshot, forKey: DevBarCoreConstants.Defaults.deepseekQuotaCacheKey)
+    }
+
+    public func clearDeepSeekSnapshot() {
+        defaults.removeObject(forKey: DevBarCoreConstants.Defaults.deepseekQuotaCacheKey)
     }
 
     private func load<Value: Decodable>(_ type: Value.Type, forKey key: String) -> Value? {

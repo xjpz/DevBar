@@ -113,6 +113,8 @@ struct DevBarWidgetEntryView: View {
             return "OpenAI"
         case .mimo:
             return "MiMo"
+        case .deepseek:
+            return "DeepSeek"
         case nil:
             return entry.selectedProvider.displayName
         }
@@ -417,6 +419,8 @@ struct LockScreenQuotaEntryView: View {
             return "OpenAI"
         case .mimo:
             return "MiMo"
+        case .deepseek:
+            return "DeepSeek"
         case nil:
             return entry.selectedProvider.displayName
         }

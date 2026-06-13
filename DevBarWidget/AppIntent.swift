@@ -11,6 +11,7 @@ enum WidgetProviderSelection: String, AppEnum, CaseIterable {
     case glm
     case openai
     case mimo
+    case deepseek
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation {
         TypeDisplayRepresentation(name: "Provider")
@@ -20,7 +21,8 @@ enum WidgetProviderSelection: String, AppEnum, CaseIterable {
         [
             .glm: DisplayRepresentation(title: "GLM"),
             .openai: DisplayRepresentation(title: "OpenAI"),
-            .mimo: DisplayRepresentation(title: "MiMo")
+            .mimo: DisplayRepresentation(title: "MiMo"),
+            .deepseek: DisplayRepresentation(title: "DeepSeek")
         ]
     }
 
@@ -29,7 +31,16 @@ enum WidgetProviderSelection: String, AppEnum, CaseIterable {
         case .glm: return "GLM"
         case .openai: return "OpenAI"
         case .mimo: return "MiMo"
+        case .deepseek: return "DeepSeek"
         }
+    }
+
+    static var enabledSelectionsFromAppGroup: [WidgetProviderSelection] {
+        guard let rawValues = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID)?
+            .array(forKey: DevBarCoreConstants.AppGroup.enabledWidgetProvidersKey) as? [String] else {
+            return []
+        }
+        return rawValues.compactMap(WidgetProviderSelection.init(rawValue:))
     }
 }
 

@@ -52,6 +52,52 @@ public final class WidgetDataManager {
         defaults.removeObject(forKey: DevBarCoreConstants.AppGroup.sharedDataKey(for: provider))
     }
 
+    public func saveQuotaSnapshot(_ snapshot: ProviderQuotaSnapshot, mirrorProviderKey: Bool = true) {
+        guard let defaults else { return }
+        do {
+            let encoded = try JSONEncoder().encode(snapshot)
+            defaults.set(encoded, forKey: DevBarCoreConstants.AppGroup.quotaSnapshotKey(for: snapshot.accountID))
+            if mirrorProviderKey {
+                saveSharedData(snapshot.widgetData)
+            }
+        } catch {
+            print("[DevBar] Failed to save quota snapshot: \(error)")
+        }
+    }
+
+    public func loadQuotaSnapshot(accountID: String) -> ProviderQuotaSnapshot? {
+        guard let defaults else { return nil }
+        let key = DevBarCoreConstants.AppGroup.quotaSnapshotKey(for: accountID)
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(ProviderQuotaSnapshot.self, from: data)
+    }
+
+    public func applyQuotaSnapshot(_ snapshot: ProviderQuotaSnapshot, mirrorProviderKey: Bool = true) -> Bool {
+        let existing = loadQuotaSnapshot(accountID: snapshot.accountID)
+        guard snapshot.shouldReplace(existing) else { return false }
+        saveQuotaSnapshot(snapshot, mirrorProviderKey: mirrorProviderKey)
+        return true
+    }
+
+    public func clearQuotaSnapshot(accountID: String) {
+        guard let defaults else { return }
+        defaults.removeObject(forKey: DevBarCoreConstants.AppGroup.quotaSnapshotKey(for: accountID))
+    }
+
+    public func saveEnabledProviders(_ providers: [QuotaProvider]) {
+        guard let defaults else { return }
+        defaults.set(providers.map(\.rawValue), forKey: DevBarCoreConstants.AppGroup.enabledWidgetProvidersKey)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    public func loadEnabledProviders() -> [QuotaProvider] {
+        guard let defaults,
+              let rawValues = defaults.array(forKey: DevBarCoreConstants.AppGroup.enabledWidgetProvidersKey) as? [String] else {
+            return []
+        }
+        return rawValues.compactMap(QuotaProvider.init(rawValue:))
+    }
+
     public func saveMacThemeSnapshot(_ snapshot: MacThemeWidgetSnapshot) {
         guard let defaults else { return }
         do {
@@ -94,6 +140,11 @@ public final class WidgetDataManager {
 
     public func saveAndReload(_ snapshot: MacThemeWidgetSnapshot) {
         saveMacThemeSnapshot(snapshot)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    public func saveAndReload(_ snapshot: ProviderQuotaSnapshot, mirrorProviderKey: Bool = true) {
+        saveQuotaSnapshot(snapshot, mirrorProviderKey: mirrorProviderKey)
         WidgetCenter.shared.reloadAllTimelines()
     }
 

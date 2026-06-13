@@ -12,9 +12,13 @@ struct IOSAccountsView: View {
     @State private var glmError: String?
     @State private var openAIError: String?
     @State private var mimoError: String?
+    @State private var deepseekError: String?
+    @State private var deepseekTokenInput = ""
+    @State private var deepseekCookieInput = ""
     @State private var isSavingGLM = false
     @State private var isSavingOpenAI = false
     @State private var isSavingMimo = false
+    @State private var isSavingDeepseek = false
     @State private var isShowingScanner = false
     @State private var showMiMoWebViewLogin = false
     @State private var isResolvingTransfer = false
@@ -40,15 +44,15 @@ struct IOSAccountsView: View {
 
             Section {
                 providerListHeader
-                    .listRowInsets(EdgeInsets(top: 24, leading: 16, bottom: 0, trailing: 16))
+                    .listRowInsets(EdgeInsets(top: 24, leading: 16, bottom: 6, trailing: 16))
                     .listRowSeparator(.hidden)
                     .listRowBackground(Color.clear)
 
                 ForEach(sortedConfigs) { config in
                     providerRow(for: config)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                         .listRowSeparator(.hidden)
-                        .listRowBackground(theme.backgroundSecondary)
+                        .listRowBackground(Color.clear)
                 }
                 .onMove(perform: moveProviders)
             }
@@ -413,6 +417,54 @@ struct IOSAccountsView: View {
                     .disabled(isSavingMimo)
                 }
             }
+        case .deepseek:
+            VStack(alignment: .leading, spacing: 12) {
+                inputField(title: "Authorization") {
+                    SecureField("Bearer xxx", text: $deepseekTokenInput)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.system(.body, design: .monospaced))
+                }
+
+                inputField(title: "Cookie") {
+                    SecureField(String(localized: "mimo_cookie_placeholder"), text: $deepseekCookieInput)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.system(.body, design: .monospaced))
+                }
+
+                Text("deepseek_authorization_hint")
+                    .font(.caption)
+                    .foregroundStyle(theme.textSecondary)
+
+                if let deepseekError {
+                    Label(deepseekError, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                HStack(spacing: 10) {
+                    Button(role: .destructive) {
+                        appViewModel.clearDeepSeekCredentials()
+                        deepseekTokenInput = ""
+                        deepseekCookieInput = ""
+                        deepseekError = nil
+                    } label: {
+                        Text("ios_accounts_remove_deepseek")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        saveDeepSeek()
+                    } label: {
+                        Text("accounts_done_editing")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isSavingDeepseek)
+                }
+            }
         }
     }
 
@@ -450,6 +502,8 @@ struct IOSAccountsView: View {
             return isSavingOpenAI
         case .mimo:
             return isSavingMimo
+        case .deepseek:
+            return false
         }
     }
 
@@ -461,6 +515,8 @@ struct IOSAccountsView: View {
             return openAIError
         case .mimo:
             return mimoError
+        case .deepseek:
+            return nil
         }
     }
 
@@ -532,6 +588,9 @@ struct IOSAccountsView: View {
             return saveOpenAI()
         case .mimo:
             return saveMimo()
+        case .deepseek:
+            pageMode = .normal
+            return true
         }
     }
 
@@ -547,6 +606,13 @@ struct IOSAccountsView: View {
         }
         if mimoCookieInput.isEmpty {
             mimoCookieInput = appViewModel.mimoServiceToken
+        }
+        if deepseekTokenInput.isEmpty {
+            if let account = appViewModel.providerAccounts.first(where: { $0.provider == .deepseek }),
+               let credential = KeychainService.shared.loadProviderCredential(for: account) {
+                deepseekTokenInput = credential.token ?? ""
+                deepseekCookieInput = credential.cookieString ?? ""
+            }
         }
     }
 
@@ -651,6 +717,40 @@ struct IOSAccountsView: View {
                 pageMode = .normal
             } catch {
                 mimoError = error.localizedDescription
+            }
+        }
+        return false
+    }
+
+    @discardableResult
+    private func saveDeepSeek() -> Bool {
+        deepseekError = nil
+        let trimmedToken = deepseekTokenInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCookie = deepseekCookieInput.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !trimmedToken.isEmpty, !trimmedCookie.isEmpty else {
+            if trimmedToken.isEmpty && trimmedCookie.isEmpty {
+                appViewModel.clearDeepSeekCredentials()
+                deepseekTokenInput = ""
+                deepseekCookieInput = ""
+                pageMode = .normal
+                return true
+            }
+            deepseekError = String(localized: "deepseek_credential_required")
+            return false
+        }
+
+        isSavingDeepseek = true
+        Task {
+            defer { isSavingDeepseek = false }
+            do {
+                try await appViewModel.saveDeepSeekCredentials(
+                    token: trimmedToken,
+                    cookieString: trimmedCookie
+                )
+                pageMode = .normal
+            } catch {
+                deepseekError = error.localizedDescription
             }
         }
         return false
