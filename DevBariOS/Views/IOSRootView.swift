@@ -30,16 +30,26 @@ struct IOSRootView: View {
                 .tag(IOSAppViewModel.TabSelection.dashboard)
 
                 NavigationStack {
-                    if #available(iOS 18.0, *) {
-                        IOSWebKitView()
-                    } else {
-                        ContentUnavailableView("Requires iOS 18+", systemImage: "globe")
-                    }
+                    IOSHermesChatView()
                 }
                 .tabItem {
-                    Label("WebKit", systemImage: "globe")
+                    Label("ios_tab_chatbot", systemImage: "bubble.left.and.bubble.right.fill")
                 }
-                .tag(IOSAppViewModel.TabSelection.webkit)
+                .tag(IOSAppViewModel.TabSelection.chatbot)
+
+                if appViewModel.isWebKitTabEnabled {
+                    NavigationStack {
+                        if #available(iOS 18.0, *) {
+                            IOSWebKitView()
+                        } else {
+                            ContentUnavailableView("Requires iOS 18+", systemImage: "globe")
+                        }
+                    }
+                    .tabItem {
+                        Label("WebKit", systemImage: "globe")
+                    }
+                    .tag(IOSAppViewModel.TabSelection.webkit)
+                }
 
                 NavigationStack {
                     IOSToolsView()
@@ -131,7 +141,7 @@ struct IOSRootView: View {
 
     private var currentTabBackground: Color {
         switch appViewModel.selectedTab {
-        case .dashboard:
+        case .dashboard, .chatbot:
             theme.backgroundPrimary
         case .webkit, .tools:
             theme.backgroundSecondary

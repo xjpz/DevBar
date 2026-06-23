@@ -74,6 +74,23 @@ struct IOSSettingsView: View {
                 .accessibilityIdentifier("ios.settings.refreshInterval")
             }
 
+            Section("ios_settings_ai_features_section") {
+                settingsLink(
+                    title: localized("ios_settings_hermes_title"),
+                    systemImage: "bubble.left.and.bubble.right",
+                    summary: hermesSummary
+                ) {
+                    IOSHermesSettingsView()
+                }
+            }
+
+            Section("ios_settings_navigation_section") {
+                Toggle(isOn: $appViewModel.isWebKitTabEnabled) {
+                    Label("ios_settings_show_webkit_tab", systemImage: "globe")
+                }
+                .accessibilityIdentifier("ios.settings.webkitTabEnabled")
+            }
+
             Section("ios_settings_device_system_section") {
                 settingsLink(
                     title: localized("ios_settings_device_widget_section"),
@@ -205,6 +222,17 @@ struct IOSSettingsView: View {
         return count == 0
             ? localized("ios_settings_not_enabled")
             : String(format: localized("ios_settings_enabled_count_format"), count)
+    }
+
+    private var hermesSummary: String {
+        if appViewModel.isHermesConfigured {
+            return localized("ios_settings_hermes_configured")
+        }
+        if !appViewModel.hermesSettings.apiBaseURL.isEmpty,
+           HermesAPIClient.chatURL(from: appViewModel.hermesSettings.apiBaseURL) == nil {
+            return localized("ios_settings_hermes_invalid_url")
+        }
+        return localized("ios_settings_hermes_api_key_required")
     }
 
     private var liveActivitySummary: String {
@@ -503,6 +531,121 @@ private struct IOSPushSettingsView: View {
 
     private func localized(_ key: String.LocalizationValue) -> String {
         String(localized: key, locale: languageManager.currentLocale)
+    }
+}
+
+private struct IOSHermesSettingsView: View {
+    @EnvironmentObject private var appViewModel: IOSAppViewModel
+    @Environment(\.themeTokens) private var theme
+    @State private var apiBaseURL = ""
+    @State private var apiKey = ""
+    @State private var isStreamingEnabled = true
+    @State private var errorMessage: String?
+    @State private var didSave = false
+
+    var body: some View {
+        Form {
+            Section {
+                IOSIconTextFieldRow(
+                    title: localized("ios_settings_hermes_base_url"),
+                    systemImage: "link",
+                    text: $apiBaseURL,
+                    keyboardType: .URL,
+                    textInputAutocapitalization: .never,
+                    accessibilityIdentifier: "ios.settings.hermes.baseURL"
+                )
+
+                HStack(spacing: 12) {
+                    Image(systemName: "key")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(theme.brandPrimary)
+                        .frame(width: 24)
+
+                    SecureField(localized("ios_settings_hermes_api_key"), text: $apiKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.system(.body, design: .monospaced))
+                        .accessibilityIdentifier("ios.settings.hermes.apiKey")
+                }
+
+                Toggle(isOn: $isStreamingEnabled) {
+                    Label("ios_settings_hermes_streaming", systemImage: "dot.radiowaves.left.and.right")
+                }
+                .accessibilityIdentifier("ios.settings.hermes.streaming")
+            } footer: {
+                Text("ios_settings_hermes_footer")
+            }
+
+            if let errorMessage {
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(theme.danger)
+                }
+            }
+
+            if didSave {
+                Section {
+                    Label("ios_settings_hermes_saved", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(theme.success)
+                }
+            }
+
+            Section {
+                Button {
+                    save()
+                } label: {
+                    Label("ios_settings_hermes_save", systemImage: "checkmark.circle")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button(role: .destructive) {
+                    appViewModel.clearHermesSettings()
+                    loadCurrentSettings()
+                    didSave = false
+                    errorMessage = nil
+                } label: {
+                    Label("ios_settings_hermes_clear", systemImage: "trash")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .iosGeekScreenBackground(theme)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationTitle("ios_settings_hermes_title")
+        .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("ios.settings.hermes.screen")
+        .onAppear {
+            loadCurrentSettings()
+        }
+    }
+
+    private func loadCurrentSettings() {
+        apiBaseURL = appViewModel.hermesSettings.apiBaseURL
+        apiKey = appViewModel.hermesAPIKey
+        isStreamingEnabled = appViewModel.hermesSettings.isStreamingEnabled
+    }
+
+    private func save() {
+        do {
+            try appViewModel.saveHermesSettings(
+                apiBaseURL: apiBaseURL,
+                apiKey: apiKey,
+                isStreamingEnabled: isStreamingEnabled
+            )
+            loadCurrentSettings()
+            errorMessage = nil
+            didSave = true
+        } catch {
+            didSave = false
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func localized(_ key: String.LocalizationValue) -> String {
+        String(localized: key)
     }
 }
 

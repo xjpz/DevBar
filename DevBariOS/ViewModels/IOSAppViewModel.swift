@@ -22,6 +22,7 @@ final class IOSAppViewModel: ObservableObject {
 
     enum TabSelection: Hashable {
         case dashboard
+        case chatbot
         case webkit
         case tools
     }
@@ -98,6 +99,20 @@ final class IOSAppViewModel: ObservableObject {
             Task { await syncLiveActivity() }
         }
     }
+    @Published var hermesSettings: HermesSettings {
+        didSet {
+            hermesSettingsStore.save(hermesSettings)
+        }
+    }
+    @Published private(set) var hermesSettingsRevision = 0
+    @Published var isWebKitTabEnabled: Bool {
+        didSet {
+            hermesSettingsStore.saveWebKitTabEnabled(isWebKitTabEnabled)
+            if !isWebKitTabEnabled, selectedTab == .webkit {
+                selectedTab = .dashboard
+            }
+        }
+    }
     @Published var pushNotificationPreferences: PushNotificationPreferences {
         didSet {
             if !DevBarCoreConstants.Features.agentWatcherEnabled,
@@ -155,6 +170,7 @@ final class IOSAppViewModel: ObservableObject {
     private let authService = AuthService()
     private let settingsStore = UserDefaultsAccountSettingsStore()
     private let liveActivitySettingsStore = LiveActivitySettingsStore()
+    private let hermesSettingsStore: UserDefaultsHermesSettingsStore
     private let macThemeWidgetAvatarStore = MacThemeWidgetAvatarStore()
     private var childObservers = Set<AnyCancellable>()
     private var hasStartedDeferredLaunchWork = false
@@ -196,6 +212,10 @@ final class IOSAppViewModel: ObservableObject {
         self.refreshInterval = UserDefaults.standard.double(forKey: DevBarCoreConstants.Defaults.refreshIntervalKey)
             .nonZero ?? DevBarCoreConstants.Defaults.defaultRefreshInterval
         self.liveActivitySettings = liveActivitySettingsStore.load()
+        let hermesStore = UserDefaultsHermesSettingsStore()
+        self.hermesSettingsStore = hermesStore
+        self.hermesSettings = hermesStore.load()
+        self.isWebKitTabEnabled = hermesStore.loadWebKitTabEnabled()
         var pushPreferences = IOSPushNotificationCoordinator.shared.loadPreferences()
         if !DevBarCoreConstants.Features.agentWatcherEnabled {
             pushPreferences.agentWatcherEnabled = false
@@ -289,6 +309,14 @@ final class IOSAppViewModel: ObservableObject {
         }
 
         return KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey) ?? ""
+    }
+
+    var hermesAPIKey: String {
+        KeychainService.shared.load(key: DevBarCoreConstants.Keychain.hermesAPIKeyKey) ?? ""
+    }
+
+    var isHermesConfigured: Bool {
+        HermesAPIClient.chatURL(from: hermesSettings.apiBaseURL) != nil && !hermesAPIKey.isEmpty
     }
 
     func syncedQuotaSnapshot(for provider: QuotaProvider) -> ProviderQuotaSnapshot? {
@@ -633,6 +661,37 @@ final class IOSAppViewModel: ObservableObject {
         }
         deepSeekQuotaViewModel.resetForLogout()
         Task { await syncLiveActivity() }
+    }
+
+    func saveHermesSettings(apiBaseURL: String, apiKey: String, isStreamingEnabled: Bool) throws {
+        let trimmedBaseURL = apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard HermesAPIClient.chatURL(from: trimmedBaseURL) != nil else {
+            throw CredentialsError.invalidHermesBaseURL
+        }
+
+        let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAPIKey.isEmpty else {
+            throw CredentialsError.emptyHermesAPIKey
+        }
+
+        guard KeychainService.shared.save(
+            key: DevBarCoreConstants.Keychain.hermesAPIKeyKey,
+            value: trimmedAPIKey
+        ) == errSecSuccess else {
+            throw CredentialsError.keychainSaveFailed
+        }
+
+        hermesSettings = HermesSettings(
+            apiBaseURL: trimmedBaseURL,
+            isStreamingEnabled: isStreamingEnabled
+        )
+        hermesSettingsRevision += 1
+    }
+
+    func clearHermesSettings() {
+        KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.hermesAPIKeyKey)
+        hermesSettings = .defaults
+        hermesSettingsRevision += 1
     }
 
     func saveDeepSeekCredentials(token: String, cookieString: String) async throws {
@@ -1571,6 +1630,8 @@ extension IOSAppViewModel {
         case emptyOpenAIToken
         case emptyMimoCookie
         case emptyDeepseekToken
+        case emptyHermesAPIKey
+        case invalidHermesBaseURL
         case keychainSaveFailed
 
         var errorDescription: String? {
@@ -1585,6 +1646,10 @@ extension IOSAppViewModel {
                 return String(localized: "mimo_cookie_required")
             case .emptyDeepseekToken:
                 return String(localized: "deepseek_credential_required")
+            case .emptyHermesAPIKey:
+                return String(localized: "ios_error_enter_hermes_api_key")
+            case .invalidHermesBaseURL:
+                return String(localized: "ios_error_invalid_hermes_base_url")
             case .keychainSaveFailed:
                 return String(localized: "ios_error_keychain_save_failed")
             }
