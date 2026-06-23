@@ -51,7 +51,7 @@ struct MacThemeWidgetProvider: AppIntentTimelineProvider {
         guard let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID),
               let raw = defaults.data(forKey: DevBarCoreConstants.AppGroup.sharedDataKey(for: provider.rawValue)),
               let decoded = try? JSONDecoder().decode(WidgetSharedData.self, from: raw),
-              decoded.schemaVersion == WidgetSharedData.currentSchemaVersion else {
+              decoded.schemaVersion <= WidgetSharedData.currentSchemaVersion else {
             return nil
         }
         return decoded

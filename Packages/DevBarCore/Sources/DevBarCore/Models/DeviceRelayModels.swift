@@ -378,30 +378,35 @@ public struct DeviceRelayPeerRuntimeState: Sendable, Equatable {
     public let lastLocalSeenAt: Date?
     public let displayName: String?
     public let screenLocked: Bool?
+    public let displayAwake: Bool?
 
     public init(
         lastRemoteSeenAt: Date? = nil,
         lastLocalSeenAt: Date? = nil,
         displayName: String? = nil,
-        screenLocked: Bool? = nil
+        screenLocked: Bool? = nil,
+        displayAwake: Bool? = nil
     ) {
         self.lastRemoteSeenAt = lastRemoteSeenAt
         self.lastLocalSeenAt = lastLocalSeenAt
         self.displayName = displayName
         self.screenLocked = screenLocked
+        self.displayAwake = displayAwake
     }
 
     public func updating(
         lastRemoteSeenAt: Date? = nil,
         lastLocalSeenAt: Date? = nil,
         displayName: String? = nil,
-        screenLocked: Bool? = nil
+        screenLocked: Bool? = nil,
+        displayAwake: Bool? = nil
     ) -> DeviceRelayPeerRuntimeState {
         DeviceRelayPeerRuntimeState(
             lastRemoteSeenAt: lastRemoteSeenAt ?? self.lastRemoteSeenAt,
             lastLocalSeenAt: lastLocalSeenAt ?? self.lastLocalSeenAt,
             displayName: displayName ?? self.displayName,
-            screenLocked: screenLocked ?? self.screenLocked
+            screenLocked: screenLocked ?? self.screenLocked,
+            displayAwake: displayAwake ?? self.displayAwake
         )
     }
 }

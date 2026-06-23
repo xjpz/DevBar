@@ -46,19 +46,7 @@ class CodexHookHandler {
         }
 
         do {
-            let payload = try JSONDecoder().decode(CodexHookPayload.self, from: body)
-            let event = createEvent(from: payload, eventType: .sessionStart, severity: .info)
-
-            if let sessionId = payload.sessionId {
-                Task { @MainActor in
-                    sessionStore?.getOrCreateSession(
-                        for: .codexCLI,
-                        sessionId: sessionId,
-                        cwd: payload.cwd
-                    )
-                    sessionStore?.updateSession(sessionId, with: event)
-                }
-            }
+            _ = try JSONDecoder().decode(CodexHookPayload.self, from: body)
 
             return HTTPResponse(statusCode: 200, json: ["status": "ok"])
         } catch {
@@ -166,8 +154,8 @@ class CodexHookHandler {
             approvalsReviewer: approvalsReviewer
         )
         let message = canNotifyUser
-            ? "Codex 等待授权运行 \(toolName)"
-            : "Codex 自动审查运行 \(toolName)"
+            ? String(format: String(localized: "Codex 等待授权运行 %@"), toolName)
+            : String(format: String(localized: "Codex 自动审查运行 %@"), toolName)
 
         return AgentEvent(
             source: .codexCLI,

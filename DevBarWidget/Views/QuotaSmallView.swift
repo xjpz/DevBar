@@ -9,22 +9,15 @@ struct QuotaSmallView: View {
     let title: String
     let limits: [WidgetQuotaLimit]
     let level: String?
+    let availableResetCount: Int?
+    var provider: WidgetProvider? = nil
     var visualStyle: WidgetVisualStyle = .liquidGlass
 
     private var visibleLimits: [WidgetQuotaLimit] {
-        let prioritized = limits
-            .filter { smallWidgetPriority($0) < 99 }
-            .sorted { lhs, rhs in
-                let leftPriority = smallWidgetPriority(lhs)
-                let rightPriority = smallWidgetPriority(rhs)
-
-                if leftPriority != rightPriority {
-                    return leftPriority < rightPriority
-                }
-
-                return lhs.displayName.localizedCompare(rhs.displayName) == .orderedAscending
-            }
-
+        let sortedLimits = WidgetQuotaPresentation.sortedLimits(limits, provider: provider)
+        let prioritized = sortedLimits.filter {
+            WidgetQuotaPresentation.priority(for: $0, provider: provider) < 3
+        }
         let candidates = prioritized.isEmpty
             ? limits.sorted { $0.percentage > $1.percentage }
             : prioritized
@@ -68,6 +61,14 @@ struct QuotaSmallView: View {
                 .foregroundStyle(secondaryTextColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
+
+            if let detail = quotaDetail(for: limit) {
+                Text(detail)
+                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(secondaryTextColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.62)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
@@ -78,7 +79,11 @@ struct QuotaSmallView: View {
 
             VStack(alignment: .leading, spacing: visibleLimits.count > 2 ? 7 : 12) {
                 ForEach(visibleLimits) { limit in
-                    QuotaSmallLimitRow(limit: limit, visualStyle: visualStyle)
+                    QuotaSmallLimitRow(
+                        limit: limit,
+                        detail: quotaDetail(for: limit),
+                        visualStyle: visualStyle
+                    )
                 }
             }
         }
@@ -94,7 +99,9 @@ struct QuotaSmallView: View {
 
             Spacer(minLength: 4)
 
-            if let lvl = level {
+            if let availableResetCount, availableResetCount > 0 {
+                ResetCreditsBadge(count: availableResetCount, size: 23, visualStyle: visualStyle)
+            } else if let lvl = level {
                 Text(lvl.capitalized)
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundStyle(secondaryTextColor)
@@ -116,19 +123,14 @@ struct QuotaSmallView: View {
         visualStyle == .transparent ? Color.secondary.opacity(0.15) : Color.white.opacity(0.18)
     }
 
-    private func smallWidgetPriority(_ limit: WidgetQuotaLimit) -> Int {
-        switch limit.type {
-        case "OPENAI_SESSION":
-            return 0
-        case "OPENAI_WEEKLY":
-            return 1
-        case "TOKENS_LIMIT":
-            return 2
-        case "TIME_LIMIT":
-            return 3
-        default:
-            return 99
+    private func quotaDetail(for limit: WidgetQuotaLimit) -> String? {
+        if let unit = limit.unitDescription, !unit.isEmpty {
+            return unit
         }
+        if let reset = limit.formattedResetTime, !reset.isEmpty {
+            return "\(reset) 重置"
+        }
+        return nil
     }
 
     private func progressColor(for percentage: Int) -> Color {
@@ -140,8 +142,38 @@ struct QuotaSmallView: View {
     }
 }
 
+struct ResetCreditsBadge: View {
+    let count: Int
+    var size: CGFloat
+    var visualStyle: WidgetVisualStyle = .liquidGlass
+
+    var body: some View {
+        Image(assetName)
+            .resizable()
+            .interpolation(.high)
+            .antialiased(true)
+            .scaledToFit()
+        .frame(width: size, height: size)
+        .accessibilityLabel(resetCreditsAccessibilityText)
+    }
+
+    private var assetName: String {
+        if count >= 10 {
+            return "OpenAIResetCredits9Plus"
+        }
+        return "OpenAIResetCredits\(max(1, count))"
+    }
+
+    private var resetCreditsAccessibilityText: String {
+        Locale.current.identifier.lowercased().hasPrefix("zh")
+            ? "可用重置: \(count)"
+            : "Available resets: \(count)"
+    }
+}
+
 private struct QuotaSmallLimitRow: View {
     let limit: WidgetQuotaLimit
+    let detail: String?
     var visualStyle: WidgetVisualStyle = .liquidGlass
 
     var body: some View {
@@ -172,6 +204,14 @@ private struct QuotaSmallLimitRow: View {
                 }
             }
             .frame(height: 4)
+
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(secondaryTextColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.58)
+            }
         }
     }
 

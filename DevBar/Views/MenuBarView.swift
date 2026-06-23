@@ -167,7 +167,7 @@ private struct LoggedInContentView: View {
                     showAgentWatcher.toggle()
                 }) {
                     ZStack(alignment: .topTrailing) {
-                        Image(systemName: "eye")
+                        Image(systemName: "dot.radiowaves.left.and.right")
                         if appViewModel.agentWatcherService.waitingCount > 0 {
                             Text("\(appViewModel.agentWatcherService.waitingCount)")
                                 .font(.system(size: 9, weight: .bold))
@@ -260,10 +260,13 @@ private struct LoggedInContentView: View {
             if openAIQuotaViewModel.isLoading && openAIQuotaViewModel.usageResponse == nil {
                 ProgressView("fetching_usage")
                     .padding()
-            } else if let error = openAIQuotaViewModel.errorMessage {
-                errorView(error)
             } else if !openAIQuotaViewModel.quotaRows.isEmpty {
                 openAIQuotaListView
+            } else if MenuBarQuotaDisplayPolicy.shouldShowError(
+                rowCount: openAIQuotaViewModel.quotaRows.count,
+                errorMessage: openAIQuotaViewModel.errorMessage
+            ), let error = openAIQuotaViewModel.errorMessage {
+                errorView(error)
             } else {
                 providerConfigureView(
                     icon: "circle.hexagon",
@@ -276,7 +279,7 @@ private struct LoggedInContentView: View {
     private var openAIQuotaListView: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let planType = openAIQuotaViewModel.planType {
-                levelBadge(planType.capitalized)
+                openAIPlanRow(planType)
             }
 
             if openAIQuotaViewModel.isLimitReached {
@@ -296,6 +299,31 @@ private struct LoggedInContentView: View {
         .padding(.horizontal)
         .padding(.vertical, 8)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private func openAIPlanRow(_ planType: String) -> some View {
+        HStack {
+            levelBadge(planType)
+            Spacer(minLength: 8)
+            if let availableResetCount = openAIQuotaViewModel.availableResetCount, availableResetCount > 0 {
+                openAIResetCreditsView(availableResetCount)
+            }
+        }
+    }
+
+    private func openAIResetCreditsView(_ count: Int) -> some View {
+        HStack(spacing: 0) {
+            Text(openAIResetCreditsLabel)
+                .foregroundStyle(.secondary)
+            Text("\(count)")
+                .foregroundStyle(.green)
+                .fontWeight(.semibold)
+        }
+        .font(.caption)
+    }
+
+    private var openAIResetCreditsLabel: String {
+        String(localized: "可用重置: ")
     }
 
     // MARK: - MiMO Content
@@ -337,7 +365,10 @@ private struct LoggedInContentView: View {
                 }
             }
 
-            if let error = mimoQuotaViewModel.errorMessage {
+            if MenuBarQuotaDisplayPolicy.shouldShowError(
+                rowCount: mimoQuotaViewModel.quotaRows.count,
+                errorMessage: mimoQuotaViewModel.errorMessage
+            ), let error = mimoQuotaViewModel.errorMessage {
                 HStack {
                     Image(systemName: "arrow.triangle.2.circlepath.circle")
                     Text(error)
@@ -347,6 +378,7 @@ private struct LoggedInContentView: View {
             }
 
             if appViewModel.mimoCookieRenewalState.isFailure,
+               mimoQuotaViewModel.quotaRows.isEmpty,
                let message = appViewModel.mimoCookieRenewalState.message {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -399,7 +431,10 @@ private struct LoggedInContentView: View {
                 levelBadge(balance)
             }
 
-            if let error = deepSeekQuotaViewModel.errorMessage {
+            if MenuBarQuotaDisplayPolicy.shouldShowError(
+                rowCount: deepSeekQuotaViewModel.quotaRows.count,
+                errorMessage: deepSeekQuotaViewModel.errorMessage
+            ), let error = deepSeekQuotaViewModel.errorMessage {
                 HStack {
                     Image(systemName: "arrow.triangle.2.circlepath.circle")
                     Text(error)
@@ -558,5 +593,12 @@ private struct LoggedInContentView: View {
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
         }
+    }
+}
+
+enum MenuBarQuotaDisplayPolicy {
+    static func shouldShowError(rowCount: Int, errorMessage: String?) -> Bool {
+        guard errorMessage?.isEmpty == false else { return false }
+        return rowCount == 0
     }
 }

@@ -45,8 +45,8 @@ struct MacThemeLargeWidgetView: View {
                 .padding(.top, 1)
                 .padding(.bottom, 5)
 
-            sidebarItem(page: .quota, title: "AI 额度", icon: "chart.pie.fill", isCompact: isCompact)
             sidebarItem(page: .macConsole, title: "Mac 控制", icon: "macbook.and.iphone", isCompact: isCompact)
+            sidebarItem(page: .quota, title: "AI 额度", icon: "chart.pie.fill", isCompact: isCompact)
 
             Spacer()
 
@@ -147,61 +147,37 @@ struct MacThemeLargeWidgetView: View {
 
     private var quotaContent: some View {
         let providers = visibleProviders
-        let density = quotaDensity(for: providers.count)
-        let layout = layoutConfig(for: providers.count)
+        let pageState = providerPageState(providerCount: providers.count)
+        let pageProviders = pagedProviders(from: providers, pageState: pageState)
+        let density = quotaDensity(for: pageProviders.count, isPaged: pageState.pageCount > 1)
 
-        return VStack(spacing: 0) {
-            if layout.columnCount == 1 {
-                // 单列布局（3个以内）
-                VStack(spacing: density.cardSpacing) {
-                    ForEach(Array(providers.enumerated()), id: \.offset) { _, provider in
-                        providerQuotaCard(provider, density: density)
-                    }
+        return VStack(spacing: density.summarySpacing) {
+            VStack(spacing: density.cardSpacing) {
+                ForEach(Array(pageProviders.enumerated()), id: \.offset) { _, provider in
+                    providerQuotaCard(provider, density: density)
                 }
-                .layoutPriority(0)
-            } else {
-                // 多列布局（4个以上）
-                Grid(horizontalSpacing: density.cardSpacing, verticalSpacing: density.cardSpacing) {
-                    let rows = Array(stride(from: 0, to: providers.count, by: layout.columnCount))
-                    ForEach(rows, id: \.self) { rowIndex in
-                        GridRow {
-                            ForEach(0..<layout.columnCount, id: \.self) { colIndex in
-                                let index = rowIndex + colIndex
-                                if index < providers.count {
-                                    providerQuotaCard(providers[index], density: density)
-                                } else {
-                                    Color.clear
-                                }
-                            }
-                        }
-                    }
-                }
-                .layoutPriority(0)
             }
+            .padding(.top, 2)
+            .frame(maxWidth: .infinity, alignment: .top)
+            .layoutPriority(1)
 
-            Spacer(minLength: density.summarySpacing)
+            Spacer(minLength: 0)
 
-            quotaSyncSummary(density: density)
+            quotaSyncSummary(density: density, pageState: pageState)
                 .layoutPriority(1)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func layoutConfig(for providerCount: Int) -> (columnCount: Int, rowCount: Int) {
-        switch providerCount {
-        case 0...3:
-            return (columnCount: 1, rowCount: providerCount)
-        case 4:
-            return (columnCount: 2, rowCount: 2)
-        default:
-            return (columnCount: 2, rowCount: 3)
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .clipped()
     }
 
     private var visibleProviders: [WidgetProviderSelection] {
         let enabledSelections = WidgetProviderSelection.enabledSelectionsFromAppGroup
         if !enabledSelections.isEmpty {
-            return Array(enabledSelections.prefix(Self.maxVisibleProviderCount))
+            let enabledWithData = enabledSelections.filter { provider in
+                guard let data = entry.quotaDataByProvider[provider] else { return false }
+                return data.lastUpdated != .distantPast
+            }
+            return enabledWithData.isEmpty ? enabledSelections : enabledWithData
         }
 
         let providersWithData = WidgetProviderSelection.allCases.filter { provider in
@@ -209,10 +185,31 @@ struct MacThemeLargeWidgetView: View {
             return data.lastUpdated != .distantPast
         }
         let candidates = providersWithData.isEmpty ? WidgetProviderSelection.allCases : providersWithData
-        return Array(candidates.prefix(Self.maxVisibleProviderCount))
+        return candidates
     }
 
-    private func quotaDensity(for providerCount: Int) -> QuotaCardDensity {
+    private func providerPageState(providerCount: Int) -> ProviderPageState {
+        let page = WidgetProviderPageStore.currentPage(
+            for: DevBarCoreConstants.AppGroup.macThemeWidgetQuotaProviderPageKey,
+            providerCount: providerCount
+        )
+        let pageCount = WidgetProviderPageStore.pageCount(for: providerCount)
+        let visibleRange = WidgetProviderPageStore.pageRange(page: page, providerCount: providerCount)
+        return ProviderPageState(page: page, pageCount: pageCount, visibleRange: visibleRange, totalCount: providerCount)
+    }
+
+    private func pagedProviders(
+        from providers: [WidgetProviderSelection],
+        pageState: ProviderPageState
+    ) -> [WidgetProviderSelection] {
+        let startIndex = min(max(pageState.visibleRange.lowerBound, 0), providers.count)
+        return Array(providers.dropFirst(startIndex).prefix(WidgetProviderPageStore.pageSize))
+    }
+
+    private func quotaDensity(for providerCount: Int, isPaged: Bool) -> QuotaCardDensity {
+        if isPaged {
+            return .paged
+        }
         switch providerCount {
         case 0...1:
             return .comfortable
@@ -220,10 +217,8 @@ struct MacThemeLargeWidgetView: View {
             return .regular
         case 3:
             return .compact
-        case 4:
-            return .gridRegular
         default:
-            return .gridDense
+            return .paged
         }
     }
 
@@ -297,6 +292,8 @@ struct MacThemeLargeWidgetView: View {
                 Text("\(limit.percentage)%")
                     .font(.system(size: density.percentFontSize, weight: .heavy, design: .rounded))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .frame(width: density.percentWidth, alignment: .trailing)
 
                 if density.showsInlineReset,
@@ -325,7 +322,7 @@ struct MacThemeLargeWidgetView: View {
         .accessibilityLabel("\(limit.displayName) \(limit.percentage)%")
     }
 
-    private func quotaSyncSummary(density: QuotaCardDensity) -> some View {
+    private func quotaSyncSummary(density: QuotaCardDensity, pageState: ProviderPageState) -> some View {
         HStack(spacing: density.summaryIconSpacing) {
             Label {
                 if let updatedAt = latestQuotaUpdatedAt {
@@ -339,14 +336,46 @@ struct MacThemeLargeWidgetView: View {
 
             Spacer(minLength: 4)
 
-            Text("已同步 \(syncedProviderCount) 个 Provider")
+            if pageState.pageCount > 1 {
+                quotaPageControls(pageState: pageState)
+            } else {
+                Text("已同步 \(syncedProviderCount) 个 Provider")
+            }
         }
         .font(.system(size: density.summaryFontSize, weight: .semibold))
         .foregroundStyle(.white.opacity(0.62))
         .padding(.horizontal, density.summaryHorizontalPadding)
         .padding(.vertical, density.summaryVerticalPadding)
         .frame(maxWidth: .infinity)
-        .cardStyle()
+    }
+
+    private func quotaPageControls(pageState: ProviderPageState) -> some View {
+        HStack(spacing: 5) {
+            Button(intent: SetMacThemeQuotaProviderPageIntent(direction: .previous)) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 8, weight: .black))
+                    .frame(width: 19, height: 18)
+                    .background(.white.opacity(pageState.canGoPrevious ? 0.09 : 0.035), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .foregroundStyle(.white.opacity(pageState.canGoPrevious ? 0.76 : 0.30))
+            }
+            .buttonStyle(.plain)
+
+            Text("\(pageState.page + 1)/\(pageState.pageCount)")
+                .font(.system(size: 7.5, weight: .black, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.66))
+                .frame(minWidth: 24)
+
+            Button(intent: SetMacThemeQuotaProviderPageIntent(direction: .next)) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .black))
+                    .frame(width: 19, height: 18)
+                    .background(.white.opacity(pageState.canGoNext ? 0.09 : 0.035), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .foregroundStyle(.white.opacity(pageState.canGoNext ? 0.76 : 0.30))
+            }
+            .buttonStyle(.plain)
+        }
+        .accessibilityLabel("Provider 第 \(pageState.page + 1) 页，共 \(pageState.pageCount) 页")
     }
 
     private var macConsoleContent: some View {
@@ -458,6 +487,16 @@ struct MacThemeLargeWidgetView: View {
         }
     }
 
+    private struct ProviderPageState {
+        let page: Int
+        let pageCount: Int
+        let visibleRange: Range<Int>
+        let totalCount: Int
+
+        var canGoPrevious: Bool { page > 0 }
+        var canGoNext: Bool { page < pageCount - 1 }
+    }
+
     private struct QuotaCardDensity {
         let maxVisibleLimits: Int
         let cardSpacing: CGFloat
@@ -491,7 +530,7 @@ struct MacThemeLargeWidgetView: View {
             levelFontSize: 9,
             markerFontSize: 9,
             percentFontSize: 10,
-            percentWidth: 34,
+            percentWidth: 38,
             detailFontSize: 8,
             lineSpacing: 3,
             showsDetail: true,
@@ -514,7 +553,7 @@ struct MacThemeLargeWidgetView: View {
             levelFontSize: 8.5,
             markerFontSize: 9,
             percentFontSize: 10,
-            percentWidth: 34,
+            percentWidth: 38,
             detailFontSize: 8,
             lineSpacing: 3,
             showsDetail: true,
@@ -537,7 +576,7 @@ struct MacThemeLargeWidgetView: View {
             levelFontSize: 8.5,
             markerFontSize: 9,
             percentFontSize: 10,
-            percentWidth: 34,
+            percentWidth: 38,
             detailFontSize: 8,
             lineSpacing: 3,
             showsDetail: true,
@@ -547,6 +586,29 @@ struct MacThemeLargeWidgetView: View {
             summaryIconSpacing: 6,
             summaryHorizontalPadding: 8,
             summaryVerticalPadding: 5
+        )
+
+        static let paged = QuotaCardDensity(
+            maxVisibleLimits: 2,
+            cardSpacing: 6,
+            summarySpacing: 5,
+            contentSpacing: 5,
+            horizontalPadding: 8,
+            verticalPadding: 7,
+            titleFontSize: 10.5,
+            levelFontSize: 8,
+            markerFontSize: 8.5,
+            percentFontSize: 9.5,
+            percentWidth: 38,
+            detailFontSize: 7.5,
+            lineSpacing: 2,
+            showsDetail: true,
+            showsInlineReset: false,
+            inlineResetWidth: 0,
+            summaryFontSize: 7.5,
+            summaryIconSpacing: 4,
+            summaryHorizontalPadding: 6,
+            summaryVerticalPadding: 4
         )
 
         static let dense = QuotaCardDensity(
@@ -560,7 +622,7 @@ struct MacThemeLargeWidgetView: View {
             levelFontSize: 8,
             markerFontSize: 8.5,
             percentFontSize: 9,
-            percentWidth: 28,
+            percentWidth: 36,
             detailFontSize: 7.5,
             lineSpacing: 1,
             showsDetail: false,
@@ -572,53 +634,6 @@ struct MacThemeLargeWidgetView: View {
             summaryVerticalPadding: 4
         )
 
-        // 4个 Provider - 一行2个，2行，相对完整信息
-        static let gridRegular = QuotaCardDensity(
-            maxVisibleLimits: 2,
-            cardSpacing: 5,
-            summarySpacing: 5,
-            contentSpacing: 4,
-            horizontalPadding: 8,
-            verticalPadding: 6,
-            titleFontSize: 10,
-            levelFontSize: 8,
-            markerFontSize: 8,
-            percentFontSize: 9,
-            percentWidth: 28,
-            detailFontSize: 7.5,
-            lineSpacing: 2,
-            showsDetail: true,
-            showsInlineReset: false,
-            inlineResetWidth: 0,
-            summaryFontSize: 8,
-            summaryIconSpacing: 5,
-            summaryHorizontalPadding: 7,
-            summaryVerticalPadding: 5
-        )
-
-        // 5个以上 Provider - 一行2个，3行，仅显示主要信息
-        static let gridDense = QuotaCardDensity(
-            maxVisibleLimits: 1,
-            cardSpacing: 4,
-            summarySpacing: 4,
-            contentSpacing: 3,
-            horizontalPadding: 7,
-            verticalPadding: 5,
-            titleFontSize: 9.5,
-            levelFontSize: 7.5,
-            markerFontSize: 8,
-            percentFontSize: 9,
-            percentWidth: 26,
-            detailFontSize: 7,
-            lineSpacing: 1,
-            showsDetail: false,
-            showsInlineReset: true,
-            inlineResetWidth: 44,
-            summaryFontSize: 7.5,
-            summaryIconSpacing: 4,
-            summaryHorizontalPadding: 6,
-            summaryVerticalPadding: 4
-        )
     }
 
     private var isOnline: Bool {
@@ -668,8 +683,6 @@ struct MacThemeLargeWidgetView: View {
         default: return .orange
         }
     }
-
-    private static let maxVisibleProviderCount = 6 // 3行 × 2列
 }
 
 private struct MacThemeClockPill: View {

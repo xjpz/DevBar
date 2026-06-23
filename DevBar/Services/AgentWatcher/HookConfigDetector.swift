@@ -15,8 +15,8 @@ enum HookConfigStatus {
 
     var displayName: String {
         switch self {
-        case .detected: return "✅ 已检测到"
-        case .notDetected: return "⚠️ 未检测到"
+        case .detected: return "✅ \(String(localized: "已检测到"))"
+        case .notDetected: return "⚠️ \(String(localized: "未检测到"))"
         case .error(let msg): return "❌ \(msg)"
         }
     }
@@ -30,7 +30,6 @@ class HookConfigDetector {
     private static let claudeStopCommand = "curl -s -X POST http://127.0.0.1:49321/agent/claude/stop -H 'Content-Type: application/json' -d @-"
     private static let claudePreToolUseCommand = "curl -s -X POST http://127.0.0.1:49321/agent/claude/pre-tool-use -H 'Content-Type: application/json' -d @-"
     private static let codexPermissionCommand = "curl -s -X POST http://127.0.0.1:49321/agent/codex/permission-request -H 'Content-Type: application/json' -d @-"
-    private static let codexSessionStartCommand = "curl -s -X POST http://127.0.0.1:49321/agent/codex/session-start -H 'Content-Type: application/json' -d @-"
     private static let codexStopCommand = "curl -s -X POST http://127.0.0.1:49321/agent/codex/stop -H 'Content-Type: application/json' -d @-"
 
     private let claudeConfigPath: String
@@ -69,7 +68,7 @@ class HookConfigDetector {
                 return .notDetected
             }
         } catch {
-            return .error("读取配置失败: \(error.localizedDescription)")
+            return .error(String(format: String(localized: "读取配置失败: %@"), error.localizedDescription))
         }
     }
 
@@ -87,7 +86,7 @@ class HookConfigDetector {
                     return .detected
                 }
             } catch {
-                return .error("读取 hooks.json 失败: \(error.localizedDescription)")
+                return .error(String(format: String(localized: "读取 hooks.json 失败: %@"), error.localizedDescription))
             }
         }
 
@@ -99,7 +98,7 @@ class HookConfigDetector {
                     return .detected
                 }
             } catch {
-                return .error("读取 config.toml 失败: \(error.localizedDescription)")
+                return .error(String(format: String(localized: "读取 config.toml 失败: %@"), error.localizedDescription))
             }
         }
 
@@ -177,18 +176,6 @@ class HookConfigDetector {
                 ]
               }
             ],
-            "SessionStart": [
-              {
-                "matcher": "startup|resume",
-                "hooks": [
-                  {
-                    "type": "command",
-                    "command": "curl -s -X POST http://127.0.0.1:49321/agent/codex/session-start -H 'Content-Type: application/json' -d @-",
-                    "statusMessage": "Notifying DevBar"
-                  }
-                ]
-              }
-            ],
             "Stop": [
               {
                 "matcher": "",
@@ -245,7 +232,6 @@ class HookConfigDetector {
         var config = config
         var hooks = config["hooks"] as? [String: Any] ?? [:]
         appendHook(command: codexPermissionCommand, eventName: "PermissionRequest", to: &hooks, statusMessage: "Notifying DevBar")
-        appendHook(command: codexSessionStartCommand, eventName: "SessionStart", matcher: "startup|resume", to: &hooks, statusMessage: "Notifying DevBar")
         appendHook(command: codexStopCommand, eventName: "Stop", to: &hooks, statusMessage: "Notifying DevBar")
         config["hooks"] = hooks
         return config

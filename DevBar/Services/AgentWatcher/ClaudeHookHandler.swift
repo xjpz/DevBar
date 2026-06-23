@@ -59,8 +59,11 @@ class ClaudeHookHandler {
                     projectName: payload.cwd.flatMap { extractProjectName(from: $0) },
                     cwd: payload.cwd,
                     sessionId: sessionId,
-                    taskTitle: payload.toolName.map { "工具: \($0)" },
-                    message: "正在执行 \(payload.toolName ?? "工具")",
+                    taskTitle: payload.toolName.map { String(format: String(localized: "工具: %@"), $0) },
+                    message: String(
+                        format: String(localized: "正在执行 %@"),
+                        payload.toolName ?? String(localized: "工具")
+                    ),
                     rawSnippet: payload.toolInput?.command,
                     requiresUserAction: false,
                     canResolveOnMac: false,
@@ -188,7 +191,7 @@ class ClaudeHookHandler {
             cwd: payload.cwd,
             sessionId: payload.sessionId,
             taskTitle: "\(toolName) permission",
-            message: "Claude Code 等待授权运行 \(toolName)",
+            message: String(format: String(localized: "Claude Code 等待授权运行 %@"), toolName),
             rawSnippet: command,
             requiresUserAction: true,
             canResolveOnMac: true,

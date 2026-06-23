@@ -12,6 +12,7 @@ struct QuotaMediumView: View {
     let subscriptionName: String?
     let subscriptionPrice: String?
     let subscriptionExpireDate: String?
+    let availableResetCount: Int?
     let lastUpdated: Date
     var visualStyle: WidgetVisualStyle = .liquidGlass
 
@@ -54,6 +55,9 @@ struct QuotaMediumView: View {
                 .foregroundStyle(primaryTextColor)
                 .lineLimit(1)
             Spacer(minLength: 4)
+            if let availableResetCount, availableResetCount > 0 {
+                ResetCreditsBadge(count: availableResetCount, size: 24, visualStyle: visualStyle)
+            }
             if let lvl = level {
                 Text(lvl.capitalized)
                     .font(.caption2)

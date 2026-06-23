@@ -2,13 +2,33 @@
   "sourceLanguage" : "zh-Hans",
   "strings" : {
     "" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ""
+          }
+        }
+      }
     },
     "%@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
+          }
+        }
+      }
     },
     "%@ - %@" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
@@ -19,6 +39,12 @@
     },
     "%@ - %@ %@" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ - %2$@ %3$@"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
@@ -29,6 +55,12 @@
     },
     "%@ · %@" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · %2$@"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
@@ -39,6 +71,12 @@
     },
     "%@ (%@)" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ (%2$@)"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
@@ -49,6 +87,12 @@
     },
     "%@ %lld" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
@@ -59,6 +103,12 @@
     },
     "%@ %lld%%" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld%%"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
@@ -69,6 +119,12 @@
     },
     "%@ %lld%% 剩余" : {
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld%% remaining"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
@@ -78,28 +134,196 @@
       }
     },
     "%@ 会立即回到登录窗口。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ will return to the login window immediately."
+          }
+        }
+      }
+    },
+    "%@ 命令均失败：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All %1$@ commands failed: %2$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 命令均失败：%@"
+          }
+        }
+      }
+    },
+    "%@ 需要处理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ Needs Attention"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 需要处理"
+          }
+        }
+      }
     },
     "%@重置" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ reset"
+          }
+        }
+      }
     },
     "%lld" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
+    },
+    "%lld / %lld Provider" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld / %2$lld Provider"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld / %2$lld Provider"
+          }
+        }
+      }
     },
     "%lld RUNNING" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld RUNNING"
+          }
+        }
+      }
     },
     "%lld 个任务" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld tasks"
+          }
+        }
+      }
     },
     "%lld 个任务等待处理" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld tasks need attention"
+          }
+        }
+      }
+    },
+    "%lld 个任务需要处理，其中 %lld 个等待授权" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld tasks need attention, including %2$lld pending approvals"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 个任务需要处理，其中 %lld 个等待授权"
+          }
+        }
+      }
+    },
+    "%lld 分钟前" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld minutes ago"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 分钟前"
+          }
+        }
+      }
+    },
+    "%lld 小时前" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld hours ago"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld 小时前"
+          }
+        }
+      }
+    },
+    "%lld/%lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld/%2$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld/%2$lld"
+          }
+        }
+      }
     },
     "%lld%%" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld%%"
+          }
+        }
+      }
     },
     "•" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "•"
+          }
+        }
+      }
     },
     "about" : {
       "localizations" : {
@@ -957,22 +1181,65 @@
       }
     },
     "ACP" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ACP"
+          }
+        }
+      }
     },
     "Agent Watcher" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent Watcher"
+          }
+        }
+      }
     },
     "AGENT WATCHER" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AGENT WATCHER"
+          }
+        }
+      }
     },
     "Agent Watcher 通知" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent Watcher Notifications"
+          }
+        }
+      }
     },
     "AI 额度" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Quota"
+          }
+        }
+      }
     },
     "AI 额度提供方" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Quota Provider"
+          }
+        }
+      }
     },
     "alerts_footer" : {
       "localizations" : {
@@ -991,10 +1258,24 @@
       }
     },
     "API Key" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API Key"
+          }
+        }
+      }
     },
     "API Records" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "API Records"
+          }
+        }
+      }
     },
     "api_key_invalid" : {
       "localizations" : {
@@ -1047,6 +1328,12 @@
     "auto_detect" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto Detect"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1072,10 +1359,24 @@
       }
     },
     "Base64" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Base64"
+          }
+        }
+      }
     },
     "Bearer xxx" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bearer xxx"
+          }
+        }
+      }
     },
     "browser_login" : {
       "localizations" : {
@@ -1110,7 +1411,14 @@
       }
     },
     "Cancel" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
     },
     "check_for_updates" : {
       "localizations" : {
@@ -1147,6 +1455,12 @@
     "choose" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1156,11 +1470,24 @@
       }
     },
     "Choose the Provider shown by this widget." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the Provider shown by this widget."
+          }
+        }
+      }
     },
     "choose_file" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose..."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1170,14 +1497,60 @@
       }
     },
     "Claude Code" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code"
+          }
+        }
+      }
+    },
+    "Claude Code 等待授权运行 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code is waiting for approval to run %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Code 等待授权运行 %@"
+          }
+        }
+      }
+    },
+    "Claude hooks 通知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Claude Hooks Notifications"
+          }
+        }
+      }
     },
     "CLI" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CLI"
+          }
+        }
+      }
     },
     "cli_path" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Path"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1203,14 +1576,76 @@
       }
     },
     "Close" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        }
+      }
     },
     "Codex CLI" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex CLI"
+          }
+        }
+      }
+    },
+    "Codex hooks 通知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex Hooks Notifications"
+          }
+        }
+      }
+    },
+    "Codex 等待授权运行 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex is waiting for approval to run %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex 等待授权运行 %@"
+          }
+        }
+      }
+    },
+    "Codex 自动审查运行 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex auto-review is running %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex 自动审查运行 %@"
+          }
+        }
+      }
     },
     "codex_cli" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex CLI"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1222,6 +1657,12 @@
     "codex_not_executable" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File is not executable"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1233,6 +1674,12 @@
     "codex_test_fail %@" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test failed: %1$@"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1244,6 +1691,12 @@
     "codex_test_ok" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection succeeded"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1253,10 +1706,24 @@
       }
     },
     "Convert to Date" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Convert to Date"
+          }
+        }
+      }
     },
     "Cookie" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cookie"
+          }
+        }
+      }
     },
     "credentials_local_only" : {
       "localizations" : {
@@ -1292,10 +1759,24 @@
       }
     },
     "DeepSeek" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek"
+          }
+        }
+      }
     },
     "DeepSeek 额度" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DeepSeek Quota"
+          }
+        }
+      }
     },
     "deepseek_authorization_hint" : {
       "localizations" : {
@@ -1346,7 +1827,6 @@
       }
     },
     "deepseek_cost_usage" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1430,7 +1910,6 @@
       }
     },
     "deepseek_token_usage" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -1447,7 +1926,14 @@
       }
     },
     "Delete" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        }
+      }
     },
     "denied" : {
       "localizations" : {
@@ -1466,28 +1952,84 @@
       }
     },
     "DevBar" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar"
+          }
+        }
+      }
     },
     "DevBar (GLM)" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar (GLM)"
+          }
+        }
+      }
     },
     "DevBar (OpenAI)" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar (OpenAI)"
+          }
+        }
+      }
     },
     "DevBar %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar %@"
+          }
+        }
+      }
     },
     "DevBar Hello" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar Hello"
+          }
+        }
+      }
     },
     "DevBar Lock Screen Quota" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar Lock Screen Quota"
+          }
+        }
+      }
     },
     "DevBar Quota" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar Quota"
+          }
+        }
+      }
     },
     "DevBar 电脑主题" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar Mac Theme"
+          }
+        }
+      }
     },
     "devbar_update" : {
       "localizations" : {
@@ -1683,7 +2225,14 @@
       }
     },
     "Enter text to generate" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter text to generate"
+          }
+        }
+      }
     },
     "enter_api_key" : {
       "localizations" : {
@@ -1702,10 +2251,24 @@
       }
     },
     "Excel 表格 (.xlsx)" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Excel Spreadsheet (.xlsx)"
+          }
+        }
+      }
     },
     "Favorite" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Favorite"
+          }
+        }
+      }
     },
     "fetching_usage" : {
       "localizations" : {
@@ -1740,7 +2303,14 @@
       }
     },
     "Format" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format"
+          }
+        }
+      }
     },
     "general" : {
       "localizations" : {
@@ -1759,13 +2329,34 @@
       }
     },
     "GitHub" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub"
+          }
+        }
+      }
     },
     "GLM" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GLM"
+          }
+        }
+      }
     },
     "GLM 额度" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GLM Quota"
+          }
+        }
+      }
     },
     "glm_configure_hint" : {
       "localizations" : {
@@ -1867,7 +2458,14 @@
       }
     },
     "Go" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Go"
+          }
+        }
+      }
     },
     "go_settings" : {
       "localizations" : {
@@ -1902,13 +2500,34 @@
       }
     },
     "Headers: %lld" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Headers: %lld"
+          }
+        }
+      }
     },
     "Hello" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hello"
+          }
+        }
+      }
     },
     "Hi, %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hi, %@"
+          }
+        }
+      }
     },
     "hide_from_dock" : {
       "localizations" : {
@@ -1927,10 +2546,24 @@
       }
     },
     "History" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "History"
+          }
+        }
+      }
     },
     "HTTP" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HTTP"
+          }
+        }
+      }
     },
     "http_error" : {
       "extractionState" : "stale",
@@ -1950,7 +2583,14 @@
       }
     },
     "https://github.com/xjpz/DevBar" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "https://github.com/xjpz/DevBar"
+          }
+        }
+      }
     },
     "icon_bar_fill" : {
       "localizations" : {
@@ -2519,6 +3159,38 @@
         }
       }
     },
+    "ios_agent_watcher_default_message" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Task needs attention"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务等待处理"
+          }
+        }
+      }
+    },
+    "ios_agent_watcher_needs_attention_format" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ Needs Attention"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 需要处理"
+          }
+        }
+      }
+    },
     "ios_common_cancel" : {
       "localizations" : {
         "en" : {
@@ -2531,6 +3203,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "取消"
+          }
+        }
+      }
+    },
+    "ios_common_done" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
           }
         }
       }
@@ -2857,6 +3545,22 @@
         }
       }
     },
+    "ios_dashboard_reading_qr" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading QR code..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在读取二维码..."
+          }
+        }
+      }
+    },
     "ios_dashboard_reset_at" : {
       "localizations" : {
         "en" : {
@@ -2885,6 +3589,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重试"
+          }
+        }
+      }
+    },
+    "ios_dashboard_scan_qr" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扫一扫"
           }
         }
       }
@@ -2949,6 +3669,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "GLM API Key 无效"
+          }
+        }
+      }
+    },
+    "ios_error_keychain_save_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not securely save credentials. Please try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法安全保存凭据，请重试"
           }
         }
       }
@@ -3068,6 +3804,182 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "点亮 Mac"
+          }
+        }
+      }
+    },
+    "ios_live_message_empty_message_error" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a message to show in Dynamic Island."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入要显示在灵动岛的一句文案。"
+          }
+        }
+      }
+    },
+    "ios_live_message_start_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to start Live Activity. Please try again later."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live Activity 启动失败，请稍后重试。"
+          }
+        }
+      }
+    },
+    "ios_live_message_status_active_detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The message is now shown in Dynamic Island. Later API pushes will display the new API message."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文案已显示在灵动岛；后续 API 推送会显示 API 的新文案。"
+          }
+        }
+      }
+    },
+    "ios_live_message_status_active_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已上岛"
+          }
+        }
+      }
+    },
+    "ios_live_message_status_enabling_detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Showing the message in Dynamic Island."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在把文案显示到灵动岛。"
+          }
+        }
+      }
+    },
+    "ios_live_message_status_enabling_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starting"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在上岛"
+          }
+        }
+      }
+    },
+    "ios_live_message_status_failed_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上岛失败"
+          }
+        }
+      }
+    },
+    "ios_live_message_status_not_ready_detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a message on this iPhone to show it locally. After Relay pairing, the server API can also push messages remotely."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本机输入文案可直接上岛；完成 Relay 绑定后，服务端 API 也可远程推送上岛。"
+          }
+        }
+      }
+    },
+    "ios_live_message_status_not_ready_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready on This iPhone"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可本机上岛"
+          }
+        }
+      }
+    },
+    "ios_live_message_status_ready_detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a short message to show it on this iPhone. The server API can also push messages remotely."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入一句文案即可本机上岛；服务端 API 也可远程推送上岛。"
+          }
+        }
+      }
+    },
+    "ios_live_message_status_ready_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ready"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可上岛"
           }
         }
       }
@@ -3408,6 +4320,38 @@
         }
       }
     },
+    "ios_settings_agent_watcher_notifications" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent Watcher Notifications"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent Watcher 通知"
+          }
+        }
+      }
+    },
+    "ios_settings_ai_quota_section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI Quota"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AI 额度"
+          }
+        }
+      }
+    },
     "ios_settings_app_label" : {
       "localizations" : {
         "en" : {
@@ -3457,7 +4401,6 @@
       }
     },
     "ios_settings_auto_refresh_interval" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3469,6 +4412,246 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "自动刷新间隔"
+          }
+        }
+      }
+    },
+    "ios_settings_avatar_not_set" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avatar not set"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "头像未设置"
+          }
+        }
+      }
+    },
+    "ios_settings_avatar_processing_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not process the avatar. Please try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "头像处理失败，请重试。"
+          }
+        }
+      }
+    },
+    "ios_settings_avatar_save_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not save the avatar. Please try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "头像保存失败，请重试。"
+          }
+        }
+      }
+    },
+    "ios_settings_avatar_set" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avatar set"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "头像已设置"
+          }
+        }
+      }
+    },
+    "ios_settings_debug_copy_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap any value to copy it to the clipboard."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点击任意值复制到剪贴板。"
+          }
+        }
+      }
+    },
+    "ios_settings_debug_none" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无"
+          }
+        }
+      }
+    },
+    "ios_settings_debug_not_available" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not available"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未获取"
+          }
+        }
+      }
+    },
+    "ios_settings_debug_not_registered" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not registered"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未注册"
+          }
+        }
+      }
+    },
+    "ios_settings_debug_not_synced" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not synced"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未同步"
+          }
+        }
+      }
+    },
+    "ios_settings_debug_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Debug Info"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调试信息"
+          }
+        }
+      }
+    },
+    "ios_settings_device_system_section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device and System Surfaces"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备与系统表面"
+          }
+        }
+      }
+    },
+    "ios_settings_device_widget_footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These details are used for the Mac theme widget and Relay device identification."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这些信息会用于 Mac 主题小组件和 Relay 设备识别。"
+          }
+        }
+      }
+    },
+    "ios_settings_device_widget_section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Device and Widgets"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设备与小组件"
+          }
+        }
+      }
+    },
+    "ios_settings_enabled_count_format" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d enabled"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已启用 %d 个"
+          }
+        }
+      }
+    },
+    "ios_settings_enabled_items_format" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d enabled"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已开启 %d 项"
           }
         }
       }
@@ -3635,6 +4818,22 @@
         }
       }
     },
+    "ios_settings_high_frequency_summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High-Frequency Event Summary"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高频事件摘要"
+          }
+        }
+      }
+    },
     "ios_settings_home_shortcuts_footer" : {
       "localizations" : {
         "en" : {
@@ -3663,6 +4862,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "桌面快捷方式"
+          }
+        }
+      }
+    },
+    "ios_settings_https_icon_url" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HTTPS Icon URL"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HTTPS 图标 URL"
+          }
+        }
+      }
+    },
+    "ios_settings_icp_record" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hubei ICP 2021013794-4A"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鄂ICP备2021013794号-4A"
           }
         }
       }
@@ -3926,6 +5157,166 @@
         }
       }
     },
+    "ios_settings_live_activity_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dynamic Island"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "灵动岛"
+          }
+        }
+      }
+    },
+    "ios_settings_live_message_end" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "结束"
+          }
+        }
+      }
+    },
+    "ios_settings_live_message_placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a message to show in Dynamic Island"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入要显示在灵动岛的一句文案"
+          }
+        }
+      }
+    },
+    "ios_settings_live_message_section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quick Island Message"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一句话上岛"
+          }
+        }
+      }
+    },
+    "ios_settings_live_message_start" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上岛"
+          }
+        }
+      }
+    },
+    "ios_settings_not_enabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disabled"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未启用"
+          }
+        }
+      }
+    },
+    "ios_settings_notifications_section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications and Remote Reachability"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知与远程触达"
+          }
+        }
+      }
+    },
+    "ios_settings_push_allow_offline" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Offline Push"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "允许离线推送"
+          }
+        }
+      }
+    },
+    "ios_settings_push_footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline notifications use the paired Relay iPhone. Icons only support HTTPS URLs."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离线通知使用已绑定 Relay iPhone；图标仅支持 HTTPS URL。"
+          }
+        }
+      }
+    },
+    "ios_settings_push_notifications_section" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Push Notifications"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推送通知"
+          }
+        }
+      }
+    },
     "ios_settings_refresh_hint" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -3961,7 +5352,6 @@
       }
     },
     "ios_settings_relay_device_name" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4007,6 +5397,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mac 中继"
+          }
+        }
+      }
+    },
+    "ios_settings_remove_avatar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Avatar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除头像"
+          }
+        }
+      }
+    },
+    "ios_settings_select_avatar" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Avatar"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择头像"
           }
         }
       }
@@ -4111,10 +5533,32 @@
     "ios_settings_time_format" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time Format"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Time Format"
+          }
+        }
+      }
+    },
+    "ios_settings_time_range_needs_adjustment" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time range needs adjustment"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间范围需调整"
           }
         }
       }
@@ -4131,6 +5575,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置"
+          }
+        }
+      }
+    },
+    "ios_settings_user_name" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User Name"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户名称"
           }
         }
       }
@@ -5170,7 +6630,14 @@
       }
     },
     "ios_tools_memo_wrong_password_single" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wrong password"
+          }
+        }
+      }
     },
     "ios_tools_ocr" : {
       "localizations" : {
@@ -6213,10 +7680,24 @@
       }
     },
     "JSON" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSON"
+          }
+        }
+      }
     },
     "Key" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key"
+          }
+        }
+      }
     },
     "language" : {
       "localizations" : {
@@ -6414,19 +7895,102 @@
       }
     },
     "Mac Relay" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac Relay"
+          }
+        }
+      }
     },
     "Mac Relay, %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac Relay, %@"
+          }
+        }
+      }
     },
     "Mac 主题" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac Theme"
+          }
+        }
+      }
+    },
+    "Mac 只显示 Badge，iPhone 不提醒" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only show a badge on Mac; do not notify iPhone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac 只显示 Badge，iPhone 不提醒"
+          }
+        }
+      }
+    },
+    "Mac 正常提醒，iPhone 不提醒" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notify normally on Mac; do not notify iPhone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac 正常提醒，iPhone 不提醒"
+          }
+        }
+      }
     },
     "Mac：%@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac：%@"
+          }
+        }
+      }
     },
     "Markdown (.md)" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Markdown (.md)"
+          }
+        }
+      }
+    },
+    "MCP 权限" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MCP Permission"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MCP 权限"
+          }
+        }
+      }
     },
     "mcp_monthly_quota" : {
       "localizations" : {
@@ -6461,13 +8025,34 @@
       }
     },
     "Method: %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Method: %@"
+          }
+        }
+      }
     },
     "MiMo" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo"
+          }
+        }
+      }
     },
     "MiMo 额度" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MiMo Quota"
+          }
+        }
+      }
     },
     "mimo_configure_hint" : {
       "localizations" : {
@@ -6648,7 +8233,6 @@
       }
     },
     "mimo_monthly_token_quota" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6828,7 +8412,14 @@
       }
     },
     "Mode" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode"
+          }
+        }
+      }
     },
     "network_error" : {
       "localizations" : {
@@ -6879,16 +8470,44 @@
       }
     },
     "No API Records yet" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No API Records yet"
+          }
+        }
+      }
     },
     "No History yet" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No History yet"
+          }
+        }
+      }
     },
     "No Tabs" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Tabs"
+          }
+        }
+      }
     },
     "No Tabs yet" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No Tabs yet"
+          }
+        }
+      }
     },
     "no_data" : {
       "localizations" : {
@@ -6955,11 +8574,24 @@
       }
     },
     "None" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None"
+          }
+        }
+      }
     },
     "not_detected" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Detected"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7101,16 +8733,44 @@
       }
     },
     "OK" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
     },
     "Open a page from Quick Open or tap +." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open a page from Quick Open or tap +."
+          }
+        }
+      }
     },
     "OpenAI" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI"
+          }
+        }
+      }
     },
     "OpenAI 额度" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI Quota"
+          }
+        }
+      }
     },
     "openai_accountid_placeholder" : {
       "extractionState" : "stale",
@@ -7125,6 +8785,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入 Account ID"
+          }
+        }
+      }
+    },
+    "openai_available_resets_label" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available resets: "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可用重置: "
           }
         }
       }
@@ -7326,10 +9002,24 @@
       }
     },
     "Page" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page"
+          }
+        }
+      }
     },
     "Pages you open in WebKit will appear here." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pages you open in WebKit will appear here."
+          }
+        }
+      }
     },
     "per_hour" : {
       "extractionState" : "stale",
@@ -7400,10 +9090,24 @@
       }
     },
     "Pin" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pin"
+          }
+        }
+      }
     },
     "PowerPoint 演示 (.pptx)" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PowerPoint Presentation (.pptx)"
+          }
+        }
+      }
     },
     "prevent_sleep" : {
       "localizations" : {
@@ -7486,10 +9190,210 @@
       }
     },
     "Provider" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provider"
+          }
+        }
+      }
+    },
+    "Provider 分页方向" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provider Page Direction"
+          }
+        }
+      }
+    },
+    "Provider 第 %lld 页，共 %lld 页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provider page %1$lld of %2$lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Provider 第 %1$lld 页，共 %2$lld 页"
+          }
+        }
+      }
+    },
+    "provider_ping_api_key_ready" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GLM API Key is ready for scheduled ping."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GLM API Key 已可用于定时 Ping。"
+          }
+        }
+      }
+    },
+    "provider_ping_cookie_only_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current GLM login uses cookies. Scheduled ping requires an API Key."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前为网页登录，自动 Ping 需要 API Key。"
+          }
+        }
+      }
+    },
+    "provider_ping_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ping failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ping 失败"
+          }
+        }
+      }
+    },
+    "provider_ping_last_run" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last success"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近成功"
+          }
+        }
+      }
+    },
+    "provider_ping_never_run" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not run yet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "尚未执行"
+          }
+        }
+      }
+    },
+    "provider_ping_requires_api_key" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configure a GLM API Key before enabling scheduled ping."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要先配置 GLM API Key 才能启用定时 Ping。"
+          }
+        }
+      }
+    },
+    "provider_ping_success" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ping succeeded"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ping 成功"
+          }
+        }
+      }
+    },
+    "provider_ping_test" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test Ping"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "立即测试 Ping"
+          }
+        }
+      }
+    },
+    "provider_ping_time" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Daily at"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每天"
+          }
+        }
+      }
+    },
+    "provider_ping_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quota Window Ping"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "额度窗口 Ping"
+          }
+        }
+      }
     },
     "Query: %lld" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Query: %lld"
+          }
+        }
+      }
     },
     "quit" : {
       "localizations" : {
@@ -7524,7 +9428,14 @@
       }
     },
     "Relay 只转发消息和在线状态，Agent 执行与敏感凭证仍保留在 Mac 本地。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relay only forwards messages and online status. Agent execution and sensitive credentials stay local on your Mac."
+          }
+        }
+      }
     },
     "relay_disabled_hint" : {
       "localizations" : {
@@ -7543,10 +9454,24 @@
       }
     },
     "Relay：%@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relay：%@"
+          }
+        }
+      }
     },
     "Request URL" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Request URL"
+          }
+        }
+      }
     },
     "request_permission" : {
       "localizations" : {
@@ -7565,7 +9490,14 @@
       }
     },
     "Requires iOS 18+" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requires iOS 18+"
+          }
+        }
+      }
     },
     "reset_at" : {
       "localizations" : {
@@ -7584,7 +9516,14 @@
       }
     },
     "Response" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Response"
+          }
+        }
+      }
     },
     "restart_now" : {
       "localizations" : {
@@ -7651,16 +9590,44 @@
       }
     },
     "save" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save"
+          }
+        }
+      }
     },
     "Save pages from the browser detail view." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save pages from the browser detail view."
+          }
+        }
+      }
     },
     "Saved" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved"
+          }
+        }
+      }
     },
     "Saved Fetch/XHR requests will appear here." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved Fetch/XHR requests will appear here."
+          }
+        }
+      }
     },
     "scan_or_account_login" : {
       "extractionState" : "stale",
@@ -7680,13 +9647,34 @@
       }
     },
     "Search or enter website name" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search or enter website name"
+          }
+        }
+      }
     },
     "Seconds or milliseconds" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seconds or milliseconds"
+          }
+        }
+      }
     },
     "Select Date" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select Date"
+          }
+        }
+      }
     },
     "settings" : {
       "localizations" : {
@@ -7705,13 +9693,34 @@
       }
     },
     "Shell Script (.sh)" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shell Script (.sh)"
+          }
+        }
+      }
     },
     "Show short-period provider quota usage on the Lock Screen." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show short-period provider quota usage on the Lock Screen."
+          }
+        }
+      }
     },
     "Show the DevBar Hello signature on the Lock Screen." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show the DevBar Hello signature on the Lock Screen."
+          }
+        }
+      }
     },
     "show_original" : {
       "localizations" : {
@@ -7876,7 +9885,14 @@
       }
     },
     "Tabs" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tabs"
+          }
+        }
+      }
     },
     "tagline" : {
       "localizations" : {
@@ -7897,6 +9913,12 @@
     "test_connection" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7908,6 +9930,12 @@
     "testing" : {
       "extractionState" : "stale",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Testing..."
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7917,7 +9945,14 @@
       }
     },
     "Text File (.txt)" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Text File (.txt)"
+          }
+        }
+      }
     },
     "threshold" : {
       "localizations" : {
@@ -7938,6 +9973,12 @@
     "time_format_12h" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "12-Hour"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
@@ -7949,6 +9990,12 @@
     "time_format_24h" : {
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "24-Hour"
+          }
+        },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "new",
@@ -7974,7 +10021,6 @@
       }
     },
     "token_quota" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7991,7 +10037,14 @@
       }
     },
     "Tools" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tools"
+          }
+        }
+      }
     },
     "translate_to_chinese" : {
       "localizations" : {
@@ -8044,7 +10097,14 @@
       }
     },
     "Unfavorite" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unfavorite"
+          }
+        }
+      }
     },
     "unknown_error" : {
       "extractionState" : "stale",
@@ -8064,7 +10124,14 @@
       }
     },
     "Unpin" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpin"
+          }
+        }
+      }
     },
     "up_to_date" : {
       "localizations" : {
@@ -8099,10 +10166,24 @@
       }
     },
     "URL: %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "URL: %@"
+          }
+        }
+      }
     },
     "Use Quick Open or the top-right + button to create a new tab." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Quick Open or the top-right + button to create a new tab."
+          }
+        }
+      }
     },
     "used_percentage" : {
       "localizations" : {
@@ -8121,7 +10202,14 @@
       }
     },
     "Value" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Value"
+          }
+        }
+      }
     },
     "version" : {
       "localizations" : {
@@ -8156,10 +10244,24 @@
       }
     },
     "Visited pages will appear here." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Visited pages will appear here."
+          }
+        }
+      }
     },
     "WebKit" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WebKit"
+          }
+        }
+      }
     },
     "wechat_accounts" : {
       "localizations" : {
@@ -8500,7 +10602,14 @@
       }
     },
     "wechat_cwd_agent_access_denied" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar cannot access this directory yet. Add it in settings first, then try again."
+          }
+        }
+      }
     },
     "wechat_cwd_choose" : {
       "localizations" : {
@@ -9191,448 +11300,2323 @@
       }
     },
     "Word 文档 (.docx)" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Word Document (.docx)"
+          }
+        }
+      }
     },
     "一切正常" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All Good"
+          }
+        }
+      }
     },
     "一句话上岛" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One-Line Live Message"
+          }
+        }
+      }
+    },
+    "上一页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Previous Page"
+          }
+        }
+      }
     },
     "上岛" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start Live Message"
+          }
+        }
+      }
+    },
+    "下一页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Page"
+          }
+        }
+      }
     },
     "中继日志" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relay Log"
+          }
+        }
+      }
     },
     "中继未连接" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relay Not Connected"
+          }
+        }
+      }
     },
     "中继连接失败" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relay Connection Failed"
+          }
+        }
+      }
     },
     "二维码包含账号凭证，只建议在你自己的可信设备之间迁移。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The QR code contains account credentials. Only transfer it between your own trusted devices."
+          }
+        }
+      }
     },
     "二维码生成失败" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to Generate QR Code"
+          }
+        }
+      }
+    },
+    "任务卡住" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Task Stalled"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务卡住"
+          }
+        }
+      }
+    },
+    "任务失败" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Task Failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务失败"
+          }
+        }
+      }
+    },
+    "任务完成" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Task Completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务完成"
+          }
+        }
+      }
+    },
+    "任务等待处理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Task Needs Attention"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务等待处理"
+          }
+        }
+      }
     },
     "优先显示需要处理的任务" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prioritize tasks that need attention"
+          }
+        }
+      }
+    },
+    "会话开始" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session Started"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会话开始"
+          }
+        }
+      }
     },
     "使用说明" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instructions"
+          }
+        }
+      }
+    },
+    "停止" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止"
+          }
+        }
+      }
     },
     "允许" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow"
+          }
+        }
+      }
     },
     "允许离线推送" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow Offline Push"
+          }
+        }
+      }
+    },
+    "全量同步" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全量同步"
+          }
+        }
+      }
     },
     "关闭" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        }
+      }
+    },
+    "关闭 hooks 通知后仍会记录等待状态和更新状态中心，但不会发送 Mac 或 iPhone 通知。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When hooks notifications are off, waiting states and Status Center updates are still recorded, but Mac and iPhone notifications are not sent."
+          }
+        }
+      }
     },
     "关闭显示器" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn Off Display"
+          }
+        }
+      }
     },
     "关闭电脑显示器" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn Off Mac Display"
+          }
+        }
+      }
     },
     "最近事件" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent Events"
+          }
+        }
+      }
     },
     "最近同步 %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last synced %1$@"
+          }
+        }
+      }
     },
     "最近授权" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent Approvals"
+          }
+        }
+      }
+    },
+    "切换 AI 额度 Provider 页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch AI Quota Provider Page"
+          }
+        }
+      }
+    },
+    "切换 Mac 主题额度 Provider 页" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch Mac Theme Quota Provider Page"
+          }
+        }
+      }
     },
     "切换小组件页面" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch Widget Page"
+          }
+        }
+      }
+    },
+    "刚刚" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Just now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刚刚"
+          }
+        }
+      }
     },
     "删除账号" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete Account"
+          }
+        }
+      }
     },
     "刷新" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refresh"
+          }
+        }
+      }
     },
     "剩余" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remaining"
+          }
+        }
+      }
+    },
+    "包含 Provider：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Includes Providers: %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "包含 Provider：%@"
+          }
+        }
+      }
     },
     "匹配关键词" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Matched Keyword"
+          }
+        }
+      }
     },
     "发送" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send"
+          }
+        }
+      }
     },
     "发送人" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sender"
+          }
+        }
+      }
     },
     "发送任务到在线 Mac" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send Tasks to Online Macs"
+          }
+        }
+      }
     },
     "取消" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "只提醒 Mac" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac Only"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只提醒 Mac"
+          }
+        }
+      }
     },
     "只读适合远程问答；工作区写入允许 Codex 修改当前工作目录下文件，仍会走授权确认。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Read-only is suitable for remote Q&A. Workspace write lets Codex modify files in the current working directory, with approval still required."
+          }
+        }
+      }
+    },
+    "可用重置: " : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available resets: "
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可用重置: "
+          }
+        }
+      }
     },
     "启用 Agent Watcher" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Agent Watcher"
+          }
+        }
+      }
+    },
+    "命令确认" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Command Confirmation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "命令确认"
+          }
+        }
+      }
+    },
+    "在 AI 额度小组件内切换 Provider 分页。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch provider pages in the AI Quota widget."
+          }
+        }
+      }
     },
     "在 Finder 中右键即可使用这些功能。需在系统设置 > 扩展中启用 DevBar Finder Extension。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Right-click in Finder to use these features. Enable DevBar Finder Extension in System Settings > Extensions."
+          }
+        }
+      }
+    },
+    "在 Mac 主题小组件内切换 AI 额度 Provider 分页。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch AI quota provider pages in the Mac Theme widget."
+          }
+        }
+      }
     },
     "在一个大号小组件里查看 AI 额度和电脑控制入口。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View AI quotas and Mac controls in one large widget."
+          }
+        }
+      }
     },
     "在小组件内切换显示页面。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch the displayed page in the widget."
+          }
+        }
+      }
     },
     "在线" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Online"
+          }
+        }
+      }
     },
     "在线 · %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Online · %1$@"
+          }
+        }
+      }
+    },
+    "失败" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失败"
+          }
+        }
+      }
     },
     "如果二维码过期，请关闭后重新生成。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If the QR code expires, close this and generate a new one."
+          }
+        }
+      }
+    },
+    "安全中继二维码" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secure Relay QR Code"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安全中继二维码"
+          }
+        }
+      }
+    },
+    "安静模式" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quiet Mode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安静模式"
+          }
+        }
+      }
     },
     "完成" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Done"
+          }
+        }
+      }
     },
     "导入到 iPhone" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Import to iPhone"
+          }
+        }
+      }
     },
     "小组件内容" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Widget Content"
+          }
+        }
+      }
     },
     "尚未绑定 iPhone。生成二维码后，用 iPhone DevBar 扫描完成配对。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No iPhone is paired yet. Generate a QR code, then scan it with DevBar on iPhone to pair."
+          }
+        }
+      }
     },
     "屏幕：%@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Screen: %1$@"
+          }
+        }
+      }
+    },
+    "工具" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tool"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具"
+          }
+        }
+      }
+    },
+    "工具: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tool: %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具: %@"
+          }
+        }
+      }
     },
     "工具：%@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tool: %1$@"
+          }
+        }
+      }
+    },
+    "工具执行前" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Before Tool Use"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具执行前"
+          }
+        }
+      }
+    },
+    "工具执行后" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After Tool Use"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具执行后"
+          }
+        }
+      }
+    },
+    "已卡住" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stalled"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已卡住"
+          }
+        }
+      }
     },
     "已同步 %lld 个 Provider" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld providers synced"
+          }
+        }
+      }
+    },
+    "已完成" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成"
+          }
+        }
+      }
+    },
+    "已检测到" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detected"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已检测到"
+          }
+        }
+      }
     },
     "当前使用安全中继：账号凭证已在本机加密，服务端只临时保存密文。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Using secure relay: account credentials are encrypted on this device, and the server only stores ciphertext temporarily."
+          }
+        }
+      }
     },
     "当前工作目录" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current Working Directory"
+          }
+        }
+      }
     },
     "当前没有需要处理的任务" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No tasks need attention right now"
+          }
+        }
+      }
     },
     "待授权" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pending Approval"
+          }
+        }
+      }
     },
     "快速设置" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quick Settings"
+          }
+        }
+      }
+    },
+    "所有 Agent 事件都提醒 iPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notify iPhone for all agent events."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所有 Agent 事件都提醒 iPhone"
+          }
+        }
+      }
     },
     "所有任务运行正常" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All tasks are running normally"
+          }
+        }
+      }
     },
     "扫一扫" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan"
+          }
+        }
+      }
     },
     "扫描 Mac DevBar 里的连接二维码后，这里会显示已绑定 Mac。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After scanning the connection QR code from DevBar on Mac, paired Macs will appear here."
+          }
+        }
+      }
     },
     "把快捷指令收到的短信内容提交到 DevBar 服务端，优先通过 Relay 转发到已配对电脑，离线时使用系统通知兜底。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send SMS content from Shortcuts to the DevBar server. It is forwarded to paired Macs through Relay first, with system notifications as the offline fallback."
+          }
+        }
+      }
     },
     "拒绝" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deny"
+          }
+        }
+      }
     },
     "拷贝文件路径" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copy File Path"
+          }
+        }
+      }
     },
     "授权" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approval"
+          }
+        }
+      }
     },
     "接入状态" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connection Status"
+          }
+        }
+      }
     },
     "推荐" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recommended"
+          }
+        }
+      }
     },
     "推送通知" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Push Notifications"
+          }
+        }
+      }
     },
     "提交代码、写文件、删除、安装、执行等高风险操作也可通过微信 Y 放行" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High-risk actions such as committing code, writing files, deleting, installing, and running commands can also be approved with Y in WeChat."
+          }
+        }
+      }
     },
     "操作：%@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operation: %1$@"
+          }
+        }
+      }
+    },
+    "文件权限" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File Permission"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件权限"
+          }
+        }
+      }
     },
     "文件类型" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File Type"
+          }
+        }
+      }
+    },
+    "方向" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direction"
+          }
+        }
+      }
     },
     "显示二维码" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show QR Code"
+          }
+        }
+      }
     },
     "显示内容" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Display Content"
+          }
+        }
+      }
     },
     "显示活跃和等待任务数量" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show active and waiting task counts"
+          }
+        }
+      }
+    },
+    "智能提醒" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Smart Alerts"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能提醒"
+          }
+        }
+      }
     },
     "暂无中继日志" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No relay logs yet"
+          }
+        }
+      }
     },
     "暂无事件" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No events yet"
+          }
+        }
+      }
+    },
+    "未检测到" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Not Detected"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未检测到"
+          }
+        }
+      }
     },
     "未添加授权目录" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No authorized directories added"
+          }
+        }
+      }
+    },
+    "未知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unknown"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知"
+          }
+        }
+      }
     },
     "本地连接" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local Connection"
+          }
+        }
+      }
+    },
+    "权限请求" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permission Request"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "权限请求"
+          }
+        }
+      }
     },
     "来源：%@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source: %1$@"
+          }
+        }
+      }
     },
     "标记已处理" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mark as Handled"
+          }
+        }
+      }
     },
     "桌面小组件" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Desktop Widgets"
+          }
+        }
+      }
+    },
+    "正在执行 %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Running %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在执行 %@"
+          }
+        }
+      }
     },
     "正在读取二维码..." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading QR code..."
+          }
+        }
+      }
     },
     "正在读取迁移配置..." : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading transfer configuration..."
+          }
+        }
+      }
     },
     "沙盒" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sandbox"
+          }
+        }
+      }
+    },
+    "没有可用的 %@ 命令" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No available %1$@ command"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可用的 %@ 命令"
+          }
+        }
+      }
     },
     "液态玻璃" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liquid Glass"
+          }
+        }
+      }
     },
     "深色" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        }
+      }
     },
     "添加 Provider 账号" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Provider Account"
+          }
+        }
+      }
     },
     "添加到桌面后，可编辑并选择 Provider 额度、Agent Watcher、Mac 主题或翻页时钟。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After adding it to the desktop, edit it to choose Provider Quota, Agent Watcher, Mac Theme, or Flip Clock."
+          }
+        }
+      }
     },
     "添加可切换目录" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add Switchable Directory"
+          }
+        }
+      }
     },
     "添加目录时会同时验证 DevBar 和外部 CLI 子进程访问权限。若目录位于文稿、桌面、下载或 iCloud，系统授权会在这里完成，避免远程首次访问才弹窗。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When adding a directory, DevBar also verifies access for external CLI child processes. If it is in Documents, Desktop, Downloads, or iCloud, system authorization is completed here to avoid a first remote access prompt."
+          }
+        }
+      }
     },
     "灵动岛" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dynamic Island"
+          }
+        }
+      }
     },
     "点亮电脑" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wake Mac"
+          }
+        }
+      }
     },
     "点击任意值复制到剪贴板。" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Click any value to copy it to the clipboard."
+          }
+        }
+      }
     },
     "生成一个 5 分钟内有效的二维码，在 iPhone 上扫码导入当前配置。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generate a QR code valid for 5 minutes, then scan it on iPhone to import the current configuration."
+          }
+        }
+      }
     },
     "用 iPhone DevBar 扫描二维码完成配对。二维码不包含设备密钥，过期后请重新生成。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scan the QR code with DevBar on iPhone to pair. The QR code does not contain the device key; generate a new one after it expires."
+          }
+        }
+      }
     },
     "用于区分同一个 Provider 下的多个账号" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Used to distinguish multiple accounts under the same provider"
+          }
+        }
+      }
+    },
+    "用户输入" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "User Input"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户输入"
+          }
+        }
+      }
     },
     "电脑" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        }
+      }
     },
     "电脑控制台" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac Console"
+          }
+        }
+      }
     },
     "监控 AI 任务状态，查看是否有任务等待处理" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monitor AI task status and see whether any tasks need attention"
+          }
+        }
+      }
     },
     "短信内容" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SMS Content"
+          }
+        }
+      }
     },
     "短信提醒" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SMS Alerts"
+          }
+        }
+      }
     },
     "离线" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline"
+          }
+        }
+      }
+    },
+    "离线二维码" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline QR Code"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离线二维码"
+          }
+        }
+      }
     },
     "离线通知使用已绑定 Relay iPhone；图标仅支持 HTTPS URL。" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Offline notifications use the paired Relay iPhone. Icons only support HTTPS URLs."
+          }
+        }
+      }
     },
     "移除头像" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remove Avatar"
+          }
+        }
+      }
+    },
+    "空闲" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Idle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空闲"
+          }
+        }
+      }
     },
     "等待 %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for %1$@"
+          }
+        }
+      }
     },
     "等待: %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting: %1$@"
+          }
+        }
+      }
     },
     "等待中" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting"
+          }
+        }
+      }
     },
     "等待你处理" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for You"
+          }
+        }
+      }
     },
     "等待处理" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Needs Attention"
+          }
+        }
+      }
+    },
+    "等待授权" : {
 
+    },
+    "等待授权、登录失效、任务失败会推送到 iPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pending approvals, expired logins, and task failures are pushed to iPhone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待授权、登录失效、任务失败会推送到 iPhone"
+          }
+        }
+      }
+    },
+    "等待输入" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for Input"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "等待输入"
+          }
+        }
+      }
     },
     "等待额度同步" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for quota sync"
+          }
+        }
+      }
     },
     "结束" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "End"
+          }
+        }
+      }
+    },
+    "网络权限" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network Permission"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网络权限"
+          }
+        }
+      }
     },
     "翻页时钟" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Flip Clock"
+          }
+        }
+      }
     },
     "设备与小组件" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devices and Widgets"
+          }
+        }
+      }
     },
     "设备与系统表面" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devices and System Surfaces"
+          }
+        }
+      }
+    },
+    "读取 config.toml 失败: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to read config.toml: %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取 config.toml 失败: %@"
+          }
+        }
+      }
+    },
+    "读取 hooks.json 失败: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to read hooks.json: %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取 hooks.json 失败: %@"
+          }
+        }
+      }
+    },
+    "读取配置失败: %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Failed to read configuration: %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取配置失败: %@"
+          }
+        }
+      }
     },
     "调试信息" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Debug Info"
+          }
+        }
+      }
     },
     "转发短信提醒" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forward SMS Alerts"
+          }
+        }
+      }
     },
     "输入要显示在灵动岛的一句文案" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enter a line to show in Dynamic Island"
+          }
+        }
+      }
     },
     "迁移到 iPhone" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transfer to iPhone"
+          }
+        }
+      }
+    },
+    "过期时间：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expires: %1$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "过期时间：%@"
+          }
+        }
+      }
     },
     "运行中" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Running"
+          }
+        }
+      }
     },
     "运行概览" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Run Overview"
+          }
+        }
+      }
     },
     "运行正常" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Running Normally"
+          }
+        }
+      }
     },
     "这些信息会用于 Mac 主题小组件和 Relay 设备识别。" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This information is used by the Mac Theme widget and Relay device identification."
+          }
+        }
+      }
     },
     "远程中继" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remote Relay"
+          }
+        }
+      }
     },
     "远程可切换目录" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remote Switchable Directories"
+          }
+        }
+      }
     },
     "远程控制" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remote Control"
+          }
+        }
+      }
     },
     "远程设备" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remote Devices"
+          }
+        }
+      }
     },
     "连接 iPhone" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connect iPhone"
+          }
+        }
+      }
     },
     "连接中" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecting"
+          }
+        }
+      }
     },
     "选择 Agent Watcher 小组件显示的内容。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose what the Agent Watcher widget displays."
+          }
+        }
+      }
     },
     "选择头像" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose Avatar"
+          }
+        }
+      }
     },
     "选择当前工作目录，所选目录会加入远程可用目录" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the current working directory. The selected directory will be added to remote available directories."
+          }
+        }
+      }
     },
     "选择桌面小组件显示的内容。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose what the desktop widget displays."
+          }
+        }
+      }
     },
     "选择默认页面和 AI 额度提供方。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose the default page and AI quota provider."
+          }
+        }
+      }
     },
     "透明" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transparent"
+          }
+        }
+      }
     },
     "透明小组件" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transparent Widget"
+          }
+        }
+      }
+    },
+    "通知" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通知"
+          }
+        }
+      }
     },
     "通知与远程触达" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications and Remote Reachability"
+          }
+        }
+      }
     },
     "通知标题" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification Title"
+          }
+        }
+      }
     },
     "通知模式" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification Mode"
+          }
+        }
+      }
     },
     "通过 DevBar Relay 关闭已配对电脑的显示器。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn off the paired Mac display through DevBar Relay."
+          }
+        }
+      }
     },
     "通过 DevBar Relay 点亮已配对电脑的显示器。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wake the paired Mac display through DevBar Relay."
+          }
+        }
+      }
     },
     "通过 DevBar Relay 锁定已配对的电脑。" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock the paired Mac through DevBar Relay."
+          }
+        }
+      }
     },
     "鄂ICP备2021013794号-4A" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "E ICP No. 2021013794-4A"
+          }
+        }
+      }
     },
     "配对码：%@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pairing Code: %1$@"
+          }
+        }
+      }
     },
     "配置" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Settings"
+          }
+        }
+      }
+    },
+    "配额警告" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quota Warning"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配额警告"
+          }
+        }
+      }
     },
     "重新检测" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detect Again"
+          }
+        }
+      }
+    },
+    "重要事件同步 iPhone" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync Important Events to iPhone"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重要事件同步 iPhone"
+          }
+        }
+      }
+    },
+    "重要事件立即提醒，普通事件只显示 Badge，重复事件节流" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Important events notify immediately; normal events only update the badge, and repeated events are throttled."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重要事件立即提醒，普通事件只显示 Badge，重复事件节流"
+          }
+        }
+      }
     },
     "锁定" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock"
+          }
+        }
+      }
     },
     "锁定 %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock %1$@"
+          }
+        }
+      }
     },
     "锁定 Mac？" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock Mac?"
+          }
+        }
+      }
     },
     "锁屏电脑" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock Mac"
+          }
+        }
+      }
+    },
+    "错误" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Error"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "错误"
+          }
+        }
+      }
+    },
+    "需要登录" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Login Required"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要登录"
+          }
+        }
+      }
     },
     "需重新授权" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reauthorization Required"
+          }
+        }
+      }
     },
     "静音" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Silent"
+          }
+        }
+      }
     },
     "页面" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page"
+          }
+        }
+      }
     },
     "额度自动刷新间隔" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quota Auto-Refresh Interval"
+          }
+        }
+      }
     },
     "高频事件摘要" : {
-
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High-Frequency Event Summary"
+          }
+        }
+      }
     },
     "高风险也允许微信确认" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Allow WeChat confirmation for high-risk actions"
+          }
+        }
+      }
     },
     "默认安全目录: %@" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default safe directory: %1$@"
+          }
+        }
+      }
     },
     "默认终端" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default Terminal"
+          }
+        }
+      }
     },
     "默认页面" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default Page"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

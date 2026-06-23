@@ -9,3 +9,9 @@ enum MacScreenLockStateProvider {
         return session["CGSSessionScreenIsLocked"] as? Bool ?? false
     }
 }
+
+enum MacDisplayStateProvider {
+    static func isDisplayAwake() -> Bool {
+        CGDisplayIsAsleep(CGMainDisplayID()) == 0
+    }
+}

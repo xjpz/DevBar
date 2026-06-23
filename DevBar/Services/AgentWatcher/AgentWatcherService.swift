@@ -318,7 +318,7 @@ class AgentWatcherService: ObservableObject {
 
     private func sendLocalNotification(for session: AgentSession) {
         let content = UNMutableNotificationContent()
-        content.title = "\(session.source.displayName) 需要处理"
+        content.title = String(format: String(localized: "%@ 需要处理"), session.source.displayName)
         content.body = localNotificationMessage(for: session.lastEvent)
         content.sound = .default
         content.categoryIdentifier = "AGENT_WATCHER"
@@ -343,6 +343,7 @@ class AgentWatcherService: ObservableObject {
         guard let relayManager = relayManager else { return }
         guard event.canNotifyUser else { return }
         guard event.canNotifyPhone else { return }
+        guard settings.hookNotificationsEnabled(for: event.source) else { return }
         guard currentUserActivityState().isPhonePaired else { return }
 
         let sessionId = event.sessionId ?? "unknown"
@@ -423,7 +424,11 @@ class AgentWatcherService: ObservableObject {
             "status": "summary",
             "eventType": "agent.summary",
             "severity": summary.stalledCount > 0 ? AgentSeverity.critical.rawValue : AgentSeverity.important.rawValue,
-            "message": "\(summary.taskCount) 个任务需要处理，其中 \(summary.approvalCount) 个等待授权",
+            "message": String(
+                format: String(localized: "%lld 个任务需要处理，其中 %lld 个等待授权"),
+                summary.taskCount,
+                summary.approvalCount
+            ),
             "taskCount": String(summary.taskCount),
             "approvalCount": String(summary.approvalCount),
             "stalledCount": String(summary.stalledCount)
@@ -472,7 +477,7 @@ class AgentWatcherService: ObservableObject {
     }
 
     private func localNotificationMessage(for event: AgentEvent?) -> String {
-        guard let event else { return "任务等待处理" }
+        guard let event else { return String(localized: "任务等待处理") }
         return settings.showCommandSummary ? event.message : "\(event.source.displayName) \(event.eventType.displayName)"
     }
 

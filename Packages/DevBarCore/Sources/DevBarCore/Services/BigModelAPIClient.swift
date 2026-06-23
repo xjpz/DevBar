@@ -2,6 +2,7 @@ import Foundation
 
 public final class BigModelAPIClient: Sendable {
     private let session: URLSession
+    private static let pingModel = "glm-4.7"
 
     public init() {
         let config = URLSessionConfiguration.default
@@ -92,4 +93,67 @@ public final class BigModelAPIClient: Sendable {
             throw APIError.decodingError(error)
         }
     }
+
+    public func sendPing(apiKey: String) async throws {
+        let authorization = Self.normalizedBearerToken(apiKey)
+        guard !authorization.isEmpty,
+              let url = URL(string: DevBarCoreConstants.API.glmChatCompletionsURL) else {
+            throw APIError.invalidResponse
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 20
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(authorization, forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(GLMPingRequest(
+            model: Self.pingModel,
+            messages: [GLMPingMessage(role: "user", content: "ping")],
+            maxTokens: 1,
+            temperature: 0
+        ))
+
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        switch httpResponse.statusCode {
+        case 200..<300:
+            return
+        case 401, 403:
+            throw APIError.unauthorized
+        default:
+            if let raw = String(data: data, encoding: .utf8), !raw.isEmpty {
+                print("[DevBar] GLM ping HTTP \(httpResponse.statusCode): \(raw.prefix(300))")
+            }
+            throw APIError.httpError(httpResponse.statusCode)
+        }
+    }
+
+    public static func normalizedBearerToken(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        return trimmed.hasPrefix("Bearer ") ? trimmed : "Bearer \(trimmed)"
+    }
+}
+
+private struct GLMPingRequest: Encodable {
+    let model: String
+    let messages: [GLMPingMessage]
+    let maxTokens: Int
+    let temperature: Int
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case messages
+        case maxTokens = "max_tokens"
+        case temperature
+    }
+}
+
+private struct GLMPingMessage: Encodable {
+    let role: String
+    let content: String
 }

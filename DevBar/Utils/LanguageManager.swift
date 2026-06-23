@@ -51,6 +51,7 @@ final class LanguageManager: ObservableObject {
     init() {
         let saved = UserDefaults.standard.string(forKey: "app_language") ?? "system"
         self.selectedLanguage = AppLanguage(rawValue: saved) ?? .system
+        applyAppleLanguages()
     }
 
     /// Persist language to AppleLanguages so String(localized:) picks it up

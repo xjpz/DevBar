@@ -49,7 +49,7 @@ struct IOSDashboardView: View {
                 Button {
                     isShowingScanner = true
                 } label: {
-                    Label("扫一扫", systemImage: "qrcode.viewfinder")
+                    Label("ios_dashboard_scan_qr", systemImage: "qrcode.viewfinder")
                         .labelStyle(.iconOnly)
                 }
                 .accessibilityIdentifier("ios.dashboard.scan")
@@ -110,7 +110,7 @@ struct IOSDashboardView: View {
         }
         .overlay {
             if isResolvingScan {
-                ProgressView("正在读取二维码...")
+                ProgressView("ios_dashboard_reading_qr")
                     .padding(18)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
@@ -190,7 +190,7 @@ struct IOSDashboardView: View {
             if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .openai, localLastUpdated: appViewModel.openAIQuotaViewModel.lastUpdated) {
                 snapshot.level
             } else {
-                appViewModel.openAIQuotaViewModel.planType.map { $0.capitalized } ?? appViewModel.syncedQuotaSnapshot(for: .openai)?.level
+                appViewModel.openAIQuotaViewModel.planType ?? appViewModel.syncedQuotaSnapshot(for: .openai)?.level
             }
         case .mimo:
             if let snapshot = appViewModel.preferredSyncedQuotaSnapshot(for: .mimo, localLastUpdated: appViewModel.mimoQuotaViewModel.lastUpdated) {
@@ -215,12 +215,16 @@ struct IOSDashboardView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(provider.accentColor.opacity(theme.providerPlateOpacity))
 
-            Image(provider.assetName)
+            Image(iosAssetName(for: provider))
                 .resizable()
                 .scaledToFit()
                 .padding(8)
         }
         .frame(width: 36, height: 36)
+    }
+
+    private func iosAssetName(for provider: QuotaProvider) -> String {
+        provider == .mimo ? "MiMO" : provider.assetName
     }
 
     private func lastRefreshText(for provider: QuotaProvider) -> String {
@@ -295,9 +299,12 @@ struct IOSDashboardView: View {
                 if let error = appViewModel.openAIQuotaViewModel.errorMessage {
                     refreshWarning(error)
                 }
+                if let availableResetCount = appViewModel.openAIQuotaViewModel.availableResetCount, availableResetCount > 0 {
+                    resetCreditsRow(availableResetCount)
+                }
                 ForEach(openAIUsageRows) { row in
                     UsageLimitRow(
-                        title: row.name,
+                        title: localizedQuotaTitle(row.name, provider: .openai),
                         percentage: row.percentage,
                         resetText: row.resetTime,
                         detailText: nil,
@@ -337,7 +344,7 @@ struct IOSDashboardView: View {
 
                 ForEach(appViewModel.mimoQuotaViewModel.quotaRows) { row in
                     UsageLimitRow(
-                        title: row.name,
+                        title: localizedQuotaTitle(row.name, provider: .mimo),
                         percentage: row.percentage,
                         resetText: row.resetTime,
                         detailText: row.unitDescription,
@@ -377,7 +384,7 @@ struct IOSDashboardView: View {
 
                 ForEach(appViewModel.deepSeekQuotaViewModel.quotaRows) { row in
                     UsageLimitRow(
-                        title: row.name,
+                        title: localizedQuotaTitle(row.name, provider: .deepseek),
                         percentage: row.percentage,
                         resetText: row.resetTime,
                         detailText: row.unitDescription,
@@ -407,9 +414,15 @@ struct IOSDashboardView: View {
                     .foregroundStyle(theme.textSecondary)
             }
 
+            if snapshot.provider == .openai,
+               let availableResetCount = snapshot.availableResetCount,
+               availableResetCount > 0 {
+                resetCreditsRow(availableResetCount)
+            }
+
             ForEach(snapshot.limits) { limit in
                 UsageLimitRow(
-                    title: limit.displayName,
+                    title: localizedQuotaTitle(for: limit, provider: snapshot.provider),
                     percentage: limit.percentage,
                     resetText: limit.formattedResetTime,
                     detailText: limit.unitDescription,
@@ -417,6 +430,87 @@ struct IOSDashboardView: View {
                 )
             }
         }
+    }
+
+    private func localizedQuotaTitle(_ rawTitle: String, provider: QuotaProvider) -> String {
+        localizedQuotaTitle(
+            for: WidgetQuotaLimit(
+                type: rawTitle,
+                displayName: rawTitle,
+                percentage: 0,
+                unitDescription: nil,
+                formattedResetTime: nil
+            ),
+            provider: provider
+        )
+    }
+
+    private func localizedQuotaTitle(for limit: WidgetQuotaLimit, provider: QuotaProvider) -> String {
+        switch provider {
+        case .glm:
+            if WidgetQuotaPresentation.isFiveHourLimit(limit) {
+                return String(format: localized("glm_session_quota"), firstInteger(in: limit.displayName) ?? 5)
+            }
+            if WidgetQuotaPresentation.isWeeklyLimit(limit) {
+                return localized("glm_weekly_quota")
+            }
+            if WidgetQuotaPresentation.isMonthlyLimit(limit) || limit.type == "TIME_LIMIT" {
+                return localized("mcp_monthly_quota")
+            }
+            if WidgetQuotaPresentation.isTokenLimit(limit) {
+                return localized("token_quota")
+            }
+        case .openai:
+            if WidgetQuotaPresentation.isFiveHourLimit(limit) {
+                return String(format: localized("openai_session"), firstInteger(in: limit.displayName) ?? 5)
+            }
+            if WidgetQuotaPresentation.isWeeklyLimit(limit) {
+                return localized("openai_weekly")
+            }
+            if WidgetQuotaPresentation.isMonthlyLimit(limit) {
+                return localized("mcp_monthly_quota")
+            }
+        case .mimo:
+            if WidgetQuotaPresentation.isMonthlyLimit(limit) || WidgetQuotaPresentation.isTokenLimit(limit) {
+                return localized("mimo_monthly_token_quota")
+            }
+        case .deepseek:
+            if WidgetQuotaPresentation.isCostLimit(limit) {
+                return localized("deepseek_cost_usage")
+            }
+            if WidgetQuotaPresentation.isTokenLimit(limit) {
+                return localized("deepseek_token_usage")
+            }
+        }
+
+        return limit.displayName
+    }
+
+    private func firstInteger(in text: String) -> Int? {
+        var digits = ""
+        for character in text {
+            if character.isNumber {
+                digits.append(character)
+            } else if !digits.isEmpty {
+                break
+            }
+        }
+        return digits.isEmpty ? nil : Int(digits)
+    }
+
+    private func resetCreditsRow(_ count: Int) -> some View {
+        HStack(spacing: 0) {
+            Text(openAIResetCreditsLabel)
+                .foregroundStyle(theme.textSecondary)
+            Text("\(count)")
+                .foregroundStyle(.green)
+                .fontWeight(.semibold)
+        }
+        .font(theme.captionFont)
+    }
+
+    private var openAIResetCreditsLabel: String {
+        localized("openai_available_resets_label")
     }
 
     private func configurePrompt(_ text: String) -> some View {

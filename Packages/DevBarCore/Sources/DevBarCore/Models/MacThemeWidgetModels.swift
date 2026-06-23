@@ -118,7 +118,7 @@ public struct MacThemeWidgetSnapshot: Codable, Sendable, Equatable {
 }
 
 public enum MacThemeWidgetPolicy {
-    public static let availablePages: [MacThemeWidgetPage] = [.quota, .macConsole]
+    public static let availablePages: [MacThemeWidgetPage] = [.macConsole, .quota]
 
     public static func percentText(_ percent: Int?) -> String {
         guard let percent else { return "--" }

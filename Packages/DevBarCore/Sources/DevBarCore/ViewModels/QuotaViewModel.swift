@@ -22,11 +22,14 @@ public final class QuotaViewModel: ObservableObject {
     }
 
     public var hasValidSubscription: Bool {
-        subscription?.isValid == true
+        if let subscription {
+            return subscription.isValid
+        }
+        return quotaData != nil
     }
 
     public var statusText: String {
-        guard hasValidSubscription else { return "DevBar" }
+        if let subscription, !subscription.isValid { return "DevBar" }
         guard let data = quotaData, let limits = data.limits, !limits.isEmpty else {
             return "DevBar"
         }
@@ -44,6 +47,13 @@ public final class QuotaViewModel: ObservableObject {
             isLoading = true
         }
         errorMessage = nil
+
+        if credentials.cookieString.isEmpty {
+            subscription = nil
+            await fetchQuota(credentials: credentials)
+            initialDataLoaded = true
+            return
+        }
 
         do {
             let subscriptions = try await apiClient.fetchSubscriptionList(credentials: credentials)

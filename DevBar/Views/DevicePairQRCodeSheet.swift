@@ -72,7 +72,10 @@ struct DevicePairQRCodeSheet: View {
         let date = Date(timeIntervalSince1970: TimeInterval(payload.expiresAt) / 1000)
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        return "过期时间：\(formatter.localizedString(for: date, relativeTo: Date()))"
+        return String(
+            format: String(localized: "过期时间：%@"),
+            formatter.localizedString(for: date, relativeTo: Date())
+        )
     }
 
     private func makeQRCodeImage(from value: String) -> CGImage? {

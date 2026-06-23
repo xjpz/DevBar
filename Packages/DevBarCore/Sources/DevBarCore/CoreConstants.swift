@@ -2,10 +2,10 @@ import Foundation
 
 public enum DevBarCoreConstants {
     public enum Features {
-        public static let agentWatcherEnabled = false
+        public static let agentWatcherEnabled = true
         public static let flipClockWidgetEnabled = true
         public static let iPhoneWidgetsEnabled = false
-        public static let notificationRemindersEnabled = false
+        public static let notificationRemindersEnabled = true
     }
 
     public enum API {
@@ -13,12 +13,14 @@ public enum DevBarCoreConstants {
         public static let loginURL = "\(baseURL)/login"
         public static let subscriptionListURL = "\(baseURL)/api/biz/subscription/list"
         public static let quotaLimitURL = "\(baseURL)/api/monitor/usage/quota/limit"
+        public static let glmChatCompletionsURL = "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions"
     }
 
     public enum Keychain {
         public static let service = "cc.xjpz.DevBar"
         public static let tokenKey = "authorization_token"
         public static let cookieKey = "cookie_string"
+        public static let glmAPIKeyKey = "glm_api_key"
         public static let openAIAccessTokenKey = "openai_access_token"
         public static let mimoServiceTokenKey = "mimo_service_token"
         public static let macRelayDeviceSecretKey = "relay_device_secret_mac"
@@ -87,6 +89,8 @@ public enum DevBarCoreConstants {
         public static let sharedDataKey = "widget_shared_data"
         public static let macThemeWidgetSnapshotKey = "mac_theme_widget_snapshot"
         public static let macThemeWidgetSelectedPageKey = "mac_theme_widget_selected_page"
+        public static let macThemeWidgetQuotaProviderPageKey = "mac_theme_widget_quota_provider_page"
+        public static let desktopQuotaWidgetProviderPageKey = "desktop_quota_widget_provider_page"
         public static let macThemeWidgetAvatarFileName = "mac-theme-widget-avatar.jpg"
         public static let liveActivitySelectedProviderKey = "live_activity_selected_provider"
         public static let agentWatcherWidgetKey = "agent_watcher_widget_data"
@@ -106,6 +110,7 @@ public enum DevBarCoreConstants {
         public static let defaultRefreshInterval: TimeInterval = 300
         public static let accountConfigsKey = "account_configs"
         public static let providerAccountsKey = "provider_accounts_v2"
+        public static let providerPingConfigsKey = "provider_ping_configs"
         public static let glmQuotaCacheKey = "glm_quota_cache"
         public static let openAIQuotaCacheKey = "openai_quota_cache"
         public static let mimoQuotaCacheKey = "mimo_quota_cache"

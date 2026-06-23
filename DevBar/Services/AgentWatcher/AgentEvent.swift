@@ -60,26 +60,26 @@ enum AgentEventType: String, Codable {
 
     var displayName: String {
         switch self {
-        case .notification: return "通知"
-        case .stop: return "停止"
-        case .error: return "错误"
-        case .permissionRequest: return "权限请求"
-        case .sessionStart: return "会话开始"
-        case .preToolUse: return "工具执行前"
-        case .postToolUse: return "工具执行后"
-        case .userPromptSubmit: return "用户输入"
-        case .approvalRequired: return "等待授权"
-        case .commandConfirmationRequired: return "命令确认"
-        case .filePermissionRequired: return "文件权限"
-        case .networkPermissionRequired: return "网络权限"
-        case .mcpPermissionRequired: return "MCP 权限"
-        case .loginRequired: return "需要登录"
-        case .waitingUserInput: return "等待输入"
-        case .taskCompleted: return "任务完成"
-        case .taskFailed: return "任务失败"
-        case .taskStalled: return "任务卡住"
-        case .quotaWarning: return "配额警告"
-        case .unknown: return "未知"
+        case .notification: return String(localized: "通知")
+        case .stop: return String(localized: "停止")
+        case .error: return String(localized: "错误")
+        case .permissionRequest: return String(localized: "权限请求")
+        case .sessionStart: return String(localized: "会话开始")
+        case .preToolUse: return String(localized: "工具执行前")
+        case .postToolUse: return String(localized: "工具执行后")
+        case .userPromptSubmit: return String(localized: "用户输入")
+        case .approvalRequired: return String(localized: "等待授权")
+        case .commandConfirmationRequired: return String(localized: "命令确认")
+        case .filePermissionRequired: return String(localized: "文件权限")
+        case .networkPermissionRequired: return String(localized: "网络权限")
+        case .mcpPermissionRequired: return String(localized: "MCP 权限")
+        case .loginRequired: return String(localized: "需要登录")
+        case .waitingUserInput: return String(localized: "等待输入")
+        case .taskCompleted: return String(localized: "任务完成")
+        case .taskFailed: return String(localized: "任务失败")
+        case .taskStalled: return String(localized: "任务卡住")
+        case .quotaWarning: return String(localized: "配额警告")
+        case .unknown: return String(localized: "未知")
         }
     }
 }

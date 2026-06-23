@@ -5,6 +5,68 @@ import Testing
 struct AgentWatcherHookPayloadTests {
     @MainActor
     @Test
+    func codexSessionStartDoesNotCreateRunningSession() async throws {
+        let store = AgentSessionStore()
+        store.sessions = [:]
+        let handler = CodexHookHandler(sessionStore: store)
+        let request = HTTPRequest(
+            method: "POST",
+            path: "/agent/codex/session-start",
+            headers: [:],
+            body: Data(
+                #"""
+                {
+                  "session_id": "codex-resume-session",
+                  "cwd": "/Users/xjpz/Documents/workspace/ai/xcode/DevBar",
+                  "hook_event_name": "SessionStart",
+                  "matcher": "resume"
+                }
+                """#.utf8
+            )
+        )
+
+        let response = handler.handleSessionStart(request: request)
+        await Task.yield()
+
+        #expect(response.statusCode == 200)
+        #expect(store.sessions["codex-resume-session"] == nil)
+    }
+
+    @MainActor
+    @Test
+    func codexPreToolUseCreatesRunningSession() async throws {
+        let store = AgentSessionStore()
+        store.sessions = [:]
+        let handler = CodexHookHandler(sessionStore: store)
+        let request = HTTPRequest(
+            method: "POST",
+            path: "/agent/codex/pre-tool-use",
+            headers: [:],
+            body: Data(
+                #"""
+                {
+                  "session_id": "codex-active-session",
+                  "cwd": "/Users/xjpz/Documents/workspace/ai/xcode/DevBar",
+                  "hook_event_name": "PreToolUse",
+                  "tool_name": "shell",
+                  "tool_input": { "command": "git status" }
+                }
+                """#.utf8
+            )
+        )
+
+        let response = handler.handlePreToolUse(request: request)
+        await Task.yield()
+
+        let session = store.sessions["codex-active-session"]
+        #expect(response.statusCode == 200)
+        #expect(session?.source == .codexCLI)
+        #expect(session?.state == .running)
+        #expect(session?.lastEvent?.eventType == .preToolUse)
+    }
+
+    @MainActor
+    @Test
     func claudePermissionRequestCreatesWaitingApprovalSession() async throws {
         let store = AgentSessionStore()
         store.sessions = [:]

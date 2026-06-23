@@ -1,3 +1,5 @@
+import DevBarCore
+import Foundation
 import SwiftUI
 import SwiftData
 
@@ -9,6 +11,10 @@ struct DevBariOSApp: App {
     @StateObject private var languageManager = IOSLanguageManager()
     @StateObject private var themeManager = IOSThemeManager()
     @StateObject private var shortcutStore = ShortcutStore.shared
+
+    init() {
+        Self.ensureSharedModelStoreDirectoryExists()
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -23,7 +29,7 @@ struct DevBariOSApp: App {
                 .preferredColorScheme(themeManager.preferredColorScheme)
                 .id("app.root.\(languageManager.selectedLanguage.rawValue)")
                 .task {
-                    await appViewModel.refreshOnLaunch()
+                    await appViewModel.startDeferredLaunchWork()
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     guard newPhase == .active else { return }
@@ -42,6 +48,20 @@ struct DevBariOSApp: App {
                 }
         }
         .modelContainer(for: [IOSAPIRecord.self, IOSWebHistoryRecord.self, IOSMemoItem.self, IOSMarkdownDocument.self], isAutosaveEnabled: true, isUndoEnabled: false)
+    }
+
+    /// SwiftData's default `ModelConfiguration` uses `groupContainer: .automatic`. Because this app
+    /// declares a single App Group, `.automatic` places `default.store` inside the App Group container
+    /// instead of the app sandbox. App Group containers do not auto-create `Library/Application Support`,
+    /// so SwiftData fails to create the store (NSCocoaErrorDomain 512 / "No such file or directory") and
+    /// the process aborts on launch — reproducible on device, masked on the Simulator by CoreData's
+    /// directory-recovery path. Pre-create the directory before the scene builds the container.
+    private static func ensureSharedModelStoreDirectoryExists() {
+        guard let groupURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: DevBarCoreConstants.AppGroup.groupID
+        ) else { return }
+        let appSupport = groupURL.appending(path: "Library/Application Support", directoryHint: .isDirectory)
+        try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
     }
 }
 

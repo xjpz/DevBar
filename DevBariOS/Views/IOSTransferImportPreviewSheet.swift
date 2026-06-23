@@ -17,6 +17,7 @@ struct IOSTransferImportPreviewSheet: View {
                     LabeledContent("ios_transfer_device_label", value: preview.payload.deviceName ?? String(localized: "ios_transfer_unknown_mac"))
                     LabeledContent("ios_transfer_expires_label", value: themeManager.formatTime(date: preview.payload.expiresAt))
                 }
+                .listRowBackground(rowBackground)
 
                 if preview.hasConflicts {
                     Section("ios_transfer_attention_section") {
@@ -24,13 +25,15 @@ struct IOSTransferImportPreviewSheet: View {
                             .font(.subheadline)
                             .foregroundStyle(theme.textSecondary)
                     }
+                    .listRowBackground(rowBackground)
                 }
 
                 Section("ios_transfer_providers_section") {
-                    ForEach(preview.providerChanges) { change in
+                    ForEach(displayChanges) { change in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(alignment: .firstTextBaseline) {
                                 Text(change.provider.localizedName)
+                                    .foregroundStyle(theme.textPrimary)
                                 Spacer()
                                 if change.hasConflict {
                                     Text("ios_transfer_will_replace")
@@ -42,11 +45,25 @@ struct IOSTransferImportPreviewSheet: View {
                             Text(providerDescription(for: change))
                                 .font(.caption)
                                 .foregroundStyle(theme.textSecondary)
+
+                            if let accountID = change.accountID {
+                                Text(accountID)
+                                    .font(.caption2)
+                                    .foregroundStyle(theme.textTertiary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
                         }
                     }
                 }
+                .listRowBackground(rowBackground)
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
             .navigationTitle("ios_transfer_title")
+            .toolbarBackground(theme.backgroundPrimary, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("ios_common_cancel") {
@@ -72,9 +89,22 @@ struct IOSTransferImportPreviewSheet: View {
                 }
             }
         }
+        .tint(theme.brandPrimary)
+        .preferredColorScheme(theme.isGeek ? .dark : nil)
+        .iosGeekScreenBackground(theme)
     }
 
-    private func providerDescription(for change: TransferImportProviderChange) -> String {
+    private var displayChanges: [TransferImportDisplayChange] {
+        let providerChanges = preview.providerChanges.map(TransferImportDisplayChange.init(providerChange:))
+        let accountChanges = preview.accountChanges.map(TransferImportDisplayChange.init(accountChange:))
+        return providerChanges + accountChanges
+    }
+
+    private var rowBackground: Color {
+        theme.isGeek ? theme.surfacePrimary.opacity(0.72) : theme.surfacePrimary
+    }
+
+    private func providerDescription(for change: TransferImportDisplayChange) -> String {
         let credentialDescription: String
         switch change.provider {
         case .glm:
@@ -133,5 +163,35 @@ struct IOSTransferImportPreviewSheet: View {
         }
 
         return String(format: String(localized: "ios_transfer_description"), credentialDescription, configDescription)
+    }
+}
+
+private struct TransferImportDisplayChange: Identifiable {
+    let id: String
+    let provider: QuotaProvider
+    let credentialAction: TransferImportProviderChange.CredentialAction
+    let configAction: TransferImportProviderChange.ConfigAction
+    let accountIdentifierChanged: Bool
+    let hasConflict: Bool
+    let accountID: String?
+
+    init(providerChange: TransferImportProviderChange) {
+        self.id = providerChange.provider.rawValue
+        self.provider = providerChange.provider
+        self.credentialAction = providerChange.credentialAction
+        self.configAction = providerChange.configAction
+        self.accountIdentifierChanged = providerChange.accountIdentifierChanged
+        self.hasConflict = providerChange.hasConflict
+        self.accountID = nil
+    }
+
+    init(accountChange: TransferImportAccountChange) {
+        self.id = accountChange.accountID
+        self.provider = accountChange.provider
+        self.credentialAction = accountChange.credentialAction
+        self.configAction = accountChange.configAction
+        self.accountIdentifierChanged = accountChange.accountIdentifierChanged
+        self.hasConflict = accountChange.hasConflict
+        self.accountID = accountChange.accountID
     }
 }

@@ -45,7 +45,7 @@ struct OpenAITimelineProvider: TimelineProvider {
         guard let decoded = try? JSONDecoder().decode(WidgetSharedData.self, from: raw) else {
             return nil
         }
-        guard decoded.schemaVersion == WidgetSharedData.currentSchemaVersion else {
+        guard decoded.schemaVersion <= WidgetSharedData.currentSchemaVersion else {
             return nil
         }
         return decoded

@@ -132,3 +132,115 @@ struct SetMacThemeWidgetPageIntent: AppIntent {
         return .result()
     }
 }
+
+enum WidgetProviderPageDirection: String, AppEnum {
+    case previous
+    case next
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Provider 分页方向")
+    }
+
+    static var caseDisplayRepresentations: [WidgetProviderPageDirection: DisplayRepresentation] {
+        [
+            .previous: DisplayRepresentation(title: "上一页"),
+            .next: DisplayRepresentation(title: "下一页")
+        ]
+    }
+
+    var delta: Int {
+        switch self {
+        case .previous: return -1
+        case .next: return 1
+        }
+    }
+}
+
+struct SetDesktopQuotaProviderPageIntent: AppIntent {
+    static var title: LocalizedStringResource { "切换 AI 额度 Provider 页" }
+    static var description = IntentDescription("在 AI 额度小组件内切换 Provider 分页。")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "方向")
+    var direction: WidgetProviderPageDirection
+
+    init() {}
+
+    init(direction: WidgetProviderPageDirection) {
+        self.direction = direction
+    }
+
+    func perform() async throws -> some IntentResult {
+        WidgetProviderPageStore.advance(
+            key: DevBarCoreConstants.AppGroup.desktopQuotaWidgetProviderPageKey,
+            direction: direction
+        )
+        WidgetCenter.shared.reloadTimelines(ofKind: "DevBarTransparentWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "DevBarLiquidGlassWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "DevBarDarkWidget")
+        return .result()
+    }
+}
+
+struct SetMacThemeQuotaProviderPageIntent: AppIntent {
+    static var title: LocalizedStringResource { "切换 Mac 主题额度 Provider 页" }
+    static var description = IntentDescription("在 Mac 主题小组件内切换 AI 额度 Provider 分页。")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "方向")
+    var direction: WidgetProviderPageDirection
+
+    init() {}
+
+    init(direction: WidgetProviderPageDirection) {
+        self.direction = direction
+    }
+
+    func perform() async throws -> some IntentResult {
+        WidgetProviderPageStore.advance(
+            key: DevBarCoreConstants.AppGroup.macThemeWidgetQuotaProviderPageKey,
+            direction: direction
+        )
+        WidgetCenter.shared.reloadTimelines(ofKind: "DevBarMacThemeWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "DevBarTransparentWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "DevBarLiquidGlassWidget")
+        WidgetCenter.shared.reloadTimelines(ofKind: "DevBarDarkWidget")
+        return .result()
+    }
+}
+
+enum WidgetProviderPageStore {
+    static let pageSize = 3
+
+    static func currentPage(for key: String, providerCount: Int) -> Int {
+        let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID)
+        let storedPage = defaults?.integer(forKey: key) ?? 0
+        return clampedPage(storedPage, providerCount: providerCount)
+    }
+
+    static func pageCount(for providerCount: Int) -> Int {
+        max(1, (providerCount + pageSize - 1) / pageSize)
+    }
+
+    static func pageRange(page: Int, providerCount: Int) -> Range<Int> {
+        guard providerCount > 0 else { return 0..<0 }
+        let lowerBound = min(max(page, 0) * pageSize, providerCount)
+        let upperBound = min(lowerBound + pageSize, providerCount)
+        return lowerBound..<upperBound
+    }
+
+    static func advance(key: String, direction: WidgetProviderPageDirection) {
+        let enabledProviderCount = WidgetProviderSelection.enabledSelectionsFromAppGroup.count
+        let providerCount = enabledProviderCount > 0 ? enabledProviderCount : WidgetProviderSelection.allCases.count
+        let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID)
+        let currentPage = clampedPage(defaults?.integer(forKey: key) ?? 0, providerCount: providerCount)
+        let nextPage = clampedPage(currentPage + direction.delta, providerCount: providerCount)
+        defaults?.set(nextPage, forKey: key)
+    }
+
+    private static func clampedPage(_ page: Int, providerCount: Int) -> Int {
+        guard providerCount > 0 else { return 0 }
+        let lastPage = pageCount(for: providerCount) - 1
+        return min(max(page, 0), lastPage)
+    }
+}

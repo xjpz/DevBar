@@ -15,9 +15,10 @@ public struct WidgetSharedData: Codable, Sendable, Equatable {
     public let subscriptionName: String?
     public let subscriptionPrice: String?
     public let subscriptionExpireDate: String?
+    public let availableResetCount: Int?
     public let lastUpdated: Date
 
-    public static let currentSchemaVersion = 4
+    public static let currentSchemaVersion = 5
 
     public static let placeholder = WidgetSharedData(
         provider: nil,
@@ -27,6 +28,7 @@ public struct WidgetSharedData: Codable, Sendable, Equatable {
         subscriptionName: nil,
         subscriptionPrice: nil,
         subscriptionExpireDate: nil,
+        availableResetCount: nil,
         lastUpdated: .distantPast
     )
 
@@ -38,6 +40,7 @@ public struct WidgetSharedData: Codable, Sendable, Equatable {
         subscriptionName: String?,
         subscriptionPrice: String?,
         subscriptionExpireDate: String?,
+        availableResetCount: Int? = nil,
         lastUpdated: Date
     ) {
         self.provider = provider
@@ -47,6 +50,7 @@ public struct WidgetSharedData: Codable, Sendable, Equatable {
         self.subscriptionName = subscriptionName
         self.subscriptionPrice = subscriptionPrice
         self.subscriptionExpireDate = subscriptionExpireDate
+        self.availableResetCount = availableResetCount
         self.lastUpdated = lastUpdated
     }
 }
@@ -85,6 +89,7 @@ public struct ProviderQuotaSnapshot: Codable, Sendable, Identifiable, Equatable 
     public let level: String?
     public let subscriptionName: String?
     public let subscriptionExpireDate: String?
+    public let availableResetCount: Int?
     public let fetchedAt: Date
     public let sourceDeviceID: String?
     public let revision: Int
@@ -97,6 +102,7 @@ public struct ProviderQuotaSnapshot: Codable, Sendable, Identifiable, Equatable 
         level: String?,
         subscriptionName: String?,
         subscriptionExpireDate: String?,
+        availableResetCount: Int? = nil,
         fetchedAt: Date = Date(),
         sourceDeviceID: String? = nil,
         revision: Int = 1
@@ -108,6 +114,7 @@ public struct ProviderQuotaSnapshot: Codable, Sendable, Identifiable, Equatable 
         self.level = level
         self.subscriptionName = subscriptionName
         self.subscriptionExpireDate = subscriptionExpireDate
+        self.availableResetCount = availableResetCount
         self.fetchedAt = fetchedAt
         self.sourceDeviceID = sourceDeviceID
         self.revision = revision
@@ -122,6 +129,7 @@ public struct ProviderQuotaSnapshot: Codable, Sendable, Identifiable, Equatable 
             subscriptionName: subscriptionName,
             subscriptionPrice: nil,
             subscriptionExpireDate: subscriptionExpireDate,
+            availableResetCount: availableResetCount,
             lastUpdated: fetchedAt
         )
     }

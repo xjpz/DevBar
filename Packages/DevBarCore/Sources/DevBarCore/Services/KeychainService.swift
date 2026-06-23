@@ -29,6 +29,7 @@ public final class KeychainService: Sendable {
     public func clear() {
         delete(key: DevBarCoreConstants.Keychain.tokenKey)
         delete(key: DevBarCoreConstants.Keychain.cookieKey)
+        delete(key: DevBarCoreConstants.Keychain.glmAPIKeyKey)
         delete(key: DevBarCoreConstants.Keychain.openAIAccessTokenKey)
         delete(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
     }

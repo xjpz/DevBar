@@ -69,6 +69,10 @@ public final class DeviceRelayManager: ObservableObject {
         peerRuntimeStates[peer.deviceId]?.screenLocked
     }
 
+    public func displayAwake(for peer: DeviceRelayDevice) -> Bool? {
+        peerRuntimeStates[peer.deviceId]?.displayAwake
+    }
+
 #if DEBUG
     func setConnectedForTesting() {
         connectionState = .connected
@@ -446,6 +450,7 @@ public final class DeviceRelayManager: ObservableObject {
         targetDeviceId: String,
         requestId: String?,
         screenLocked: Bool?,
+        displayAwake: Bool?,
         deviceName: String?
     ) async throws {
         guard let localDeviceID else {
@@ -457,6 +462,7 @@ public final class DeviceRelayManager: ObservableObject {
                 targetDeviceId: targetDeviceId,
                 requestId: requestId,
                 screenLocked: screenLocked,
+                displayAwake: displayAwake,
                 deviceName: deviceName
             )
         )
@@ -625,11 +631,15 @@ public final class DeviceRelayManager: ObservableObject {
         targetDeviceId: String,
         requestId: String?,
         screenLocked: Bool?,
+        displayAwake: Bool?,
         deviceName: String?
     ) -> DeviceRelayMessage {
         var payload: [String: String] = [:]
         if let screenLocked {
             payload["screenLocked"] = screenLocked ? "true" : "false"
+        }
+        if let displayAwake {
+            payload["displayAwake"] = displayAwake ? "true" : "false"
         }
         if let deviceName = normalizedDeviceName(deviceName) {
             payload["deviceName"] = deviceName
@@ -928,7 +938,8 @@ public final class DeviceRelayManager: ObservableObject {
             peerDeviceID: peerDeviceID,
             lastRemoteSeenAt: Date(timeIntervalSince1970: TimeInterval(message.timestamp) / 1000),
             displayName: message.payload["deviceName"],
-            screenLocked: screenLockedPayload(from: message)
+            screenLocked: screenLockedPayload(from: message),
+            displayAwake: displayAwakePayload(from: message)
         )
     }
 
@@ -938,7 +949,8 @@ public final class DeviceRelayManager: ObservableObject {
             peerDeviceID: peerDeviceID,
             lastLocalSeenAt: Date(),
             displayName: message.payload["deviceName"],
-            screenLocked: screenLockedPayload(from: message)
+            screenLocked: screenLockedPayload(from: message),
+            displayAwake: displayAwakePayload(from: message)
         )
     }
 
@@ -954,7 +966,8 @@ public final class DeviceRelayManager: ObservableObject {
         updateRuntimeState(
             peerDeviceID: peerDeviceID,
             displayName: message.payload["deviceName"],
-            screenLocked: screenLockedPayload(from: message)
+            screenLocked: screenLockedPayload(from: message),
+            displayAwake: displayAwakePayload(from: message)
         )
     }
 
@@ -963,19 +976,43 @@ public final class DeviceRelayManager: ObservableObject {
         lastRemoteSeenAt: Date? = nil,
         lastLocalSeenAt: Date? = nil,
         displayName: String? = nil,
-        screenLocked: Bool? = nil
+        screenLocked: Bool? = nil,
+        displayAwake: Bool? = nil
     ) {
         let existing = peerRuntimeStates[peerDeviceID] ?? DeviceRelayPeerRuntimeState()
         peerRuntimeStates[peerDeviceID] = existing.updating(
             lastRemoteSeenAt: lastRemoteSeenAt,
             lastLocalSeenAt: lastLocalSeenAt,
             displayName: Self.normalizedDeviceName(displayName),
-            screenLocked: screenLocked
+            screenLocked: screenLocked,
+            displayAwake: displayAwake
         )
     }
 
     private func screenLockedPayload(from message: DeviceRelayMessage) -> Bool? {
         guard let value = message.payload["screenLocked"]?.lowercased() else { return nil }
+        if ["true", "1", "yes"].contains(value) { return true }
+        if ["false", "0", "no"].contains(value) { return false }
+        return nil
+    }
+
+    private func displayAwakePayload(from message: DeviceRelayMessage) -> Bool? {
+        if let value = boolPayload("displayAwake", from: message) {
+            return value
+        }
+
+        switch message.payload["displayState"]?.lowercased() {
+        case "awake", "on", "active":
+            return true
+        case "sleeping", "sleep", "off":
+            return false
+        default:
+            return nil
+        }
+    }
+
+    private func boolPayload(_ key: String, from message: DeviceRelayMessage) -> Bool? {
+        guard let value = message.payload[key]?.lowercased() else { return nil }
         if ["true", "1", "yes"].contains(value) { return true }
         if ["false", "0", "no"].contains(value) { return false }
         return nil

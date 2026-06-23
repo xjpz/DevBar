@@ -65,6 +65,10 @@ final class AppViewModel: ObservableObject {
     let deviceRelayManager = DeviceRelayManager()
     let antiSleepService = AntiSleepService()
     let agentWatcherService = AgentWatcherService.shared
+    private let providerPingSettingsStore = UserDefaultsProviderPingSettingsStore()
+    private let providerPingAPIClient = BigModelAPIClient()
+    private let providerPingScheduler = ProviderPingScheduler()
+    private let providerPingScheduleCalculator = ProviderPingScheduleCalculator()
     private var statusTextUpdateTask: Task<Void, Never>?
     private var antiSleepStatusCancellable: AnyCancellable?
     private var childObservers = Set<AnyCancellable>()
@@ -85,6 +89,7 @@ final class AppViewModel: ObservableObject {
         didSet {
             saveAccountConfigs()
             WidgetDataManager.shared.saveEnabledProviders(enabledProviders)
+            rescheduleProviderPing()
         }
     }
     @Published var providerAccounts: [ProviderAccount] {
@@ -103,6 +108,12 @@ final class AppViewModel: ObservableObject {
                     .values
                     .map { $0 }
             )
+        }
+    }
+    @Published var providerPingConfigs: [ProviderPingConfig] = UserDefaultsProviderPingSettingsStore.defaultConfigs {
+        didSet {
+            providerPingSettingsStore.saveProviderPingConfigs(providerPingConfigs)
+            rescheduleProviderPing()
         }
     }
 
@@ -131,7 +142,7 @@ final class AppViewModel: ObservableObject {
     func hasAuthenticatedSession(for provider: QuotaProvider) -> Bool {
         switch provider {
         case .glm:
-            return credentials?.token.isEmpty == false
+            return effectiveGLMCredentials != nil
         case .openai:
             let token = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey)
             return token?.isEmpty == false
@@ -226,6 +237,9 @@ final class AppViewModel: ObservableObject {
         if provider == .mimo {
             updateMimoCookieRenewalTimer()
         }
+        if provider == .glm {
+            rescheduleProviderPing(checkMissed: isEnabled)
+        }
     }
 
     func updateProviderAccountEnabled(id accountID: String, isEnabled: Bool) {
@@ -236,6 +250,9 @@ final class AppViewModel: ObservableObject {
         updateStatusText()
         if providerAccounts[index].provider == .mimo {
             updateMimoCookieRenewalTimer()
+        }
+        if providerAccounts[index].provider == .glm {
+            rescheduleProviderPing(checkMissed: isEnabled)
         }
     }
 
@@ -351,6 +368,7 @@ final class AppViewModel: ObservableObject {
         )
         providerAccounts = loadedAccounts
         accountConfigs = configs
+        providerPingConfigs = providerPingSettingsStore.loadProviderPingConfigs()
         WidgetDataManager.shared.saveEnabledProviders(
             configs
                 .filter(\.isEnabled)
@@ -369,7 +387,16 @@ final class AppViewModel: ObservableObject {
         notificationExhaustedEnabled = UserDefaults.standard.bool(forKey: Constants.Defaults.notificationExhaustedEnabledKey)
         notificationResetEnabled = UserDefaults.standard.bool(forKey: Constants.Defaults.notificationResetEnabledKey)
         if let saved = authService.credentials {
-            credentials = saved
+            if saved.cookieString.isEmpty {
+                KeychainService.shared.save(
+                    key: DevBarCoreConstants.Keychain.glmAPIKeyKey,
+                    value: BigModelAPIClient.normalizedBearerToken(saved.token)
+                )
+                authService.logout()
+                credentials = nil
+            } else {
+                credentials = saved
+            }
             quotaViewModel.isLoading = true
         }
         syncAuthState()
@@ -387,12 +414,22 @@ final class AppViewModel: ObservableObject {
                 }
             }
         antiSleepService.setEnabled(antiSleepEnabled)
+        providerPingScheduler.onFire = { [weak self] in
+            Task { @MainActor in
+                await self?.runAutomaticProviderPingIfNeeded()
+            }
+        }
+        providerPingScheduler.onWake = { [weak self] in
+            Task { @MainActor in
+                await self?.runAutomaticProviderPingIfNeeded()
+            }
+        }
 
         if hasAuthenticatedSession(for: .glm) {
             Task { @MainActor [weak self] in
                 await Task.yield()
                 guard let self else { return }
-                await self.quotaViewModel.loadInitialData(credentials: self.credentials)
+                await self.quotaViewModel.loadInitialData(credentials: self.effectiveGLMCredentials)
                 self.updateStatusText(after: .milliseconds(200))
                 self.checkAndNotify()
                 self.startRefreshIfNeeded()
@@ -486,12 +523,15 @@ final class AppViewModel: ObservableObject {
                 }
             }
         }
+
+        rescheduleProviderPing(checkMissed: true)
     }
 
     private static func providersWithLegacyStoredCredentials() -> Set<QuotaProvider> {
         var providers: Set<QuotaProvider> = []
         let keychain = KeychainService.shared
-        if keychain.load(key: DevBarCoreConstants.Keychain.tokenKey)?.isEmpty == false {
+        if keychain.load(key: DevBarCoreConstants.Keychain.tokenKey)?.isEmpty == false ||
+            keychain.load(key: DevBarCoreConstants.Keychain.glmAPIKeyKey)?.isEmpty == false {
             providers.insert(.glm)
         }
         if keychain.load(key: DevBarCoreConstants.Keychain.openAIAccessTokenKey)?.isEmpty == false {
@@ -532,6 +572,24 @@ final class AppViewModel: ObservableObject {
         } else {
             providerAccounts.append(account)
         }
+    }
+
+    func moveProviderAccount(id accountID: String, to targetAccountID: String) {
+        guard accountID != targetAccountID else { return }
+
+        var accounts = providerAccounts.sorted { $0.order < $1.order }
+        guard let fromIndex = accounts.firstIndex(where: { $0.id == accountID }),
+              let toIndex = accounts.firstIndex(where: { $0.id == targetAccountID }) else {
+            return
+        }
+
+        let moving = accounts.remove(at: fromIndex)
+        accounts.insert(moving, at: toIndex)
+        for index in accounts.indices {
+            accounts[index].order = index
+            accounts[index].updatedAt = Date()
+        }
+        providerAccounts = accounts
     }
 
     private func normalizeProviderAccountOrders() {
@@ -862,6 +920,7 @@ final class AppViewModel: ObservableObject {
                 targetDeviceId: targetDeviceId,
                 requestId: requestId,
                 screenLocked: MacScreenLockStateProvider.isScreenLocked(),
+                displayAwake: MacDisplayStateProvider.isDisplayAwake(),
                 deviceName: Self.currentDeviceName
             )
         } catch {
@@ -927,6 +986,7 @@ final class AppViewModel: ObservableObject {
             quotaViewModel.resetForLogout()
             credentials = nil
             authService.logout()
+            KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.glmAPIKeyKey)
         case .openai:
             openAIQuotaViewModel.resetForLogout()
             KeychainService.shared.delete(key: Constants.Keychain.openAIAccessTokenKey)
@@ -947,11 +1007,14 @@ final class AppViewModel: ObservableObject {
             }
         }
         refreshAuthenticationState()
+        if provider == .glm {
+            rescheduleProviderPing()
+        }
     }
 
     func makeTransferPayload(expirationInterval: TimeInterval = 300) -> TransferPayload {
         let exportedAt = Date()
-        let glmCredentials = credentials.map {
+        let glmCredentials = effectiveGLMCredentials.map {
             ProviderTransferCredentials(token: $0.token, cookieString: $0.cookieString)
         }
         let openAIToken = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey)
@@ -1066,8 +1129,8 @@ final class AppViewModel: ObservableObject {
     }
 
     func refreshQuota(silent: Bool = false) async {
-        if isProviderEnabled(.glm), hasAuthenticatedSession(for: .glm) {
-            await quotaViewModel.fetchQuota(credentials: credentials, silent: silent)
+        if isProviderEnabled(.glm), let glmCredentials = effectiveGLMCredentials {
+            await quotaViewModel.fetchQuota(credentials: glmCredentials, silent: silent)
             await broadcastQuotaSnapshotIfPossible(for: .glm)
             updateStatusText(after: .milliseconds(200))
             if quotaViewModel.errorMessage == String(localized: "login_expired") {
@@ -1334,6 +1397,7 @@ final class AppViewModel: ObservableObject {
                 level: openAIQuotaViewModel.planType,
                 subscriptionName: nil,
                 subscriptionExpireDate: nil,
+                availableResetCount: openAIQuotaViewModel.availableResetCount,
                 sourceDeviceID: deviceRelayManager.localDeviceID
             )
         case .mimo:
@@ -1381,10 +1445,10 @@ final class AppViewModel: ObservableObject {
     /// Start refresh if not already running (prevents duplicate timers)
     func startRefreshIfNeeded() {
         guard refreshInterval > 0 else { return } // Don't start if "Never"
-        guard hasAuthenticatedSession(for: .glm) else { return }
-        print("[DevBar] ⑦ startRefreshIfNeeded, hasCredentials=\(credentials != nil)")
+        guard let glmCredentials = effectiveGLMCredentials else { return }
+        print("[DevBar] ⑦ startRefreshIfNeeded, hasCredentials=\(glmCredentials.token.isEmpty == false)")
         quotaViewModel.startAutoRefresh(
-            credentials: credentials,
+            credentials: glmCredentials,
             interval: refreshInterval,
             onFetchComplete: { [weak self] in
                 self?.updateStatusText(after: .milliseconds(200))
@@ -1432,6 +1496,152 @@ final class AppViewModel: ObservableObject {
 
     func stopAutoRefresh() {
         quotaViewModel.stopAutoRefresh()
+    }
+
+    var glmAPIKeyForModelCall: String? {
+        if let key = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.glmAPIKeyKey) {
+            let normalized = BigModelAPIClient.normalizedBearerToken(key)
+            if !normalized.isEmpty {
+                return normalized
+            }
+        }
+
+        guard let account = providerAccounts.first(where: { $0.provider == .glm }),
+              let credential = KeychainService.shared.loadProviderCredential(for: account),
+              credential.cookieString?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+              let token = credential.token else {
+            return nil
+        }
+
+        let normalized = BigModelAPIClient.normalizedBearerToken(token)
+        return normalized.isEmpty ? nil : normalized
+    }
+
+    var effectiveGLMCredentials: AuthCredentials? {
+        if let credentials,
+           !credentials.token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           !credentials.cookieString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return credentials
+        }
+
+        guard let glmAPIKeyForModelCall else { return nil }
+        return AuthCredentials(token: glmAPIKeyForModelCall, cookieString: "")
+    }
+
+    func saveGLMAPIKey(_ rawValue: String) {
+        let normalized = BigModelAPIClient.normalizedBearerToken(rawValue)
+        guard !normalized.isEmpty else { return }
+
+        KeychainService.shared.save(key: DevBarCoreConstants.Keychain.glmAPIKeyKey, value: normalized)
+        authService.logout()
+        credentials = nil
+        upsertCredentialForPrimaryAccount(
+            provider: .glm,
+            token: normalized,
+            cookieString: nil,
+            accountIdentifier: nil
+        )
+        if !isProviderEnabled(.glm) {
+            updateAccountConfig(provider: .glm, isEnabled: true)
+        }
+        refreshAuthenticationState()
+        startRefreshIfNeeded()
+        rescheduleProviderPing(checkMissed: true)
+    }
+
+    func providerPingConfig(for provider: QuotaProvider) -> ProviderPingConfig {
+        providerPingConfigs.first(where: { $0.provider == provider }) ?? .defaultGLM
+    }
+
+    func updateProviderPingConfig(_ config: ProviderPingConfig) {
+        if let index = providerPingConfigs.firstIndex(where: { $0.provider == config.provider }) {
+            providerPingConfigs[index] = config
+        } else {
+            providerPingConfigs.append(config)
+        }
+    }
+
+    func testProviderPing(_ provider: QuotaProvider) async throws {
+        guard provider == .glm, let apiKey = glmAPIKeyForModelCall else {
+            throw APIError.notLoggedIn
+        }
+
+        do {
+            try await providerPingAPIClient.sendPing(apiKey: apiKey)
+            recordProviderPingResult(provider: provider, automatic: false, errorMessage: nil)
+        } catch {
+            recordProviderPingResult(
+                provider: provider,
+                automatic: false,
+                errorMessage: sanitizedPingErrorMessage(error)
+            )
+            throw error
+        }
+    }
+
+    private func runAutomaticProviderPingIfNeeded() async {
+        let config = providerPingConfig(for: .glm)
+        defer { rescheduleProviderPing() }
+
+        guard providerPingScheduleCalculator.shouldRunAutomaticPing(for: config, now: Date()),
+              isProviderEnabled(.glm),
+              let apiKey = glmAPIKeyForModelCall else {
+            return
+        }
+
+        do {
+            try await providerPingAPIClient.sendPing(apiKey: apiKey)
+            recordProviderPingResult(provider: .glm, automatic: true, errorMessage: nil)
+        } catch {
+            recordProviderPingResult(
+                provider: .glm,
+                automatic: true,
+                errorMessage: sanitizedPingErrorMessage(error)
+            )
+        }
+    }
+
+    private func recordProviderPingResult(provider: QuotaProvider, automatic: Bool, errorMessage: String?) {
+        var config = providerPingConfig(for: provider)
+        let now = Date()
+        if automatic {
+            config.lastAutomaticRunDay = providerPingScheduleCalculator.todayKey(now: now)
+            config.lastAutomaticRunAt = now
+        } else {
+            config.lastTestAt = now
+        }
+
+        if let errorMessage {
+            config.lastErrorMessage = errorMessage
+        } else {
+            config.lastSuccessAt = now
+            config.lastErrorMessage = nil
+        }
+        updateProviderPingConfig(config)
+    }
+
+    private func rescheduleProviderPing(checkMissed: Bool = false) {
+        guard let config = providerPingConfigs.first(where: { $0.provider == .glm }),
+              config.isEnabled,
+              isProviderEnabled(.glm),
+              glmAPIKeyForModelCall != nil else {
+            providerPingScheduler.stop()
+            return
+        }
+
+        providerPingScheduler.schedule(config: config)
+        if checkMissed {
+            Task { @MainActor [weak self] in
+                await self?.runAutomaticProviderPingIfNeeded()
+            }
+        }
+    }
+
+    private func sanitizedPingErrorMessage(_ error: Error) -> String {
+        if let apiError = error as? APIError {
+            return apiError.errorDescription ?? String(describing: apiError)
+        }
+        return error.localizedDescription
     }
 
     private var selectedRefreshProvider: QuotaProvider {

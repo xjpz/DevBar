@@ -13,18 +13,20 @@ struct QuotaTimelineProvider: AppIntentTimelineProvider {
     }
 
     func snapshot(for configuration: ConfigurationAppIntent, in context: Context) async -> QuotaEntry {
-        let data = Self.loadSharedData(for: configuration.provider) ?? .placeholder
+        let resolved = Self.resolvedSharedData(for: configuration.provider)
+        let data = resolved.data
         let isLoggedIn = data.lastUpdated != .distantPast
         return QuotaEntry(
             data: data,
-            selectedProvider: configuration.provider,
+            selectedProvider: resolved.provider,
             isLoggedIn: isLoggedIn,
             date: Date()
         )
     }
 
     func timeline(for configuration: ConfigurationAppIntent, in context: Context) async -> Timeline<QuotaEntry> {
-        let data = Self.loadSharedData(for: configuration.provider) ?? .placeholder
+        let resolved = Self.resolvedSharedData(for: configuration.provider)
+        let data = resolved.data
         let isLoggedIn = data.lastUpdated != .distantPast
         let now = Date()
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: now)!
@@ -32,7 +34,7 @@ struct QuotaTimelineProvider: AppIntentTimelineProvider {
         var entries = [
             QuotaEntry(
                 data: data,
-                selectedProvider: configuration.provider,
+                selectedProvider: resolved.provider,
                 isLoggedIn: isLoggedIn,
                 date: now
             )
@@ -48,7 +50,7 @@ struct QuotaTimelineProvider: AppIntentTimelineProvider {
             entries.append(
                 QuotaEntry(
                     data: data,
-                    selectedProvider: configuration.provider,
+                    selectedProvider: resolved.provider,
                     isLoggedIn: isLoggedIn,
                     date: resetTime
                 )
@@ -56,6 +58,22 @@ struct QuotaTimelineProvider: AppIntentTimelineProvider {
         }
 
         return Timeline(entries: entries, policy: .after(nextUpdate))
+    }
+
+    private static func resolvedSharedData(for selectedProvider: WidgetProviderSelection) -> (data: WidgetSharedData, provider: WidgetProviderSelection) {
+        if let selectedData = loadSharedData(for: selectedProvider),
+           selectedData.lastUpdated != .distantPast {
+            return (selectedData, selectedProvider)
+        }
+
+        let fallbackProviders = WidgetProviderSelection.enabledSelectionsFromAppGroup + WidgetProviderSelection.allCases
+        for provider in fallbackProviders where provider != selectedProvider {
+            if let data = loadSharedData(for: provider), data.lastUpdated != .distantPast {
+                return (data, provider)
+            }
+        }
+
+        return (.placeholder, selectedProvider)
     }
 
     static func loadSharedData(for provider: WidgetProviderSelection) -> WidgetSharedData? {
@@ -66,7 +84,7 @@ struct QuotaTimelineProvider: AppIntentTimelineProvider {
         guard let decoded = try? JSONDecoder().decode(WidgetSharedData.self, from: raw) else {
             return nil
         }
-        guard decoded.schemaVersion == WidgetSharedData.currentSchemaVersion else {
+        guard decoded.schemaVersion <= WidgetSharedData.currentSchemaVersion else {
             return nil
         }
         return decoded
@@ -152,6 +170,8 @@ struct DevBarWidgetEntryView: View {
                 title: providerTitle,
                 limits: entry.data.limits,
                 level: entry.data.level,
+                availableResetCount: entry.data.availableResetCount,
+                provider: entry.data.provider,
                 visualStyle: visualStyle
             )
         case .systemMedium:
@@ -162,6 +182,7 @@ struct DevBarWidgetEntryView: View {
                 subscriptionName: entry.data.subscriptionName,
                 subscriptionPrice: entry.data.subscriptionPrice,
                 subscriptionExpireDate: entry.data.subscriptionExpireDate,
+                availableResetCount: entry.data.availableResetCount,
                 lastUpdated: entry.data.lastUpdated,
                 visualStyle: visualStyle
             )
@@ -170,6 +191,7 @@ struct DevBarWidgetEntryView: View {
                 limits: entry.data.limits,
                 level: entry.data.level,
                 subscriptionName: entry.data.subscriptionName,
+                availableResetCount: entry.data.availableResetCount,
                 lastUpdated: entry.data.lastUpdated,
                 visualStyle: visualStyle
             )
@@ -181,6 +203,7 @@ struct DevBarWidgetEntryView: View {
                 subscriptionName: entry.data.subscriptionName,
                 subscriptionPrice: entry.data.subscriptionPrice,
                 subscriptionExpireDate: entry.data.subscriptionExpireDate,
+                availableResetCount: entry.data.availableResetCount,
                 lastUpdated: entry.data.lastUpdated,
                 visualStyle: visualStyle
             )

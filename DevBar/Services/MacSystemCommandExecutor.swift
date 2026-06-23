@@ -94,9 +94,13 @@ enum MacSystemCommandError: LocalizedError {
             return "\(executablePath) exited \(status)"
         case let .unavailable(command, errors):
             guard !errors.isEmpty else {
-                return "没有可用的 \(command) 命令"
+                return String(format: String(localized: "没有可用的 %@ 命令"), command)
             }
-            return "\(command) 命令均失败：\(errors.joined(separator: "；"))"
+            return String(
+                format: String(localized: "%@ 命令均失败：%@"),
+                command,
+                errors.joined(separator: "; ")
+            )
         }
     }
 }

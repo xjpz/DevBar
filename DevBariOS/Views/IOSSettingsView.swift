@@ -63,20 +63,20 @@ struct IOSSettingsView: View {
                 .accessibilityIdentifier("ios.settings.timeFormat")
             }
 
-            Section("AI 额度") {
+            Section("ios_settings_ai_quota_section") {
                 Picker(selection: $appViewModel.refreshInterval) {
                     ForEach(intervals, id: \.1) { label, value in
                         Text(label).tag(value)
                     }
                 } label: {
-                    Label("额度自动刷新间隔", systemImage: "arrow.clockwise")
+                    Label("ios_settings_auto_refresh_interval", systemImage: "arrow.clockwise")
                 }
                 .accessibilityIdentifier("ios.settings.refreshInterval")
             }
 
-            Section("设备与系统表面") {
+            Section("ios_settings_device_system_section") {
                 settingsLink(
-                    title: "设备与小组件",
+                    title: localized("ios_settings_device_widget_section"),
                     systemImage: "iphone.and.arrow.forward",
                     summary: deviceWidgetSummary
                 ) {
@@ -84,7 +84,7 @@ struct IOSSettingsView: View {
                 }
 
                 settingsLink(
-                    title: "灵动岛",
+                    title: localized("ios_settings_live_activity_title"),
                     systemImage: "iphone.radiowaves.left.and.right",
                     summary: liveActivitySummary
                 ) {
@@ -92,7 +92,7 @@ struct IOSSettingsView: View {
                 }
 
                 settingsLink(
-                    title: String(localized: "ios_settings_home_shortcuts_section", defaultValue: "桌面快捷方式"),
+                    title: localized("ios_settings_home_shortcuts_section"),
                     systemImage: "square.grid.2x2",
                     summary: homeScreenShortcutSummary
                 ) {
@@ -100,9 +100,9 @@ struct IOSSettingsView: View {
                 }
             }
 
-            Section("通知与远程触达") {
+            Section("ios_settings_notifications_section") {
                 settingsLink(
-                    title: "推送通知",
+                    title: localized("ios_settings_push_notifications_section"),
                     systemImage: "bell",
                     summary: pushNotificationSummary
                 ) {
@@ -110,7 +110,7 @@ struct IOSSettingsView: View {
                 }
 
                 settingsLink(
-                    title: "一句话上岛",
+                    title: localized("ios_settings_live_message_section"),
                     systemImage: "quote.bubble",
                     summary: appViewModel.devBarLiveMessageStatus.title
                 ) {
@@ -118,7 +118,7 @@ struct IOSSettingsView: View {
                 }
 
                 settingsLink(
-                    title: String(localized: "ios_settings_greeting_section", defaultValue: "问候语"),
+                    title: localized("ios_settings_greeting_section"),
                     systemImage: "quote.opening",
                     summary: greetingPreviewText
                 ) {
@@ -145,7 +145,7 @@ struct IOSSettingsView: View {
             } header: {
                 Text("ios_settings_about_section")
             } footer: {
-                Text("鄂ICP备2021013794号-4A")
+                Text("ios_settings_icp_record")
                     .font(.footnote)
                     .foregroundStyle(theme.textTertiary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -183,7 +183,9 @@ struct IOSSettingsView: View {
     }
 
     private var deviceWidgetSummary: String {
-        let avatarText = appViewModel.macThemeWidgetAvatarFileName == nil ? "头像未设置" : "头像已设置"
+        let avatarText = appViewModel.macThemeWidgetAvatarFileName == nil
+            ? localized("ios_settings_avatar_not_set")
+            : localized("ios_settings_avatar_set")
         return "\(appViewModel.relayDeviceName) / \(avatarText)"
     }
 
@@ -193,20 +195,24 @@ struct IOSSettingsView: View {
             DevBarCoreConstants.Features.agentWatcherEnabled && appViewModel.pushNotificationPreferences.agentWatcherEnabled,
             appViewModel.pushNotificationPreferences.summaryEnabled,
         ].filter { $0 }.count
-        return enabledCount == 0 ? "未开启" : "已开启 \(enabledCount) 项"
+        return enabledCount == 0
+            ? localized("ios_settings_not_enabled")
+            : String(format: localized("ios_settings_enabled_items_format"), enabledCount)
     }
 
     private var homeScreenShortcutSummary: String {
         let count = appViewModel.selectedHomeScreenShortcutActions.count
-        return count == 0 ? "未启用" : "已启用 \(count) 个"
+        return count == 0
+            ? localized("ios_settings_not_enabled")
+            : String(format: localized("ios_settings_enabled_count_format"), count)
     }
 
     private var liveActivitySummary: String {
         guard appViewModel.liveActivitySettings.isEnabled else {
-            return "未启用"
+            return localized("ios_settings_not_enabled")
         }
         guard appViewModel.liveActivitySettings.isValidTimeRange else {
-            return "时间范围需调整"
+            return localized("ios_settings_time_range_needs_adjustment")
         }
         return String(
             format: "%02d:%02d-%02d:%02d",
@@ -251,19 +257,19 @@ struct IOSSettingsView: View {
 
         return [
             IOSSettingsDebugInfoItem(title: "App Version", value: appVersionText),
-            IOSSettingsDebugInfoItem(title: "Bundle ID", value: Bundle.main.bundleIdentifier ?? "未获取"),
+            IOSSettingsDebugInfoItem(title: "Bundle ID", value: Bundle.main.bundleIdentifier ?? localized("ios_settings_debug_not_available")),
             IOSSettingsDebugInfoItem(title: "Relay API", value: DevBarCoreConstants.DeviceRelay.baseURL),
-            IOSSettingsDebugInfoItem(title: "Relay Device ID", value: relayManager.localDeviceID ?? "未注册"),
-            IOSSettingsDebugInfoItem(title: "Relay Device Token", value: relayManager.deviceToken ?? "未注册"),
+            IOSSettingsDebugInfoItem(title: "Relay Device ID", value: relayManager.localDeviceID ?? localized("ios_settings_debug_not_registered")),
+            IOSSettingsDebugInfoItem(title: "Relay Device Token", value: relayManager.deviceToken ?? localized("ios_settings_debug_not_registered")),
             IOSSettingsDebugInfoItem(title: "Relay State", value: relayConnectionStateText(relayManager.connectionState)),
             IOSSettingsDebugInfoItem(title: "Relay Transport", value: relayManager.activeTransport.rawValue),
             IOSSettingsDebugInfoItem(title: "Push Environment", value: IOSPushNotificationCoordinator.pushEnvironment.rawValue),
-            IOSSettingsDebugInfoItem(title: "APNs Token", value: pushDebug.apnsToken ?? "未注册"),
-            IOSSettingsDebugInfoItem(title: "Live Activity Push-to-Start Token", value: pushDebug.liveActivityPushToStartToken ?? "未获取"),
-            IOSSettingsDebugInfoItem(title: "Last Push Registration", value: pushDebug.lastPushRegistration ?? "未同步"),
-            IOSSettingsDebugInfoItem(title: "Last Live Activity Push-to-Start Registration", value: pushDebug.lastLiveActivityPushToStartRegistration ?? "未同步"),
-            IOSSettingsDebugInfoItem(title: "Paired Devices", value: peers.isEmpty ? "无" : peers),
-            IOSSettingsDebugInfoItem(title: "Last Relay Error", value: relayManager.lastErrorMessage ?? "无"),
+            IOSSettingsDebugInfoItem(title: "APNs Token", value: pushDebug.apnsToken ?? localized("ios_settings_debug_not_registered")),
+            IOSSettingsDebugInfoItem(title: "Live Activity Push-to-Start Token", value: pushDebug.liveActivityPushToStartToken ?? localized("ios_settings_debug_not_available")),
+            IOSSettingsDebugInfoItem(title: "Last Push Registration", value: pushDebug.lastPushRegistration ?? localized("ios_settings_debug_not_synced")),
+            IOSSettingsDebugInfoItem(title: "Last Live Activity Push-to-Start Registration", value: pushDebug.lastLiveActivityPushToStartRegistration ?? localized("ios_settings_debug_not_synced")),
+            IOSSettingsDebugInfoItem(title: "Paired Devices", value: peers.isEmpty ? localized("ios_settings_debug_none") : peers),
+            IOSSettingsDebugInfoItem(title: "Last Relay Error", value: relayManager.lastErrorMessage ?? localized("ios_settings_debug_none")),
         ]
     }
 
@@ -298,6 +304,10 @@ struct IOSSettingsView: View {
             return "failed: \(message)"
         }
     }
+
+    private func localized(_ key: String.LocalizationValue) -> String {
+        String(localized: key, locale: languageManager.currentLocale)
+    }
 }
 
 private struct IOSSettingsLinkLabel: View {
@@ -330,6 +340,7 @@ private struct IOSSettingsLinkLabel: View {
 @MainActor
 private struct IOSDeviceWidgetSettingsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
+    @EnvironmentObject private var languageManager: IOSLanguageManager
     @Environment(\.themeTokens) private var theme
     @State private var selectedMacThemeAvatarItem: PhotosPickerItem?
     @State private var macThemeAvatarErrorMessage: String?
@@ -338,25 +349,25 @@ private struct IOSDeviceWidgetSettingsView: View {
         Form {
             Section {
                 IOSIconTextFieldRow(
-                    title: "iPhone 名称",
+                    title: localized("ios_settings_relay_device_name"),
                     systemImage: "iphone",
                     text: $appViewModel.relayDeviceName,
                     accessibilityIdentifier: "ios.settings.relayDeviceName"
                 )
 
                 IOSIconTextFieldRow(
-                    title: "用户名称",
+                    title: localized("ios_settings_user_name"),
                     systemImage: "person.text.rectangle",
                     text: $appViewModel.macThemeWidgetUserName,
                     accessibilityIdentifier: "ios.settings.macThemeWidgetUserName"
                 )
             } footer: {
-                Text("这些信息会用于 Mac 主题小组件和 Relay 设备识别。")
+                Text("ios_settings_device_widget_footer")
             }
 
             Section {
                 PhotosPicker(selection: $selectedMacThemeAvatarItem, matching: .images) {
-                    Label("选择头像", systemImage: "photo.on.rectangle")
+                    Label("ios_settings_select_avatar", systemImage: "photo.on.rectangle")
                 }
                 .accessibilityIdentifier("ios.settings.macThemeWidgetAvatar")
 
@@ -364,7 +375,7 @@ private struct IOSDeviceWidgetSettingsView: View {
                     Button(role: .destructive) {
                         appViewModel.clearMacThemeWidgetAvatar()
                     } label: {
-                        Label("移除头像", systemImage: "trash")
+                        Label("ios_settings_remove_avatar", systemImage: "trash")
                     }
                 }
 
@@ -384,7 +395,7 @@ private struct IOSDeviceWidgetSettingsView: View {
         .scrollContentBackground(.hidden)
         .iosGeekScreenBackground(theme)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .navigationTitle("设备与小组件")
+        .navigationTitle("ios_settings_device_widget_section")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("ios.settings.deviceWidget.screen")
         .onChange(of: selectedMacThemeAvatarItem) { _, item in
@@ -394,17 +405,21 @@ private struct IOSDeviceWidgetSettingsView: View {
                 guard let data = try? await item.loadTransferable(type: Data.self),
                       let image = UIImage(data: data),
                       let avatarData = Self.macThemeWidgetAvatarData(from: image) else {
-                    macThemeAvatarErrorMessage = "头像处理失败，请重试。"
+                    macThemeAvatarErrorMessage = localized("ios_settings_avatar_processing_failed")
                     return
                 }
                 do {
                     try appViewModel.saveMacThemeWidgetAvatarData(avatarData)
                     macThemeAvatarErrorMessage = nil
                 } catch {
-                    macThemeAvatarErrorMessage = "头像保存失败，请重试。"
+                    macThemeAvatarErrorMessage = localized("ios_settings_avatar_save_failed")
                 }
             }
         }
+    }
+
+    private func localized(_ key: String.LocalizationValue) -> String {
+        String(localized: key, locale: languageManager.currentLocale)
     }
 
     private static func macThemeWidgetAvatarData(from image: UIImage) -> Data? {
@@ -435,27 +450,28 @@ private struct IOSDeviceWidgetSettingsView: View {
 
 private struct IOSPushSettingsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
+    @EnvironmentObject private var languageManager: IOSLanguageManager
     @Environment(\.themeTokens) private var theme
 
     var body: some View {
         Form {
             Section {
                 Toggle(isOn: $appViewModel.pushNotificationPreferences.pushEnabled) {
-                    Label("允许离线推送", systemImage: "bell.badge")
+                    Label("ios_settings_push_allow_offline", systemImage: "bell.badge")
                 }
 
                 if DevBarCoreConstants.Features.agentWatcherEnabled {
                     Toggle(isOn: $appViewModel.pushNotificationPreferences.agentWatcherEnabled) {
-                        Label("Agent Watcher 通知", systemImage: "terminal")
+                        Label("ios_settings_agent_watcher_notifications", systemImage: "terminal")
                     }
                 }
 
                 Toggle(isOn: $appViewModel.pushNotificationPreferences.summaryEnabled) {
-                    Label("高频事件摘要", systemImage: "list.bullet.rectangle")
+                    Label("ios_settings_high_frequency_summary", systemImage: "list.bullet.rectangle")
                 }
 
                 IOSIconTextFieldRow(
-                    title: "HTTPS 图标 URL",
+                    title: localized("ios_settings_https_icon_url"),
                     systemImage: "link",
                     text: pushIconURLBinding,
                     keyboardType: .URL,
@@ -465,13 +481,13 @@ private struct IOSPushSettingsView: View {
                 .disabled(!appViewModel.pushNotificationPreferences.pushEnabled)
                 .opacity(appViewModel.pushNotificationPreferences.pushEnabled ? 1 : 0.55)
             } footer: {
-                Text("离线通知使用已绑定 Relay iPhone；图标仅支持 HTTPS URL。")
+                Text("ios_settings_push_footer")
             }
         }
         .scrollContentBackground(.hidden)
         .iosGeekScreenBackground(theme)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .navigationTitle("推送通知")
+        .navigationTitle("ios_settings_push_notifications_section")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("ios.settings.push.screen")
     }
@@ -484,10 +500,15 @@ private struct IOSPushSettingsView: View {
             appViewModel.pushNotificationPreferences.iconUrl = trimmed.isEmpty ? nil : trimmed
         }
     }
+
+    private func localized(_ key: String.LocalizationValue) -> String {
+        String(localized: key, locale: languageManager.currentLocale)
+    }
 }
 
 private struct IOSLiveMessageSettingsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
+    @EnvironmentObject private var languageManager: IOSLanguageManager
     @Environment(\.themeTokens) private var theme
 
     var body: some View {
@@ -497,7 +518,7 @@ private struct IOSLiveMessageSettingsView: View {
                     Text(appViewModel.devBarLiveMessageStatus.title)
                         .foregroundStyle(devBarLiveMessageStatusColor)
                 } label: {
-                    Label("一句话上岛", systemImage: "quote.bubble")
+                    Label("ios_settings_live_message_section", systemImage: "quote.bubble")
                 }
 
                 Text(appViewModel.devBarLiveMessageStatus.detail)
@@ -511,7 +532,7 @@ private struct IOSLiveMessageSettingsView: View {
                         .foregroundStyle(theme.brandPrimary)
                         .frame(width: 24)
 
-                    TextField("输入要显示在灵动岛的一句文案", text: $appViewModel.devBarLiveMessageDraft, axis: .vertical)
+                    TextField(localized("ios_settings_live_message_placeholder"), text: $appViewModel.devBarLiveMessageDraft, axis: .vertical)
                         .lineLimit(1...3)
                         .textInputAutocapitalization(.sentences)
                         .autocorrectionDisabled(false)
@@ -525,7 +546,7 @@ private struct IOSLiveMessageSettingsView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "sparkles")
                                 .font(.body.weight(.semibold))
-                            Text("上岛")
+                            Text("ios_settings_live_message_start")
                         }
                         .frame(minWidth: 72)
                     }
@@ -535,7 +556,7 @@ private struct IOSLiveMessageSettingsView: View {
                     Button(role: .destructive) {
                         Task { await appViewModel.disableDevBarLiveMessageIsland() }
                     } label: {
-                        Label("结束", systemImage: "xmark.circle")
+                        Label("ios_settings_live_message_end", systemImage: "xmark.circle")
                     }
                     .buttonStyle(.bordered)
                     .disabled(!canDisableDevBarLiveMessage)
@@ -545,7 +566,7 @@ private struct IOSLiveMessageSettingsView: View {
         .scrollContentBackground(.hidden)
         .iosGeekScreenBackground(theme)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .navigationTitle("一句话上岛")
+        .navigationTitle("ios_settings_live_message_section")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("ios.settings.liveMessage.screen")
     }
@@ -580,6 +601,10 @@ private struct IOSLiveMessageSettingsView: View {
         case .notReady:
             theme.textTertiary
         }
+    }
+
+    private func localized(_ key: String.LocalizationValue) -> String {
+        String(localized: key, locale: languageManager.currentLocale)
     }
 }
 
@@ -676,7 +701,7 @@ private struct IOSLiveActivitySettingsView: View {
         .scrollContentBackground(.hidden)
         .iosGeekScreenBackground(theme)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .navigationTitle("灵动岛")
+        .navigationTitle("ios_settings_live_activity_title")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("ios.settings.liveActivity.screen")
     }
@@ -822,14 +847,14 @@ private struct IOSSettingsDebugInfoSheet: View {
                         .buttonStyle(.plain)
                     }
                 } footer: {
-                    Text("点击任意值复制到剪贴板。")
+                    Text("ios_settings_debug_copy_hint")
                 }
             }
-            .navigationTitle("调试信息")
+            .navigationTitle("ios_settings_debug_title")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") {
+                    Button("ios_common_done") {
                         dismiss()
                     }
                 }

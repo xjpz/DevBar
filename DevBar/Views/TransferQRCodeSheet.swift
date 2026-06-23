@@ -82,20 +82,23 @@ struct TransferQRCodeSheet: View {
     private var expirationText: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .full
-        return "过期时间：\(formatter.localizedString(for: payload.expiresAt, relativeTo: Date()))"
+        return String(
+            format: String(localized: "过期时间：%@"),
+            formatter.localizedString(for: payload.expiresAt, relativeTo: Date())
+        )
     }
 
     private var providerSummaryText: String {
         let names = payload.importedProviders.map(\.localizedName).joined(separator: " / ")
-        return "包含 Provider：\(names)"
+        return String(format: String(localized: "包含 Provider：%@"), names)
     }
 
     private var modeText: String {
         switch mode {
         case .direct:
-            return "离线二维码"
+            return String(localized: "离线二维码")
         case .relay:
-            return "安全中继二维码"
+            return String(localized: "安全中继二维码")
         }
     }
 

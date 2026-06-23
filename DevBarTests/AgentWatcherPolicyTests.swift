@@ -47,6 +47,34 @@ struct AgentWatcherPolicyTests {
         #expect(decision.sendMacNotification)
     }
 
+    @Test func codexHookNotificationToggleSuppressesNotificationsButKeepsBadge() {
+        let settings = makeSettings()
+        settings.codexHookNotificationsEnabled = false
+
+        let decision = settings.shouldNotify(
+            for: makeEvent(source: .codexCLI),
+            userActivity: UserActivityState(isMacLocked: true, isPhonePaired: true, isPhoneOnline: true)
+        )
+
+        #expect(decision.updateMacBadge)
+        #expect(!decision.sendMacNotification)
+        #expect(!decision.sendPhoneNotification)
+    }
+
+    @Test func claudeHookNotificationToggleSuppressesNotificationsButKeepsBadge() {
+        let settings = makeSettings()
+        settings.claudeHookNotificationsEnabled = false
+
+        let decision = settings.shouldNotify(
+            for: makeEvent(source: .claudeCode),
+            userActivity: UserActivityState(isMacLocked: true, isPhonePaired: true, isPhoneOnline: true)
+        )
+
+        #expect(decision.updateMacBadge)
+        #expect(!decision.sendMacNotification)
+        #expect(!decision.sendPhoneNotification)
+    }
+
     @MainActor
     @Test func minimalRelayPayloadDoesNotContainPathOrCommand() {
         let event = AgentEvent(
@@ -83,9 +111,9 @@ struct AgentWatcherPolicyTests {
         return AgentWatcherSettings(defaults: defaults)
     }
 
-    private func makeEvent() -> AgentEvent {
+    private func makeEvent(source: AgentSource = .codexCLI) -> AgentEvent {
         AgentEvent(
-            source: .codexCLI,
+            source: source,
             eventType: .approvalRequired,
             severity: .important,
             sessionId: "session-1",

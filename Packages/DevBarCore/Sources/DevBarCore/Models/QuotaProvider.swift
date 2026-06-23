@@ -29,7 +29,7 @@ public enum QuotaProvider: String, CaseIterable, Codable, Sendable {
         switch self {
         case .glm: return "GLM"
         case .openai: return "OpenAI"
-        case .mimo: return "MiMO"
+        case .mimo: return "MiMo"
         case .deepseek: return "DeepSeek"
         }
     }
@@ -173,15 +173,44 @@ private extension String {
 public struct OpenAIUsageResponse: Codable, Sendable, Equatable {
     public let planType: String?
     public let rateLimit: OpenAIRateLimit?
+    public let rateLimitResetCredits: OpenAIRateLimitResetCredits?
 
     enum CodingKeys: String, CodingKey {
         case planType = "plan_type"
         case rateLimit = "rate_limit"
+        case rateLimitResetCredits = "rate_limit_reset_credits"
     }
 
-    public init(planType: String?, rateLimit: OpenAIRateLimit?) {
+    public init(
+        planType: String?,
+        rateLimit: OpenAIRateLimit?,
+        rateLimitResetCredits: OpenAIRateLimitResetCredits? = nil
+    ) {
         self.planType = planType
         self.rateLimit = rateLimit
+        self.rateLimitResetCredits = rateLimitResetCredits
+    }
+
+    public var availableResetCount: Int? {
+        rateLimitResetCredits?.availableCount
+    }
+
+    public var displayPlanType: String? {
+        Self.displayPlanType(for: planType)
+    }
+
+    public static func displayPlanType(for rawValue: String?) -> String? {
+        guard let trimmed = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else {
+            return nil
+        }
+
+        switch trimmed.lowercased() {
+        case "prolite":
+            return "Pro"
+        default:
+            return trimmed.capitalized
+        }
     }
 }
 
@@ -254,5 +283,17 @@ public struct OpenAIUsageWindow: Codable, Sendable, Equatable {
         let formatter = DateFormatter()
         formatter.dateFormat = "MM/dd HH:mm"
         return formatter.string(from: date)
+    }
+}
+
+public struct OpenAIRateLimitResetCredits: Codable, Sendable, Equatable {
+    public let availableCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case availableCount = "available_count"
+    }
+
+    public init(availableCount: Int) {
+        self.availableCount = availableCount
     }
 }

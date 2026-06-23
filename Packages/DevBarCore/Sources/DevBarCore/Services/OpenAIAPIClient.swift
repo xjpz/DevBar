@@ -25,11 +25,18 @@ public final class OpenAIAPIClient: Sendable {
             request.setValue(accountId, forHTTPHeaderField: "ChatGPT-Account-Id")
         }
 
+        print("[OpenAIAPIClient] GET \(url.absoluteString)")
+        print("[OpenAIAPIClient] Headers: Accept=application/json Authorization=<redacted> ChatGPT-Account-Id=\(accountId?.isEmpty == false ? "set" : "unset")")
+
         let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            print("[OpenAIAPIClient] Invalid response body: \(Self.responseBodyString(from: data))")
             throw APIError.invalidResponse
         }
+
+        print("[OpenAIAPIClient] Response status: \(httpResponse.statusCode)")
+        print("[OpenAIAPIClient] Response body: \(Self.responseBodyString(from: data))")
 
         switch httpResponse.statusCode {
         case 200:
@@ -45,5 +52,12 @@ public final class OpenAIAPIClient: Sendable {
         } catch {
             throw APIError.decodingError(error)
         }
+    }
+
+    private static func responseBodyString(from data: Data) -> String {
+        if let body = String(data: data, encoding: .utf8) {
+            return body
+        }
+        return "<non-utf8 body \(data.count) bytes>"
     }
 }

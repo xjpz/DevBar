@@ -319,20 +319,26 @@ private struct DesktopStyledQuotaLargeView: View {
 
     var body: some View {
         let providers = visibleProviders
-        let density = quotaDensity(for: providers.count)
+        let pageState = providerPageState(providerCount: providers.count)
+        let pageProviders = pagedProviders(from: providers, pageState: pageState)
+        let density = quotaDensity(for: pageProviders.count)
 
         VStack(alignment: .leading, spacing: 7) {
             HStack {
                 Label("AI 额度", systemImage: "chart.pie.fill")
                     .font(.headline.weight(.bold))
                 Spacer()
-                Text("DevBar")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(secondaryTextColor)
+                if pageState.pageCount > 1 {
+                    quotaPageControls(pageState: pageState)
+                } else {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(secondaryTextColor)
+                }
             }
 
             VStack(spacing: density.cardSpacing) {
-                ForEach(Array(providers.enumerated()), id: \.offset) { _, provider in
+                ForEach(Array(pageProviders.enumerated()), id: \.offset) { _, provider in
                     providerCard(provider, density: density)
                 }
             }
@@ -349,7 +355,11 @@ private struct DesktopStyledQuotaLargeView: View {
 
                 Spacer(minLength: 4)
 
-                Text("已同步 \(syncedProviderCount) 个 Provider")
+                if pageState.pageCount > 1 {
+                    Text("\(pageProviders.count) / \(providers.count) Provider")
+                } else {
+                    Text("已同步 \(syncedProviderCount) 个 Provider")
+                }
             }
             .font(.caption2.weight(.semibold))
             .foregroundStyle(secondaryTextColor)
@@ -368,7 +378,11 @@ private struct DesktopStyledQuotaLargeView: View {
     private var visibleProviders: [WidgetProviderSelection] {
         let enabledSelections = WidgetProviderSelection.enabledSelectionsFromAppGroup
         if !enabledSelections.isEmpty {
-            return Array(enabledSelections.prefix(Self.maxVisibleProviderCount))
+            let enabledWithData = enabledSelections.filter { provider in
+                guard let data = dataByProvider[provider] else { return false }
+                return data.lastUpdated != .distantPast
+            }
+            return enabledWithData.isEmpty ? enabledSelections : enabledWithData
         }
 
         let providersWithData = WidgetProviderSelection.allCases.filter { provider in
@@ -376,7 +390,54 @@ private struct DesktopStyledQuotaLargeView: View {
             return data.lastUpdated != .distantPast
         }
         let candidates = providersWithData.isEmpty ? WidgetProviderSelection.allCases : providersWithData
-        return Array(candidates.prefix(Self.maxVisibleProviderCount))
+        return candidates
+    }
+
+    private func providerPageState(providerCount: Int) -> ProviderPageState {
+        let page = WidgetProviderPageStore.currentPage(
+            for: DevBarCoreConstants.AppGroup.desktopQuotaWidgetProviderPageKey,
+            providerCount: providerCount
+        )
+        let pageCount = WidgetProviderPageStore.pageCount(for: providerCount)
+        let visibleRange = WidgetProviderPageStore.pageRange(page: page, providerCount: providerCount)
+        return ProviderPageState(page: page, pageCount: pageCount, visibleRange: visibleRange)
+    }
+
+    private func pagedProviders(
+        from providers: [WidgetProviderSelection],
+        pageState: ProviderPageState
+    ) -> [WidgetProviderSelection] {
+        let startIndex = min(max(pageState.visibleRange.lowerBound, 0), providers.count)
+        return Array(providers.dropFirst(startIndex).prefix(WidgetProviderPageStore.pageSize))
+    }
+
+    private func quotaPageControls(pageState: ProviderPageState) -> some View {
+        HStack(spacing: 5) {
+            Button(intent: SetDesktopQuotaProviderPageIntent(direction: .previous)) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 8, weight: .black))
+                    .frame(width: 20, height: 19)
+                    .background(cardBackground.opacity(pageState.canGoPrevious ? 1 : 0.45), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .foregroundStyle(secondaryTextColor.opacity(pageState.canGoPrevious ? 1 : 0.45))
+            }
+            .buttonStyle(.plain)
+
+            Text("\(pageState.page + 1)/\(pageState.pageCount)")
+                .font(.system(size: 8, weight: .black, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(secondaryTextColor)
+                .frame(minWidth: 26)
+
+            Button(intent: SetDesktopQuotaProviderPageIntent(direction: .next)) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 8, weight: .black))
+                    .frame(width: 20, height: 19)
+                    .background(cardBackground.opacity(pageState.canGoNext ? 1 : 0.45), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .foregroundStyle(secondaryTextColor.opacity(pageState.canGoNext ? 1 : 0.45))
+            }
+            .buttonStyle(.plain)
+        }
+        .accessibilityLabel("Provider 第 \(pageState.page + 1) 页，共 \(pageState.pageCount) 页")
     }
 
     private func quotaDensity(for providerCount: Int) -> QuotaCardDensity {
@@ -534,6 +595,15 @@ private struct DesktopStyledQuotaLargeView: View {
             data?.limits ?? [],
             provider: data?.provider
         ).prefix(maxCount))
+    }
+
+    private struct ProviderPageState {
+        let page: Int
+        let pageCount: Int
+        let visibleRange: Range<Int>
+
+        var canGoPrevious: Bool { page > 0 }
+        var canGoNext: Bool { page < pageCount - 1 }
     }
 
     private struct QuotaCardDensity {

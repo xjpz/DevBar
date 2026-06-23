@@ -114,7 +114,7 @@ private struct LiveActivityProviderIcon: View {
     }
 
     private var assetScale: CGFloat {
-        assetName == "MiMO" ? 1.14 : 1
+        assetName == "MiMo" ? 1.14 : 1
     }
 }
 

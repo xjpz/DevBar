@@ -18,7 +18,11 @@ public final class OpenAIQuotaViewModel: ObservableObject {
         restoreCachedState()
     }
 
-    public var planType: String? { usageResponse?.planType }
+    public var planType: String? { usageResponse?.displayPlanType }
+
+    public var availableResetCount: Int? {
+        usageResponse?.availableResetCount
+    }
 
     public var quotaRows: [QuotaRowItem] {
         guard let rateLimit = usageResponse?.rateLimit else { return [] }
@@ -112,6 +116,7 @@ public final class OpenAIQuotaViewModel: ObservableObject {
         guard let snapshot = cacheStore.loadOpenAISnapshot() else { return }
         usageResponse = snapshot.usageResponse
         lastUpdated = snapshot.lastUpdated
+        saveWidgetData()
     }
 
     private func persistCache() {
@@ -151,10 +156,11 @@ public final class OpenAIQuotaViewModel: ObservableObject {
             provider: .openai,
             schemaVersion: WidgetSharedData.currentSchemaVersion,
             limits: limits,
-            level: response.planType,
+            level: response.displayPlanType,
             subscriptionName: nil,
             subscriptionPrice: nil,
             subscriptionExpireDate: nil,
+            availableResetCount: response.availableResetCount,
             lastUpdated: Date()
         )
         WidgetDataManager.shared.saveAndReload(data, for: "openai")

@@ -16,6 +16,7 @@ enum Constants {
         static let service = DevBarCoreConstants.Keychain.service
         static let tokenKey = DevBarCoreConstants.Keychain.tokenKey
         static let cookieKey = DevBarCoreConstants.Keychain.cookieKey
+        static let glmAPIKeyKey = DevBarCoreConstants.Keychain.glmAPIKeyKey
         static let openAIAccessTokenKey = DevBarCoreConstants.Keychain.openAIAccessTokenKey
     }
 
@@ -52,6 +53,7 @@ enum Constants {
 
         // Account configs
         static let accountConfigsKey = DevBarCoreConstants.Defaults.accountConfigsKey
+        static let providerPingConfigsKey = DevBarCoreConstants.Defaults.providerPingConfigsKey
     }
 
     enum Update {

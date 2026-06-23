@@ -337,11 +337,11 @@ struct EventRow: View {
     private func timeAgo(_ date: Date) -> String {
         let interval = Date().timeIntervalSince(date)
         if interval < 60 {
-            return "刚刚"
+            return String(localized: "刚刚")
         } else if interval < 3600 {
-            return "\(Int(interval / 60))分钟前"
+            return String(format: String(localized: "%lld 分钟前"), Int(interval / 60))
         } else {
-            return "\(Int(interval / 3600))小时前"
+            return String(format: String(localized: "%lld 小时前"), Int(interval / 3600))
         }
     }
 }
@@ -364,9 +364,17 @@ struct QuickSettingsSection: View {
                 .font(.caption)
                 .disabled(!settings.isEnabled)
 
+            Toggle("Claude hooks 通知", isOn: $settings.claudeHookNotificationsEnabled)
+                .font(.caption)
+                .disabled(!settings.isEnabled || !settings.claudeEnabled)
+
             Toggle("Codex CLI", isOn: $settings.codexEnabled)
                 .font(.caption)
                 .disabled(!settings.isEnabled)
+
+            Toggle("Codex hooks 通知", isOn: $settings.codexHookNotificationsEnabled)
+                .font(.caption)
+                .disabled(!settings.isEnabled || !settings.codexEnabled)
 
             Picker("通知模式", selection: $settings.notificationMode) {
                 ForEach(NotificationMode.allCases, id: \.self) { mode in

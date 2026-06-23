@@ -486,12 +486,16 @@ struct IOSAccountsView: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(provider.accentColor.opacity(theme.providerPlateOpacity))
 
-            Image(provider.assetName)
+            Image(iosAssetName(for: provider))
                 .resizable()
                 .scaledToFit()
                 .padding(8)
         }
         .frame(width: 40, height: 40)
+    }
+
+    private func iosAssetName(for provider: QuotaProvider) -> String {
+        provider == .mimo ? "MiMO" : provider.assetName
     }
 
     private func savingState(for provider: QuotaProvider) -> Bool {

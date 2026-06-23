@@ -15,14 +15,14 @@ enum AgentState: String, Codable {
 
     var displayName: String {
         switch self {
-        case .idle: return "空闲"
-        case .running: return "运行中"
-        case .waitingApproval: return "等待授权"
-        case .waitingInput: return "等待输入"
-        case .loginRequired: return "需要登录"
-        case .stalled: return "已卡住"
-        case .completed: return "已完成"
-        case .failed: return "失败"
+        case .idle: return String(localized: "空闲")
+        case .running: return String(localized: "运行中")
+        case .waitingApproval: return String(localized: "等待授权")
+        case .waitingInput: return String(localized: "等待输入")
+        case .loginRequired: return String(localized: "需要登录")
+        case .stalled: return String(localized: "已卡住")
+        case .completed: return String(localized: "已完成")
+        case .failed: return String(localized: "失败")
         }
     }
 }

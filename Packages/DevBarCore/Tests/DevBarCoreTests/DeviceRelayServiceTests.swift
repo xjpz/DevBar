@@ -366,7 +366,7 @@ func deviceRelayPeerConnectionStatusExpiresStaleRemotePeer() {
 
 @MainActor
 @Test
-func deviceRelaySystemStatusTracksPeerNameAndLockState() throws {
+func deviceRelaySystemStatusTracksPeerNameLockStateAndDisplayState() throws {
     let manager = DeviceRelayManager()
     let peer = DeviceRelayDevice(
         deviceId: "mac-unit",
@@ -381,6 +381,7 @@ func deviceRelaySystemStatusTracksPeerNameAndLockState() throws {
         targetDeviceId: "iphone-unit",
         requestId: "status-unit",
         screenLocked: true,
+        displayAwake: false,
         deviceName: "Unit MacBook"
     )
 
@@ -390,8 +391,10 @@ func deviceRelaySystemStatusTracksPeerNameAndLockState() throws {
 
     #expect(decoded.type == .systemStatus)
     #expect(decoded.payload["screenLocked"] == "true")
+    #expect(decoded.payload["displayAwake"] == "false")
     #expect(manager.displayName(for: peer) == "Unit MacBook")
     #expect(manager.screenLocked(for: peer) == true)
+    #expect(manager.displayAwake(for: peer) == false)
 }
 
 @Test

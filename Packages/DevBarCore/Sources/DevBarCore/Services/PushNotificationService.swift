@@ -113,6 +113,7 @@ public final class PushNotificationService: Sendable {
         }
         var request = URLRequest(url: endpoint)
         request.httpMethod = method
+        request.timeoutInterval = 8
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")

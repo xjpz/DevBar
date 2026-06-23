@@ -91,7 +91,7 @@ struct FlipClockWidgetView: View {
     }
 
     private func datePill(date: Date, layout: FlipClockLayout) -> some View {
-        Text(date, format: .dateTime.month().day().weekday(.wide))
+        Text(formattedDate(date))
             .font(.system(size: layout.dateSize, weight: .medium, design: .rounded))
             .foregroundStyle(.white.opacity(0.76))
             .lineLimit(1)
@@ -103,6 +103,13 @@ struct FlipClockWidgetView: View {
                 Capsule()
                     .strokeBorder(.white.opacity(0.12), lineWidth: 0.7)
             }
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        if family == .systemSmall {
+            return Self.smallDateFormatter.string(from: date)
+        }
+        return date.formatted(.dateTime.month().day().weekday(.wide))
     }
 
     private var largeDecoration: some View {
@@ -125,6 +132,14 @@ struct FlipClockWidgetView: View {
     private var minuteText: String {
         String(format: "%02d", Calendar.current.component(.minute, from: entry.date))
     }
+
+    private static let smallDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.dateFormat = "M月d日 EEEE"
+        return formatter
+    }()
 }
 
 private struct FlipClockLayout {

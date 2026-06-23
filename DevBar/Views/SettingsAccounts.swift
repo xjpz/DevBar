@@ -25,7 +25,7 @@ struct SettingsAccounts: View {
     @State private var showDeepseekCookie = false
     @State private var editingProviders: Set<QuotaProvider> = []
     @State private var editingAccountIDs: Set<String> = []
-    @State private var draggedProvider: QuotaProvider?
+    @State private var draggedAccountID: String?
     @State private var accountDisplayNameInputs: [String: String] = [:]
     @State private var deepseekTokenInputs: [String: String] = [:]
     @State private var originalDeepseekTokenInputs: [String: String] = [:]
@@ -35,7 +35,9 @@ struct SettingsAccounts: View {
     @State private var isValidatingOpenAI = false
     @State private var isValidatingMimo = false
     @State private var isValidatingDeepseek = false
+    @State private var isTestingGLMPing = false
     @State private var glmLoginError: String?
+    @State private var glmPingTestMessage: String?
     @State private var openAIImportError: String?
     @State private var mimoImportError: String?
     @State private var deepseekImportError: String?
@@ -257,13 +259,13 @@ struct SettingsAccounts: View {
             }
         }
         .onDrag {
-            draggedProvider = account.provider
-            return NSItemProvider(object: account.provider.rawValue as NSString)
+            draggedAccountID = account.id
+            return NSItemProvider(object: account.id as NSString)
         }
         .onDrop(of: [.text], delegate: AccountDropDelegate(
-            target: account.provider,
-            draggedProvider: $draggedProvider,
-            moveAction: moveDraggedProvider
+            targetAccountID: account.id,
+            draggedAccountID: $draggedAccountID,
+            moveAction: appViewModel.moveProviderAccount
         ))
     }
 
@@ -340,8 +342,8 @@ struct SettingsAccounts: View {
         .background(cardBackground(for: config))
         .overlay(cardBorder(for: config))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .opacity(draggedProvider == config.provider ? 0.82 : 1)
-        .animation(.easeInOut(duration: 0.18), value: draggedProvider)
+        .opacity(draggedAccountID == account.id ? 0.82 : 1)
+        .animation(.easeInOut(duration: 0.18), value: draggedAccountID)
     }
 
     private func providerArtwork(for provider: QuotaProvider) -> some View {
@@ -456,7 +458,83 @@ struct SettingsAccounts: View {
                     .background(Color.red.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
+
+            glmPingSettingsBlock
         }
+    }
+
+    private var glmPingSettingsBlock: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Divider()
+                .overlay(Color.primary.opacity(0.06))
+
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("provider_ping_title")
+                        .font(.caption.weight(.semibold))
+                    Text(glmPingCredentialHint)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: Binding(
+                    get: { appViewModel.providerPingConfig(for: .glm).isEnabled },
+                    set: { isEnabled in
+                        var config = appViewModel.providerPingConfig(for: .glm)
+                        config.isEnabled = isEnabled
+                        appViewModel.updateProviderPingConfig(config)
+                    }
+                ))
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .disabled(appViewModel.glmAPIKeyForModelCall == nil)
+            }
+
+            DatePicker(
+                "provider_ping_time",
+                selection: glmPingTimeBinding,
+                displayedComponents: .hourAndMinute
+            )
+            .datePickerStyle(.compact)
+            .disabled(!appViewModel.providerPingConfig(for: .glm).isEnabled)
+
+            HStack(spacing: 10) {
+                Button {
+                    testGLMPing()
+                } label: {
+                    if isTestingGLMPing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text("provider_ping_test")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(isTestingGLMPing || appViewModel.glmAPIKeyForModelCall == nil)
+
+                Text(glmPingStatusText)
+                    .font(.caption2)
+                    .foregroundStyle(glmPingStatusColor)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let glmPingTestMessage {
+                Text(glmPingTestMessage)
+                    .font(.caption2)
+                    .foregroundStyle(glmPingTestMessage == String(localized: "provider_ping_success") ? Color.secondary : Color.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.035))
+        )
     }
 
     private var mimoCredentialsEditor: some View {
@@ -717,9 +795,10 @@ struct SettingsAccounts: View {
 
     private func loadStoredGLMCredentials() {
         guard glmAPIKeyInput.isEmpty else { return }
-        guard let credentials = appViewModel.credentials, credentials.cookieString.isEmpty else { return }
-        glmAPIKeyInput = credentials.token
-        originalGLMAPIKeyInput = credentials.token
+        guard let key = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.glmAPIKeyKey)
+            ?? appViewModel.glmAPIKeyForModelCall else { return }
+        glmAPIKeyInput = key
+        originalGLMAPIKeyInput = key
     }
 
     private func loadStoredMimoCookie() {
@@ -800,9 +879,11 @@ struct SettingsAccounts: View {
         switch provider {
         case .glm:
             glmLoginError = nil
-            if let credentials = appViewModel.credentials, credentials.cookieString.isEmpty {
-                glmAPIKeyInput = credentials.token
-                originalGLMAPIKeyInput = credentials.token
+            glmPingTestMessage = nil
+            if let key = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.glmAPIKeyKey)
+                ?? appViewModel.glmAPIKeyForModelCall {
+                glmAPIKeyInput = key
+                originalGLMAPIKeyInput = key
             } else {
                 originalGLMAPIKeyInput = glmAPIKeyInput
             }
@@ -820,8 +901,8 @@ struct SettingsAccounts: View {
     }
 
     private func finishGLMEditing() {
-        let trimmed = glmAPIKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
-        let originalTrimmed = originalGLMAPIKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = BigModelAPIClient.normalizedBearerToken(glmAPIKeyInput)
+        let originalTrimmed = BigModelAPIClient.normalizedBearerToken(originalGLMAPIKeyInput)
 
         guard trimmed != originalTrimmed else {
             editingProviders.remove(.glm)
@@ -941,7 +1022,7 @@ struct SettingsAccounts: View {
     }
 
     private func loginGLMWithAPIKey() {
-        let key = glmAPIKeyInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = BigModelAPIClient.normalizedBearerToken(glmAPIKeyInput)
         guard !key.isEmpty else { return }
 
         glmLoginError = nil
@@ -952,9 +1033,10 @@ struct SettingsAccounts: View {
             isValidatingGLM = false
 
             if isValid {
-                appViewModel.handleLoginSuccess(AuthCredentials(token: key, cookieString: ""))
+                appViewModel.saveGLMAPIKey(key)
+                await appViewModel.refreshQuota(silent: true)
                 editingProviders.remove(.glm)
-                originalGLMAPIKeyInput = key
+                originalGLMAPIKeyInput = BigModelAPIClient.normalizedBearerToken(key)
             } else {
                 glmLoginError = String(localized: "api_key_invalid")
             }
@@ -963,7 +1045,7 @@ struct SettingsAccounts: View {
 
     private func validateGLMAPIKey(_ key: String) async -> Bool {
         var request = URLRequest(url: URL(string: Constants.API.quotaLimitURL)!)
-        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        request.setValue(BigModelAPIClient.normalizedBearerToken(key), forHTTPHeaderField: "Authorization")
         request.timeoutInterval = 10
 
         do {
@@ -981,6 +1063,69 @@ struct SettingsAccounts: View {
             return false
         } catch {
             return false
+        }
+    }
+
+    private var glmPingTimeBinding: Binding<Date> {
+        Binding(
+            get: {
+                let config = appViewModel.providerPingConfig(for: .glm)
+                var components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+                components.hour = config.hour
+                components.minute = config.minute
+                components.second = 0
+                return Calendar.current.date(from: components) ?? Date()
+            },
+            set: { date in
+                let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                var config = appViewModel.providerPingConfig(for: .glm)
+                config.hour = parts.hour ?? config.hour
+                config.minute = parts.minute ?? config.minute
+                appViewModel.updateProviderPingConfig(config)
+            }
+        )
+    }
+
+    private var glmPingCredentialHint: String {
+        if appViewModel.glmAPIKeyForModelCall != nil {
+            return String(localized: "provider_ping_api_key_ready")
+        }
+        if appViewModel.credentials?.cookieString.isEmpty == false {
+            return String(localized: "provider_ping_cookie_only_hint")
+        }
+        return String(localized: "provider_ping_requires_api_key")
+    }
+
+    private var glmPingStatusText: String {
+        let config = appViewModel.providerPingConfig(for: .glm)
+        if let error = config.lastErrorMessage, !error.isEmpty {
+            return "\(String(localized: "provider_ping_failed")): \(error)"
+        }
+        if let lastSuccessAt = config.lastSuccessAt {
+            return "\(String(localized: "provider_ping_last_run")) \(lastSuccessAt.formatted(date: .omitted, time: .shortened))"
+        }
+        return String(localized: "provider_ping_never_run")
+    }
+
+    private var glmPingStatusColor: Color {
+        let config = appViewModel.providerPingConfig(for: .glm)
+        return config.lastErrorMessage == nil ? .secondary : .red
+    }
+
+    private func testGLMPing() {
+        glmPingTestMessage = nil
+        isTestingGLMPing = true
+
+        Task { @MainActor in
+            defer { isTestingGLMPing = false }
+            do {
+                try await appViewModel.testProviderPing(.glm)
+                glmPingTestMessage = String(localized: "provider_ping_success")
+            } catch let error as APIError {
+                glmPingTestMessage = error.errorDescription
+            } catch {
+                glmPingTestMessage = error.localizedDescription
+            }
         }
     }
 
@@ -1358,23 +1503,6 @@ struct SettingsAccounts: View {
         }
     }
 
-    private func moveDraggedProvider(_ dragged: QuotaProvider, to target: QuotaProvider) {
-        guard dragged != target else { return }
-
-        var configs = appViewModel.accountConfigs.sorted { $0.order < $1.order }
-        guard let fromIndex = configs.firstIndex(where: { $0.provider == dragged }),
-              let toIndex = configs.firstIndex(where: { $0.provider == target }) else {
-            return
-        }
-
-        let moving = configs.remove(at: fromIndex)
-        configs.insert(moving, at: toIndex)
-        for index in configs.indices {
-            configs[index].order = index
-        }
-        appViewModel.accountConfigs = configs
-    }
-
     @MainActor
     private func openTransferSheet() async {
         transferExportError = nil
@@ -1410,17 +1538,17 @@ private struct TransferSheetState: Identifiable {
 }
 
 private struct AccountDropDelegate: DropDelegate {
-    let target: QuotaProvider
-    @Binding var draggedProvider: QuotaProvider?
-    let moveAction: (QuotaProvider, QuotaProvider) -> Void
+    let targetAccountID: String
+    @Binding var draggedAccountID: String?
+    let moveAction: (String, String) -> Void
 
     func dropEntered(info: DropInfo) {
-        guard let draggedProvider, draggedProvider != target else { return }
-        moveAction(draggedProvider, target)
+        guard let draggedAccountID, draggedAccountID != targetAccountID else { return }
+        moveAction(draggedAccountID, targetAccountID)
     }
 
     func performDrop(info: DropInfo) -> Bool {
-        draggedProvider = nil
+        draggedAccountID = nil
         return true
     }
 

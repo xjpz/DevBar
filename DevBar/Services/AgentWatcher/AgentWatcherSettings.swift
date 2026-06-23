@@ -12,26 +12,26 @@ enum NotificationMode: String, Codable, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .smart: return "智能提醒"
-        case .macOnly: return "只提醒 Mac"
-        case .importantSync: return "重要事件同步 iPhone"
-        case .fullSync: return "全量同步"
-        case .quiet: return "安静模式"
+        case .smart: return String(localized: "智能提醒")
+        case .macOnly: return String(localized: "只提醒 Mac")
+        case .importantSync: return String(localized: "重要事件同步 iPhone")
+        case .fullSync: return String(localized: "全量同步")
+        case .quiet: return String(localized: "安静模式")
         }
     }
 
     var description: String {
         switch self {
         case .smart:
-            return "重要事件立即提醒，普通事件只显示 Badge，重复事件节流"
+            return String(localized: "重要事件立即提醒，普通事件只显示 Badge，重复事件节流")
         case .macOnly:
-            return "Mac 正常提醒，iPhone 不提醒"
+            return String(localized: "Mac 正常提醒，iPhone 不提醒")
         case .importantSync:
-            return "等待授权、登录失效、任务失败会推送到 iPhone"
+            return String(localized: "等待授权、登录失效、任务失败会推送到 iPhone")
         case .fullSync:
-            return "所有 Agent 事件都提醒 iPhone"
+            return String(localized: "所有 Agent 事件都提醒 iPhone")
         case .quiet:
-            return "Mac 只显示 Badge，iPhone 不提醒"
+            return String(localized: "Mac 只显示 Badge，iPhone 不提醒")
         }
     }
 }
@@ -49,6 +49,8 @@ class AgentWatcherSettings: ObservableObject {
         static let isEnabled = "agentWatcher.isEnabled"
         static let claudeEnabled = "agentWatcher.claudeEnabled"
         static let codexEnabled = "agentWatcher.codexEnabled"
+        static let claudeHookNotificationsEnabled = "agentWatcher.claudeHookNotificationsEnabled"
+        static let codexHookNotificationsEnabled = "agentWatcher.codexHookNotificationsEnabled"
         static let notificationMode = "agentWatcher.notificationMode"
         static let idleMinutesForPhone = "agentWatcher.idleMinutesForPhone"
         static let approvalEscalationSeconds = "agentWatcher.approvalEscalationSeconds"
@@ -75,6 +77,14 @@ class AgentWatcherSettings: ObservableObject {
 
     @Published var codexEnabled: Bool {
         didSet { defaults.set(codexEnabled, forKey: Keys.codexEnabled) }
+    }
+
+    @Published var claudeHookNotificationsEnabled: Bool {
+        didSet { defaults.set(claudeHookNotificationsEnabled, forKey: Keys.claudeHookNotificationsEnabled) }
+    }
+
+    @Published var codexHookNotificationsEnabled: Bool {
+        didSet { defaults.set(codexHookNotificationsEnabled, forKey: Keys.codexHookNotificationsEnabled) }
     }
 
     @Published var notificationMode: NotificationMode {
@@ -133,6 +143,8 @@ class AgentWatcherSettings: ObservableObject {
         self.isEnabled = defaults.object(forKey: Keys.isEnabled) as? Bool ?? true
         self.claudeEnabled = defaults.object(forKey: Keys.claudeEnabled) as? Bool ?? true
         self.codexEnabled = defaults.object(forKey: Keys.codexEnabled) as? Bool ?? true
+        self.claudeHookNotificationsEnabled = defaults.object(forKey: Keys.claudeHookNotificationsEnabled) as? Bool ?? true
+        self.codexHookNotificationsEnabled = defaults.object(forKey: Keys.codexHookNotificationsEnabled) as? Bool ?? true
 
         let modeString = defaults.string(forKey: Keys.notificationMode) ?? NotificationMode.smart.rawValue
         self.notificationMode = NotificationMode(rawValue: modeString) ?? .smart
@@ -162,6 +174,16 @@ class AgentWatcherSettings: ObservableObject {
                 sendMacNotification: false,
                 sendPhoneNotification: false,
                 reason: "event notifications suppressed"
+            )
+        }
+
+        guard hookNotificationsEnabled(for: event.source) else {
+            return NotificationDecision(
+                showInStatusCenter: true,
+                updateMacBadge: event.requiresUserAction,
+                sendMacNotification: false,
+                sendPhoneNotification: false,
+                reason: "hook notifications disabled"
             )
         }
 
@@ -261,12 +283,25 @@ class AgentWatcherSettings: ObservableObject {
         return decision
     }
 
+    func hookNotificationsEnabled(for source: AgentSource) -> Bool {
+        switch source {
+        case .claudeCode:
+            return claudeHookNotificationsEnabled
+        case .codexCLI, .codexAppServer:
+            return codexHookNotificationsEnabled
+        case .unknown:
+            return true
+        }
+    }
+
     // MARK: - Reset
 
     func resetToDefaults() {
         isEnabled = true
         claudeEnabled = true
         codexEnabled = true
+        claudeHookNotificationsEnabled = true
+        codexHookNotificationsEnabled = true
         notificationMode = .smart
         idleMinutesForPhone = 3
         approvalEscalationSeconds = 120

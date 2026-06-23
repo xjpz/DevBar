@@ -9,6 +9,7 @@ struct QuotaLargeView: View {
     let limits: [WidgetQuotaLimit]
     let level: String?
     let subscriptionName: String?
+    let availableResetCount: Int?
     let lastUpdated: Date
     var visualStyle: WidgetVisualStyle = .liquidGlass
 
@@ -39,6 +40,9 @@ struct QuotaLargeView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(levelBadgeBackground, in: Capsule())
+                }
+                if let availableResetCount, availableResetCount > 0 {
+                    ResetCreditsBadge(count: availableResetCount, size: 26, visualStyle: visualStyle)
                 }
             }
 

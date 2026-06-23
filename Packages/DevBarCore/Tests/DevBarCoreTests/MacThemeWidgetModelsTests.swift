@@ -3,7 +3,7 @@ import Testing
 @testable import DevBarCore
 
 @Test func macThemeWidgetMergesStatusAndActionsIntoOnePage() {
-    #expect(MacThemeWidgetPolicy.availablePages == [.quota, .macConsole])
+    #expect(MacThemeWidgetPolicy.availablePages == [.macConsole, .quota])
 }
 
 @Test func macThemeWidgetUsesPlaceholderForDeferredMacMetrics() {

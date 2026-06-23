@@ -36,28 +36,28 @@ final class IOSAppViewModel: ObservableObject {
         var title: String {
             switch self {
             case .notReady:
-                "可本机上岛"
+                String(localized: "ios_live_message_status_not_ready_title")
             case .ready:
-                "可上岛"
+                String(localized: "ios_live_message_status_ready_title")
             case .enabling:
-                "正在上岛"
+                String(localized: "ios_live_message_status_enabling_title")
             case .active:
-                "已上岛"
+                String(localized: "ios_live_message_status_active_title")
             case .failed:
-                "上岛失败"
+                String(localized: "ios_live_message_status_failed_title")
             }
         }
 
         var detail: String {
             switch self {
             case .notReady:
-                "本机输入文案可直接上岛；完成 Relay 绑定后，服务端 API 也可远程推送上岛。"
+                String(localized: "ios_live_message_status_not_ready_detail")
             case .ready:
-                "输入一句文案即可本机上岛；服务端 API 也可远程推送上岛。"
+                String(localized: "ios_live_message_status_ready_detail")
             case .enabling:
-                "正在把文案显示到灵动岛。"
+                String(localized: "ios_live_message_status_enabling_detail")
             case .active:
-                "文案已显示在灵动岛；后续 API 推送会显示 API 的新文案。"
+                String(localized: "ios_live_message_status_active_detail")
             case .failed(let message):
                 message
             }
@@ -157,11 +157,15 @@ final class IOSAppViewModel: ObservableObject {
     private let liveActivitySettingsStore = LiveActivitySettingsStore()
     private let macThemeWidgetAvatarStore = MacThemeWidgetAvatarStore()
     private var childObservers = Set<AnyCancellable>()
+    private var hasStartedDeferredLaunchWork = false
     private var hasRefreshedOnLaunch = false
     private var lastRefreshAttemptAt: Date?
     private let automaticRefreshCooldown: TimeInterval = 20
     private var usesDefaultHomeScreenShortcutSelection: Bool
     private var hasPairedMacForShortcuts = false
+    private var relayStartupTask: Task<Void, Never>?
+    private var lastMacThemeStatusRequestAt: Date?
+    private let macThemeStatusRequestCooldown: TimeInterval = 15
 
     init() {
         let accounts = settingsStore.loadProviderAccounts(
@@ -231,21 +235,6 @@ final class IOSAppViewModel: ObservableObject {
                 }
             }
             .store(in: &childObservers)
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            await self.deviceRelayManager.setup(deviceType: .iPhone, deviceName: self.relayDeviceName)
-            await IOSPushNotificationCoordinator.shared.syncRegistration(
-                relayDeviceToken: self.deviceRelayManager.deviceToken,
-                force: true
-            )
-            await IOSPushNotificationCoordinator.shared.syncLiveActivityPushToStart(
-                relayDeviceToken: self.deviceRelayManager.deviceToken,
-                force: true
-            )
-            self.refreshDevBarLiveMessageReadiness()
-            await self.refreshHomeScreenShortcuts()
-            self.syncMacThemeWidgetSnapshot()
-        }
     }
 
     private static func providersWithStoredCredentials(
@@ -397,10 +386,24 @@ final class IOSAppViewModel: ObservableObject {
         await refreshHomeScreenShortcuts()
     }
 
+    func startDeferredLaunchWork() async {
+        guard !hasStartedDeferredLaunchWork else { return }
+        hasStartedDeferredLaunchWork = true
+
+        try? await Task.sleep(for: .milliseconds(800))
+
+        await startRelayIfNeeded()
+        syncPushStateInBackground(force: true)
+        refreshDevBarLiveMessageReadiness()
+        await refreshHomeScreenShortcuts()
+        syncMacThemeWidgetSnapshot()
+        await refreshOnLaunch()
+    }
+
     func refreshOnForeground() async {
-        await deviceRelayManager.resumeConnectivity(deviceType: .iPhone, deviceName: relayDeviceName)
-        await IOSPushNotificationCoordinator.shared.syncRegistration(relayDeviceToken: deviceRelayManager.deviceToken, force: true)
-        await IOSPushNotificationCoordinator.shared.syncLiveActivityPushToStart(relayDeviceToken: deviceRelayManager.deviceToken, force: true)
+        guard hasStartedDeferredLaunchWork else { return }
+        await startRelayIfNeeded(resume: true)
+        syncPushStateInBackground(force: true)
         refreshDevBarLiveMessageReadiness()
         await refreshHomeScreenShortcuts()
 
@@ -413,6 +416,42 @@ final class IOSAppViewModel: ObservableObject {
             await refreshAll(trigger: .foreground, silent: true)
         } else {
             await syncLiveActivity()
+        }
+    }
+
+    private func startRelayIfNeeded(resume: Bool = false) async {
+        if let relayStartupTask {
+            await relayStartupTask.value
+            return
+        }
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            if resume {
+                await self.deviceRelayManager.resumeConnectivity(deviceType: .iPhone, deviceName: self.relayDeviceName)
+            } else if self.deviceRelayManager.localDeviceID == nil || self.deviceRelayManager.deviceToken == nil {
+                await self.deviceRelayManager.setup(deviceType: .iPhone, deviceName: self.relayDeviceName)
+            } else {
+                await self.deviceRelayManager.resumeConnectivity(deviceType: .iPhone, deviceName: self.relayDeviceName)
+            }
+        }
+
+        relayStartupTask = task
+        await task.value
+        relayStartupTask = nil
+    }
+
+    private func syncPushStateInBackground(force: Bool) {
+        let token = deviceRelayManager.deviceToken
+        Task { @MainActor in
+            await IOSPushNotificationCoordinator.shared.syncRegistration(
+                relayDeviceToken: token,
+                force: force
+            )
+            await IOSPushNotificationCoordinator.shared.syncLiveActivityPushToStart(
+                relayDeviceToken: token,
+                force: force
+            )
         }
     }
 
@@ -766,13 +805,21 @@ final class IOSAppViewModel: ObservableObject {
         let macStatus = mac.map { mac in
             let connectionStatus = deviceRelayManager.connectionStatus(for: mac, now: now)
             let screenLocked = deviceRelayManager.screenLocked(for: mac)
+            let displayAwake = deviceRelayManager.displayAwake(for: mac)
+            requestMacThemeStatusIfNeeded(
+                for: mac,
+                connectionStatus: connectionStatus,
+                screenLocked: screenLocked,
+                displayAwake: displayAwake,
+                now: now
+            )
             return MacStatusWidgetSnapshot(
                 deviceID: mac.deviceId,
                 deviceName: deviceRelayManager.displayName(for: mac),
                 isOnline: connectionStatus != .offline,
                 lastSeenAt: mac.lastSeenAt.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) },
                 screenState: screenLocked.map { $0 ? .locked : .unlocked } ?? .unknown,
-                displayState: .unknown,
+                displayState: macThemeDisplayState(for: displayAwake),
                 keepAwakeState: .unknown,
                 connectionMode: macThemeConnectionMode(for: connectionStatus),
                 batteryPercent: nil,
@@ -796,6 +843,27 @@ final class IOSAppViewModel: ObservableObject {
         )
     }
 
+    private func requestMacThemeStatusIfNeeded(
+        for mac: DeviceRelayDevice,
+        connectionStatus: DeviceRelayPeerConnectionStatus,
+        screenLocked: Bool?,
+        displayAwake: Bool?,
+        now: Date
+    ) {
+        guard connectionStatus != .offline else { return }
+        guard screenLocked == nil || displayAwake == nil else { return }
+        if let lastMacThemeStatusRequestAt,
+           now.timeIntervalSince(lastMacThemeStatusRequestAt) < macThemeStatusRequestCooldown {
+            return
+        }
+        lastMacThemeStatusRequestAt = now
+
+        Task { @MainActor [weak self, deviceID = mac.deviceId] in
+            guard let self else { return }
+            try? await self.deviceRelayManager.sendSystemStatusRequest(targetDeviceId: deviceID)
+        }
+    }
+
     private func macThemeConnectionMode(for status: DeviceRelayPeerConnectionStatus) -> MacWidgetConnectionMode {
         switch status {
         case .local:
@@ -805,6 +873,11 @@ final class IOSAppViewModel: ObservableObject {
         case .offline:
             return .unknown
         }
+    }
+
+    private func macThemeDisplayState(for displayAwake: Bool?) -> MacWidgetDisplayState {
+        guard let displayAwake else { return .unknown }
+        return displayAwake ? .awake : .sleeping
     }
 
     func makeTransferImportPreview(for payload: TransferPayload) -> TransferImportPreview {
@@ -1270,7 +1343,7 @@ final class IOSAppViewModel: ObservableObject {
             id: message.requestId ?? UUID().uuidString,
             source: payload["source"] ?? "Unknown",
             projectName: payload["projectName"] ?? "Unknown",
-            message: payload["message"] ?? "任务等待处理",
+            message: payload["message"] ?? String(localized: "ios_agent_watcher_default_message"),
             severity: payload["severity"] ?? "important",
             receivedAt: Date()
         )
@@ -1279,7 +1352,10 @@ final class IOSAppViewModel: ObservableObject {
 
         // 发送本地通知
         let content = UNMutableNotificationContent()
-        content.title = "\(alert.source) 需要处理"
+        content.title = String(
+            format: String(localized: "ios_agent_watcher_needs_attention_format"),
+            alert.source
+        )
         content.body = alert.message
         content.sound = .default
         content.categoryIdentifier = "AGENT_WATCHER"
@@ -1332,7 +1408,7 @@ final class IOSAppViewModel: ObservableObject {
     func enableDevBarLiveMessageIsland(message rawMessage: String) async {
         let message = rawMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !message.isEmpty else {
-            devBarLiveMessageStatus = .failed("请输入要显示在灵动岛的一句文案。")
+            devBarLiveMessageStatus = .failed(String(localized: "ios_live_message_empty_message_error"))
             return
         }
         devBarLiveMessageStatus = .enabling
@@ -1346,7 +1422,7 @@ final class IOSAppViewModel: ObservableObject {
 
         let hasActiveActivity = await DevBarLiveMessageActivityManager.shared.hasActiveActivity()
         guard registration != nil || hasActiveActivity else {
-            devBarLiveMessageStatus = .failed("Live Activity 启动失败，请稍后重试。")
+            devBarLiveMessageStatus = .failed(String(localized: "ios_live_message_start_failed"))
             return
         }
 
@@ -1510,7 +1586,7 @@ extension IOSAppViewModel {
             case .emptyDeepseekToken:
                 return String(localized: "deepseek_credential_required")
             case .keychainSaveFailed:
-                return "无法安全保存凭据，请重试"
+                return String(localized: "ios_error_keychain_save_failed")
             }
         }
     }
