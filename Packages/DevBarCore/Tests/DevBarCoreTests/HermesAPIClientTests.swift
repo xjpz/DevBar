@@ -22,6 +22,12 @@ func hermesAPIClientRejectsInvalidBaseURL() {
 }
 
 @Test
+func hermesAPIClientUsesLongRunningRequestTimeouts() {
+    #expect(HermesAPIClient.defaultRequestTimeout == 180)
+    #expect(HermesAPIClient.defaultResourceTimeout == 300)
+}
+
+@Test
 func hermesAPIClientDecodesOpenAICompatibleTextResponse() throws {
     let json = """
     {

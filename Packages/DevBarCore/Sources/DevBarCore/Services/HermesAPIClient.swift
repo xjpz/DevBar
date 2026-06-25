@@ -1,11 +1,22 @@
 import Foundation
 
 public final class HermesAPIClient: Sendable {
+    public static let defaultRequestTimeout: TimeInterval = 180
+    public static let defaultResourceTimeout: TimeInterval = 300
+
     private let session: URLSession
     private let decoder = JSONDecoder()
 
-    public init(session: URLSession = .shared) {
+    public init(session: URLSession = HermesAPIClient.defaultSession()) {
         self.session = session
+    }
+
+    public static func defaultSession() -> URLSession {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = defaultRequestTimeout
+        configuration.timeoutIntervalForResource = defaultResourceTimeout
+        configuration.waitsForConnectivity = true
+        return URLSession(configuration: configuration)
     }
 
     public func sendMessage(
@@ -135,7 +146,7 @@ public final class HermesAPIClient: Sendable {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.timeoutInterval = 60
+        request.timeoutInterval = Self.defaultRequestTimeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(authorization, forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONEncoder().encode(HermesChatRequest(messages: messages, stream: stream))

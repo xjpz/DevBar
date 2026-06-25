@@ -29,14 +29,6 @@ struct IOSRootView: View {
                 }
                 .tag(IOSAppViewModel.TabSelection.dashboard)
 
-                NavigationStack {
-                    IOSHermesChatView()
-                }
-                .tabItem {
-                    Label("ios_tab_chatbot", systemImage: "bubble.left.and.bubble.right.fill")
-                }
-                .tag(IOSAppViewModel.TabSelection.chatbot)
-
                 if appViewModel.isWebKitTabEnabled {
                     NavigationStack {
                         if #available(iOS 18.0, *) {
@@ -141,7 +133,7 @@ struct IOSRootView: View {
 
     private var currentTabBackground: Color {
         switch appViewModel.selectedTab {
-        case .dashboard, .chatbot:
+        case .dashboard:
             theme.backgroundPrimary
         case .webkit, .tools:
             theme.backgroundSecondary

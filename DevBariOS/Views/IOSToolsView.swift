@@ -14,6 +14,19 @@ struct IOSToolsView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 12) {
                 NavigationLink {
+                    IOSHermesChatView()
+                } label: {
+                    IOSToolCard(
+                        title: "Hermes Chat",
+                        subtitle: "ChatBot",
+                        systemImage: "bubble.left.and.bubble.right.fill",
+                        iconColor: .green,
+                        theme: theme
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
                     IOSAPIClientView()
                 } label: {
                     IOSToolCard(

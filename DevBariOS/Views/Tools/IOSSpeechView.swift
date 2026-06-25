@@ -15,8 +15,10 @@ final class IOSSpeechManager: ObservableObject {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private let audioEngine = AVAudioEngine()
+    private var wantsRecording = false
 
     func startRecording() {
+        wantsRecording = true
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             guard status == .authorized else {
                 DispatchQueue.main.async { self?.errorMessage = String(localized: "ios_tools_speech_denied") }
@@ -30,6 +32,7 @@ final class IOSSpeechManager: ObservableObject {
                 }
 
                 DispatchQueue.main.async {
+                    guard self?.wantsRecording == true else { return }
                     do {
                         try self?.setupAudioEngine()
                         self?.isRecording = true
@@ -42,16 +45,17 @@ final class IOSSpeechManager: ObservableObject {
         }
     }
 
-    func stopRecording() {
+    func stopRecording(commit: Bool = true) {
+        wantsRecording = false
         guard isRecording else { return }
         audioEngine.stop()
         recognitionRequest?.endAudio()
         audioEngine.inputNode.removeTap(onBus: 0)
 
-        if !partialText.isEmpty {
+        if commit, !partialText.isEmpty {
             recognizedText += (recognizedText.isEmpty ? "" : "\n") + partialText
-            partialText = ""
         }
+        partialText = ""
 
         isRecording = false
         recognitionTask = nil

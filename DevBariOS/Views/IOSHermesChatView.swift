@@ -1,64 +1,119 @@
 import DevBarCore
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 import UIKit
+import WebKit
 
 struct IOSHermesChatView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @Environment(\.themeTokens) private var theme
+    @FocusState private var isComposerFocused: Bool
+    @AppStorage("ios_hermes_chat_remark") private var chatRemark = ""
+    @State private var isSettingsPresented = false
+    @State private var isAttachmentPanelPresented = false
+    @State private var isCameraPresented = false
+    @State private var isFileImporterPresented = false
+    @State private var isVoiceInputMode = false
+    @State private var isPressingVoiceInput = false
+    @State private var isVoiceInputCancelled = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @StateObject private var speechManager = IOSSpeechManager()
     @StateObject private var viewModel = IOSHermesChatViewModel()
 
     var body: some View {
-        ZStack {
-            Color.clear
-                .iosGeekScreenBackground(theme)
+        VStack(spacing: 0) {
+            if case .failed(let message) = viewModel.status {
+                errorBanner(message)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 6)
+            }
 
-            VStack(spacing: 0) {
-                header
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 10)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 18) {
+                        if !viewModel.isConfigured {
+                            missingConfigCard
+                        } else if viewModel.messages.isEmpty {
+                            emptyState
+                        }
 
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 14) {
-                            memoryBanner
-
-                            if !viewModel.isConfigured {
-                                missingConfigCard
-                            } else if viewModel.messages.isEmpty {
-                                emptyPrompts
-                            }
-
-                            ForEach(viewModel.messages) { message in
-                                HermesMessageBubble(
-                                    message: message,
-                                    retry: viewModel.retryLastPrompt,
-                                    theme: theme
-                                )
+                        ForEach(viewModel.messages) { message in
+                            HermesChatRow(message: message, theme: theme)
                                 .id(message.id)
-                            }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 18)
                     }
-                    .onChange(of: viewModel.messages) { _, messages in
-                        guard let lastID = messages.last?.id else { return }
-                        withAnimation(.easeOut(duration: 0.2)) {
-                            proxy.scrollTo(lastID, anchor: .bottom)
-                        }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 18)
+                }
+                .scrollDismissesKeyboard(.interactively)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 12).onChanged { _ in
+                        isComposerFocused = false
+                    }
+                )
+                .onChange(of: viewModel.messages) { _, messages in
+                    guard let lastID = messages.last?.id else { return }
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(lastID, anchor: .bottom)
+                    }
+                }
+                .onChange(of: isComposerFocused) { _, focused in
+                    if focused {
+                        isVoiceInputMode = false
+                        isAttachmentPanelPresented = false
+                        scrollToLatestMessage(proxy)
+                    }
+                }
+                .onChange(of: isAttachmentPanelPresented) { _, presented in
+                    if presented {
+                        scrollToLatestMessage(proxy)
                     }
                 }
             }
         }
+        .background {
+            chatBackground
+                .ignoresSafeArea()
+        }
+        .safeAreaInset(edge: .bottom) {
+            bottomInputArea
+        }
+        .navigationDestination(isPresented: $isSettingsPresented) {
+            IOSHermesChatSettingsView(remark: $chatRemark, theme: theme)
+        }
+        .fullScreenCover(isPresented: $isCameraPresented) {
+            IOSHermesCameraPicker { name in
+                appendAttachmentReference(name: name, type: String(localized: "ios_hermes_attachment_photo_label"))
+            }
+            .ignoresSafeArea()
+        }
+        .fileImporter(isPresented: $isFileImporterPresented, allowedContentTypes: [.item], allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                appendAttachmentReference(name: url.lastPathComponent, type: String(localized: "ios_hermes_attachment_file_label"))
+            }
+        }
+        .onChange(of: selectedPhotoItem) { _, item in
+            guard item != nil else { return }
+            appendAttachmentReference(name: String(localized: "ios_hermes_attachment_photo_label"), type: String(localized: "ios_hermes_attachment_photo_label"))
+            selectedPhotoItem = nil
+        }
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .navigationBar)
-        .safeAreaInset(edge: .bottom) {
-            composer
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 8)
-                .background(theme.backgroundPrimary.opacity(0.96))
+        .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                navigationTitleView
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    isSettingsPresented = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(theme.textPrimary)
+            }
         }
         .onAppear {
             configureViewModel()
@@ -69,86 +124,27 @@ struct IOSHermesChatView: View {
         .onChange(of: appViewModel.hermesSettingsRevision) { _, _ in
             configureViewModel()
         }
+        .onChange(of: speechManager.recognizedText) { _, text in
+            guard !isPressingVoiceInput else { return }
+            commitRecognizedSpeech(text)
+        }
+        .onDisappear {
+            resetVoiceInput()
+        }
         .accessibilityIdentifier("ios.hermes.chat.screen")
     }
 
-    private var header: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "line.3.horizontal")
-                .font(.title2.weight(.medium))
-                .foregroundStyle(theme.textPrimary)
-
-            ZStack {
-                Circle()
-                    .fill(Color.purple.opacity(0.18))
-                    .frame(width: 52, height: 52)
-                Image(systemName: "sparkles")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(.purple)
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Hermes Chat")
-                    .font(.title2.weight(.semibold))
-                    .foregroundStyle(theme.textPrimary)
-
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(viewModel.isConfigured ? Color.green : Color.orange)
-                        .frame(width: 9, height: 9)
-                    Text(viewModel.isConfigured ? "ios_hermes_agent_online" : "ios_hermes_not_configured")
-                        .font(.subheadline)
-                        .foregroundStyle(theme.textSecondary)
-                }
-            }
-
-            Spacer()
-
-            Button {} label: {
-                Image(systemName: "clock.arrow.circlepath")
-                    .font(.title3.weight(.semibold))
-            }
-            .disabled(true)
-            .foregroundStyle(theme.textSecondary)
-
-            Button {} label: {
-                Image(systemName: "ellipsis")
-                    .font(.title3.weight(.semibold))
-            }
-            .disabled(true)
-            .foregroundStyle(theme.textSecondary)
+    private var emptyState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "bubble.left.and.bubble.right")
+                .font(.system(size: 34, weight: .regular))
+                .foregroundStyle(theme.textTertiary)
+            Text("ios_hermes_empty_title")
+                .font(.headline)
+                .foregroundStyle(theme.textSecondary)
         }
-    }
-
-    private var memoryBanner: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "brain.head.profile")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.purple)
-                .frame(width: 34)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("ios_hermes_memory_enabled")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(theme.textPrimary)
-                Text("ios_hermes_memory_detail")
-                    .font(.subheadline)
-                    .foregroundStyle(theme.textSecondary)
-            }
-
-            Spacer()
-
-            Button("ios_hermes_view_memory") {}
-                .buttonStyle(.bordered)
-                .tint(.purple)
-                .disabled(true)
-        }
-        .padding(16)
-        .iosGlassContainer(theme, cornerRadius: 14)
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(theme.borderSubtle, lineWidth: 1)
-        )
+        .frame(maxWidth: .infinity)
+        .padding(.top, 104)
     }
 
     private var missingConfigCard: some View {
@@ -156,96 +152,341 @@ struct IOSHermesChatView: View {
             Label("ios_hermes_missing_config_title", systemImage: "key")
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(theme.textPrimary)
-
             Text("ios_hermes_missing_config_detail")
                 .font(.subheadline)
                 .foregroundStyle(theme.textSecondary)
-
             NavigationLink {
                 IOSSettingsView()
             } label: {
                 Label("ios_hermes_open_settings", systemImage: "slider.horizontal.3")
             }
             .buttonStyle(.borderedProminent)
-            .tint(.purple)
+            .tint(.green)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
-        .iosGlassContainer(theme, cornerRadius: 16)
+        .background(theme.surfacePrimary.opacity(theme.isGeek ? 0.74 : 1), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(theme.borderSubtle, lineWidth: 1)
+        }
     }
 
-    private var emptyPrompts: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("ios_hermes_prompt_suggestions")
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(theme.textPrimary)
-
-            ForEach(promptSuggestions, id: \.self) { prompt in
-                Button {
-                    viewModel.draft = prompt
-                } label: {
-                    HStack {
-                        Text(prompt)
-                            .foregroundStyle(theme.textPrimary)
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
-                            .foregroundStyle(.purple)
-                    }
-                    .padding(12)
-                    .background(theme.backgroundSecondary.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
+    private func errorBanner(_ message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.caption.weight(.semibold))
+            Text(message)
+                .font(theme.footnoteFont)
+                .lineLimit(2)
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .iosGlassContainer(theme, cornerRadius: 16)
+        .foregroundStyle(theme.danger)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(theme.danger.opacity(0.12), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(theme.danger.opacity(0.18), lineWidth: 1)
+        }
     }
 
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            Button {} label: {
-                Image(systemName: "paperclip")
-                    .font(.title2.weight(.semibold))
-                    .frame(width: 34, height: 34)
+            Button {
+                toggleVoiceInputMode()
+            } label: {
+                composerModeButtonIcon
             }
-            .disabled(true)
-            .foregroundStyle(theme.textSecondary)
+            .buttonStyle(.plain)
 
-            TextField(String(localized: "ios_hermes_input_hint"), text: $viewModel.draft, axis: .vertical)
-                .lineLimit(1...4)
-                .padding(.vertical, 12)
-                .textInputAutocapitalization(.sentences)
-                .autocorrectionDisabled(false)
-                .accessibilityIdentifier("ios.hermes.chat.input")
+            if isVoiceInputMode {
+                voiceInputButton
+            } else {
+                TextField(String(localized: "ios_hermes_input_hint"), text: $viewModel.draft, axis: .vertical)
+                    .focused($isComposerFocused)
+                    .lineLimit(1...4)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .foregroundStyle(theme.textPrimary)
+                    .tint(theme.brandPrimary)
+                    .background(composerFieldBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(theme.borderSubtle.opacity(0.7), lineWidth: 1)
+                    }
+                    .textInputAutocapitalization(.sentences)
+                    .accessibilityIdentifier("ios.hermes.chat.input")
+            }
 
             Button {
-                if viewModel.isBusy {
-                    viewModel.cancel()
-                } else {
+                guard !viewModel.isBusy else { return }
+                if viewModel.canSend {
+                    isComposerFocused = false
+                    isAttachmentPanelPresented = false
                     viewModel.sendDraft()
+                } else {
+                    isComposerFocused = false
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        isAttachmentPanelPresented.toggle()
+                    }
                 }
             } label: {
-                Image(systemName: viewModel.isBusy ? "stop.fill" : "paperplane.fill")
-                    .font(.body.weight(.bold))
+                Image(systemName: trailingButtonImage)
+                    .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 42, height: 42)
-                    .background(
-                        Circle()
-                            .fill(viewModel.canSend || viewModel.isBusy ? Color.purple : theme.textTertiary.opacity(0.35))
-                    )
+                    .frame(width: 34, height: 34)
+                    .background(sendButtonColor, in: Circle())
             }
-            .disabled(!viewModel.canSend && !viewModel.isBusy)
+            .disabled(viewModel.isBusy == false && viewModel.isConfigured == false)
             .accessibilityIdentifier("ios.hermes.chat.send")
         }
-        .padding(.leading, 10)
-        .padding(.trailing, 6)
-        .padding(.vertical, 6)
-        .iosGlassContainer(theme, cornerRadius: 18)
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(theme.borderSubtle, lineWidth: 1)
+        .padding(.horizontal, 10)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
+        .background(inputBarBackground)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(theme.borderSubtle.opacity(theme.isGeek ? 0.24 : 0.18))
+                .frame(height: 0.5)
+        }
+    }
+
+    @ViewBuilder
+    private var composerModeButtonIcon: some View {
+        if isVoiceInputMode {
+            inputModeIcon(systemName: "keyboard", size: 17)
+        } else {
+            inputModeIcon(systemName: "microphone", size: 18)
+        }
+    }
+
+    private func inputModeIcon(systemName: String, size: CGFloat) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: size, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 34, height: 34)
+            .background(theme.surfaceSecondary.opacity(0.92), in: Circle())
+            .frame(width: 36, height: 36)
+    }
+
+    private var bottomInputArea: some View {
+        VStack(spacing: 0) {
+            composer
+            if isAttachmentPanelPresented {
+                attachmentPanel
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: isAttachmentPanelPresented)
+    }
+
+    private var attachmentPanel: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 0) {
+                attachmentPhotoButton
+                attachmentActionButton(title: "ios_hermes_attach_camera", systemImage: "camera.fill") {
+                    isAttachmentPanelPresented = false
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        isCameraPresented = true
+                    } else {
+                        appendAttachmentReference(
+                            name: String(localized: "ios_hermes_attachment_camera_label"),
+                            type: String(localized: "ios_hermes_attachment_photo_label")
+                        )
+                    }
+                }
+                attachmentActionButton(title: "ios_hermes_attach_voice", systemImage: "mic.fill") {
+                    isAttachmentPanelPresented = false
+                    isVoiceInputMode = true
+                    isComposerFocused = false
+                }
+                attachmentActionButton(title: "ios_hermes_attach_file", systemImage: "folder.fill") {
+                    isAttachmentPanelPresented = false
+                    isFileImporterPresented = true
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            Text("ios_hermes_attachment_message")
+                .font(theme.captionFont)
+                .foregroundStyle(theme.textTertiary)
+                .padding(.horizontal, 8)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 22)
+        .frame(height: 238)
+        .background(inputBarBackground)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(theme.borderSubtle.opacity(theme.isGeek ? 0.26 : 0.18))
+                .frame(height: 0.5)
+        }
+    }
+
+    private var attachmentPhotoButton: some View {
+        PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+            attachmentTileContent(title: "ios_hermes_attach_photo", systemImage: "photo.fill")
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func attachmentActionButton(title: LocalizedStringKey, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            attachmentTileContent(title: title, systemImage: systemImage)
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func attachmentTileContent(title: LocalizedStringKey, systemImage: String) -> some View {
+        VStack(spacing: 10) {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(attachmentTileBackground)
+                .frame(width: 62, height: 62)
+                .overlay {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 25, weight: .semibold))
+                        .foregroundStyle(theme.textPrimary)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .stroke(theme.borderSubtle.opacity(theme.isGeek ? 0.34 : 0.18), lineWidth: 1)
+                }
+
+            Text(title)
+                .font(theme.captionFont)
+                .foregroundStyle(theme.textSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
+    private var sendButtonColor: Color {
+        if viewModel.isBusy { return theme.surfaceSecondary.opacity(0.92) }
+        return viewModel.canSend ? theme.brandPrimary : theme.surfaceSecondary.opacity(0.92)
+    }
+
+    private var trailingButtonImage: String {
+        if viewModel.isBusy { return "plus" }
+        if viewModel.canSend { return "paperplane.fill" }
+        return isAttachmentPanelPresented ? "xmark" : "plus"
+    }
+
+    private var chatBackground: some View {
+        LinearGradient(
+            colors: theme.isGeek
+                ? [theme.backgroundPrimary, theme.backgroundSecondary.opacity(0.96), theme.backgroundPrimary]
+                : [theme.backgroundSecondary, theme.backgroundPrimary],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
         )
+        .overlay(alignment: .topTrailing) {
+            if theme.isGeek {
+                Circle()
+                    .fill(theme.brandSecondary.opacity(0.08))
+                    .frame(width: 260, height: 260)
+                    .blur(radius: 72)
+                    .offset(x: 92, y: 20)
+            }
+        }
+    }
+
+    private var composerFieldBackground: Color {
+        theme.isGeek ? theme.surfacePrimary.opacity(0.82) : theme.surfacePrimary
+    }
+
+    private var inputBarBackground: Color {
+        theme.isGeek ? theme.backgroundPrimary.opacity(0.96) : theme.backgroundSecondary
+    }
+
+    private var attachmentTileBackground: Color {
+        theme.isGeek ? theme.surfacePrimary.opacity(0.78) : theme.surfacePrimary
+    }
+
+    private var suggestionBackground: Color {
+        theme.isGeek ? theme.surfacePrimary.opacity(0.66) : theme.surfacePrimary
+    }
+
+    private var headerTitle: LocalizedStringKey {
+        if viewModel.isBusy { return "ios_hermes_replying" }
+        let trimmed = chatRemark.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "ios_hermes_title" : LocalizedStringKey(trimmed)
+    }
+
+    private var navigationTitleView: some View {
+        HStack(alignment: .center, spacing: 4) {
+            Text(headerTitle)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(theme.textPrimary)
+                .lineLimit(1)
+            if !viewModel.isBusy {
+                Text("AI")
+                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                    .foregroundStyle(theme.backgroundPrimary)
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 1)
+                    .background(theme.brandPrimary.opacity(theme.isGeek ? 0.86 : 0.65), in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+            }
+        }
+    }
+
+    private var voiceInputButton: some View {
+        Text(voiceInputTitle)
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(voiceInputForeground)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 40)
+            .background(voiceButtonBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(voiceButtonBorder, lineWidth: 1)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                IOSHermesPressToTalkTouchSurface(
+                    onChanged: { translation in
+                        updatePressToTalk(translation: translation)
+                    },
+                    onEnded: { translation in
+                        finishPressToTalk(translation: translation)
+                    },
+                    onCancelled: {
+                        stopPressToTalk(cancelled: true)
+                    }
+                )
+            }
+            .accessibilityIdentifier("ios.hermes.chat.voiceInput")
+    }
+
+    private var voiceInputTitle: LocalizedStringKey {
+        if isVoiceInputCancelled { return "ios_hermes_voice_release_cancel" }
+        if isPressingVoiceInput { return "ios_hermes_voice_release" }
+        return "ios_hermes_voice_hold"
+    }
+
+    private var voiceInputForeground: Color {
+        if isVoiceInputCancelled { return theme.danger }
+        if isPressingVoiceInput { return theme.brandPrimary }
+        return theme.textPrimary
+    }
+
+    private var voiceButtonBackground: Color {
+        if isVoiceInputCancelled {
+            return theme.danger.opacity(theme.isGeek ? 0.16 : 0.12)
+        }
+        if isPressingVoiceInput {
+            return theme.brandPrimary.opacity(theme.isGeek ? 0.16 : 0.12)
+        }
+        return composerFieldBackground
+    }
+
+    private var voiceButtonBorder: Color {
+        if isVoiceInputCancelled { return theme.danger.opacity(0.72) }
+        return isPressingVoiceInput ? theme.brandPrimary.opacity(0.72) : theme.borderSubtle.opacity(0.7)
     }
 
     private func configureViewModel() {
@@ -255,98 +496,175 @@ struct IOSHermesChatView: View {
         )
     }
 
-    private var promptSuggestions: [String] {
-        [
-            String(localized: "ios_hermes_prompt_check_deploy"),
-            String(localized: "ios_hermes_prompt_summarize_context"),
-            String(localized: "ios_hermes_prompt_create_plan"),
-        ]
+    private func toggleVoiceInputMode() {
+        if isVoiceInputMode {
+            isVoiceInputMode = false
+            isComposerFocused = true
+        } else {
+            isComposerFocused = false
+            isAttachmentPanelPresented = false
+            isVoiceInputMode = true
+        }
+        stopPressToTalk()
     }
+
+    private func updatePressToTalk(translation: CGSize) {
+        startPressToTalkIfNeeded()
+        let shouldCancel = translation.height < -48
+        if shouldCancel != isVoiceInputCancelled {
+            isVoiceInputCancelled = shouldCancel
+            if shouldCancel {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            }
+        }
+    }
+
+    private func startPressToTalkIfNeeded() {
+        guard !isPressingVoiceInput, !speechManager.isRecording else { return }
+        isPressingVoiceInput = true
+        isVoiceInputCancelled = false
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        speechManager.clear()
+        speechManager.startRecording()
+    }
+
+    private func finishPressToTalk(translation: CGSize) {
+        let shouldCancel = isVoiceInputCancelled || translation.height < -48
+        stopPressToTalk(cancelled: shouldCancel)
+    }
+
+    private func stopPressToTalk(cancelled: Bool = false) {
+        guard isPressingVoiceInput || speechManager.isRecording else { return }
+        isPressingVoiceInput = false
+        isVoiceInputCancelled = false
+        speechManager.stopRecording(commit: !cancelled)
+        if cancelled {
+            speechManager.clear()
+        } else {
+            commitRecognizedSpeech(speechManager.recognizedText)
+        }
+    }
+
+    private func resetVoiceInput() {
+        if speechManager.isRecording {
+            speechManager.stopRecording()
+        }
+        isPressingVoiceInput = false
+        isVoiceInputCancelled = false
+    }
+
+    private func commitRecognizedSpeech(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if viewModel.draft.isEmpty {
+            viewModel.draft = trimmed
+        } else if !viewModel.draft.contains(trimmed) {
+            viewModel.draft += " " + trimmed
+        }
+        isVoiceInputMode = false
+        isAttachmentPanelPresented = false
+        DispatchQueue.main.async {
+            isComposerFocused = true
+        }
+    }
+
+    private func appendAttachmentReference(name: String, type: String) {
+        let reference = String(format: String(localized: "ios_hermes_attachment_reference"), type, name)
+        if viewModel.draft.isEmpty {
+            viewModel.draft = reference
+        } else {
+            viewModel.draft += "\n" + reference
+        }
+        isComposerFocused = true
+    }
+
+    private func scrollToLatestMessage(_ proxy: ScrollViewProxy) {
+        guard let lastID = viewModel.messages.last?.id else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+            withAnimation(.easeOut(duration: 0.2)) {
+                proxy.scrollTo(lastID, anchor: .bottom)
+            }
+        }
+    }
+
 }
 
-private struct HermesMessageBubble: View {
+private struct HermesChatRow: View {
     let message: IOSHermesChatViewModel.Message
-    let retry: () -> Void
     let theme: IOSThemeTokens
+    @State private var isHTMLPreviewPresented = false
 
     var body: some View {
-        if message.role == .user {
-            HStack {
-                Spacer(minLength: 64)
-                VStack(alignment: .trailing, spacing: 4) {
+        VStack(spacing: 8) {
+            Text(Self.timeFormatter.string(from: message.createdAt))
+                .font(theme.captionFont)
+                .foregroundStyle(theme.textTertiary)
+
+            if message.role == .user {
+                HStack(alignment: .top) {
+                    Spacer(minLength: 54)
                     Text(message.content)
-                        .font(.body)
-                        .foregroundStyle(.white)
-                    Text(Self.timeFormatter.string(from: message.createdAt))
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.68))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(
-                    LinearGradient(
-                        colors: [Color.purple.opacity(0.88), Color.blue.opacity(0.82)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                )
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    Image(systemName: "sparkles")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.purple)
-                        .frame(width: 34, height: 34)
-                        .background(Color.purple.opacity(0.16), in: Circle())
-
-                    Text("Hermes Agent")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.purple)
-
-                    Text(Self.timeFormatter.string(from: message.createdAt))
-                        .font(.caption)
-                        .foregroundStyle(theme.textSecondary)
-
-                    Spacer()
-                }
-
-                if message.content.isEmpty && !message.isComplete {
-                    ProgressView()
-                        .tint(.purple)
-                } else {
-                    HermesMessageContent(content: message.content, theme: theme)
-                }
-
-                if case .assistant = message.role, message.isComplete {
-                    HStack(spacing: 10) {
-                        Button {
-                            UIPasteboard.general.string = message.content
-                        } label: {
-                            Label("ios_common_copy", systemImage: "doc.on.doc")
+                        .font(theme.bodyFont)
+                        .foregroundStyle(userTextColor)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .padding(.trailing, 5)
+                        .background(userBubbleBackground, in: HermesBubbleShape(direction: .right))
+                        .contextMenu {
+                            Button("ios_common_copy") {
+                                UIPasteboard.general.string = message.content
+                            }
                         }
-                        .buttonStyle(.bordered)
-                        .tint(.purple)
-
-                        Button {
-                            retry()
-                        } label: {
-                            Label("ios_hermes_regenerate", systemImage: "arrow.clockwise")
+                }
+            } else {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let htmlContent {
+                            HStack {
+                                Spacer(minLength: 0)
+                                Button {
+                                    withAnimation(.easeOut(duration: 0.18)) {
+                                        isHTMLPreviewPresented.toggle()
+                                    }
+                                } label: {
+                                    Label(
+                                        isHTMLPreviewPresented ? "ios_hermes_html_show_source" : "ios_hermes_html_render",
+                                        systemImage: isHTMLPreviewPresented ? "text.alignleft" : "safari"
+                                    )
+                                    .labelStyle(.titleAndIcon)
+                                    .font(theme.captionFont.weight(.semibold))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 5)
+                                    .background(theme.surfaceSecondary.opacity(theme.isGeek ? 0.74 : 0.9), in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(theme.brandPrimary)
+                            }
                         }
-                        .buttonStyle(.bordered)
-                        .tint(.purple)
+
+                        if isHTMLPreviewPresented, let htmlContent {
+                            HermesHTMLPreview(html: htmlContent, theme: theme)
+                        } else {
+                            HermesMarkdownMessage(content: message.content, theme: theme)
+                        }
                     }
-                    .font(.caption.weight(.semibold))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .padding(.leading, 5)
+                        .background(assistantBubbleBackground, in: HermesBubbleShape(direction: .left))
+                        .overlay {
+                            HermesBubbleShape(direction: .left)
+                                .stroke(theme.borderSubtle.opacity(theme.isGeek ? 0.78 : 0.45), lineWidth: 1)
+                        }
+                        .contextMenu {
+                            Button("ios_common_copy") {
+                                UIPasteboard.general.string = message.content
+                            }
+                        }
+                    Spacer(minLength: 54)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .iosGlassContainer(theme, cornerRadius: 16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(theme.borderSubtle, lineWidth: 1)
-            )
         }
     }
 
@@ -355,9 +673,252 @@ private struct HermesMessageBubble: View {
         formatter.dateFormat = "HH:mm"
         return formatter
     }()
+
+    private var userTextColor: Color {
+        theme.isGeek ? theme.backgroundPrimary : .black
+    }
+
+    private var userBubbleBackground: LinearGradient {
+        LinearGradient(
+            colors: theme.isGeek
+                ? [theme.brandPrimary.opacity(0.86), theme.brandSecondary.opacity(0.72)]
+                : [Color(red: 0.47, green: 0.88, blue: 0.30), Color(red: 0.47, green: 0.88, blue: 0.30)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var assistantBubbleBackground: Color {
+        theme.isGeek ? theme.surfacePrimary.opacity(0.78) : theme.surfacePrimary
+    }
+
+    private var htmlContent: String? {
+        HermesHTMLExtractor.extract(from: message.content)
+    }
 }
 
-private struct HermesMessageContent: View {
+private struct IOSHermesChatSettingsView: View {
+    @Binding var remark: String
+    let theme: IOSThemeTokens
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                VStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(theme.brandPrimary.opacity(theme.isGeek ? 0.18 : 0.12))
+                            .frame(width: 68, height: 68)
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundStyle(theme.brandPrimary)
+                    }
+
+                    Text(displayName)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(theme.textPrimary)
+                        .lineLimit(1)
+
+                    Text("ios_hermes_chat_settings_subtitle")
+                        .font(theme.footnoteFont)
+                        .foregroundStyle(theme.textTertiary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 20)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("ios_hermes_chat_remark")
+                        .font(theme.captionFont.weight(.semibold))
+                        .foregroundStyle(theme.textTertiary)
+                        .padding(.horizontal, 16)
+
+                    HStack(spacing: 12) {
+                        Text("ios_hermes_chat_remark")
+                            .font(theme.bodyFont)
+                            .foregroundStyle(theme.textPrimary)
+                        TextField(String(localized: "ios_hermes_chat_remark_placeholder"), text: $remark)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.sentences)
+                            .foregroundStyle(theme.textPrimary)
+                            .tint(theme.brandPrimary)
+                    }
+                    .frame(minHeight: 52)
+                    .padding(.horizontal, 16)
+                    .background(settingsRowBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(theme.borderSubtle.opacity(theme.isGeek ? 0.42 : 0.18), lineWidth: 1)
+                    }
+
+                    Text("ios_hermes_chat_remark_footer")
+                        .font(theme.footnoteFont)
+                        .foregroundStyle(theme.textTertiary)
+                        .padding(.horizontal, 16)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 8)
+        }
+        .background(settingsBackground.ignoresSafeArea())
+        .navigationTitle("ios_hermes_chat_settings")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(settingsNavigationBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(theme.isGeek ? .dark : .light, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+    }
+
+    private var settingsBackground: some View {
+        LinearGradient(
+            colors: theme.isGeek
+                ? [theme.backgroundPrimary, theme.backgroundSecondary.opacity(0.96)]
+                : [theme.backgroundSecondary, theme.backgroundPrimary],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    private var settingsNavigationBackground: Color {
+        theme.isGeek ? theme.backgroundPrimary.opacity(0.98) : theme.backgroundSecondary
+    }
+
+    private var settingsRowBackground: Color {
+        theme.isGeek ? theme.surfacePrimary.opacity(0.66) : theme.surfacePrimary
+    }
+
+    private var displayName: String {
+        let trimmed = remark.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? String(localized: "ios_hermes_title") : trimmed
+    }
+}
+
+private struct IOSHermesCameraPicker: UIViewControllerRepresentable {
+    let onPicked: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        private let parent: IOSHermesCameraPicker
+
+        init(parent: IOSHermesCameraPicker) {
+            self.parent = parent
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            parent.onPicked(String(localized: "ios_hermes_attachment_camera_label"))
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
+}
+
+private enum HermesBubbleTailDirection {
+    case left
+    case right
+}
+
+private struct HermesBubbleShape: Shape {
+    let direction: HermesBubbleTailDirection
+
+    func path(in rect: CGRect) -> Path {
+        let tailWidth: CGFloat = 8
+        let tailHeight: CGFloat = 11
+        let cornerRadius: CGFloat = 10
+        let bubbleRect: CGRect
+
+        switch direction {
+        case .left:
+            bubbleRect = CGRect(
+                x: rect.minX + tailWidth,
+                y: rect.minY,
+                width: max(0, rect.width - tailWidth),
+                height: rect.height
+            )
+        case .right:
+            bubbleRect = CGRect(
+                x: rect.minX,
+                y: rect.minY,
+                width: max(0, rect.width - tailWidth),
+                height: rect.height
+            )
+        }
+
+        let minX = bubbleRect.minX
+        let maxX = bubbleRect.maxX
+        let minY = bubbleRect.minY
+        let maxY = bubbleRect.maxY
+        let tailY = minY + min(22, max(15, rect.height * 0.24))
+        var path = Path()
+
+        switch direction {
+        case .right:
+            path.move(to: CGPoint(x: minX + cornerRadius, y: minY))
+            path.addLine(to: CGPoint(x: maxX - cornerRadius, y: minY))
+            path.addQuadCurve(to: CGPoint(x: maxX, y: minY + cornerRadius), control: CGPoint(x: maxX, y: minY))
+            path.addLine(to: CGPoint(x: maxX, y: tailY - tailHeight * 0.5))
+            path.addCurve(
+                to: CGPoint(x: rect.maxX, y: tailY),
+                control1: CGPoint(x: maxX + tailWidth * 0.28, y: tailY - tailHeight * 0.38),
+                control2: CGPoint(x: maxX + tailWidth * 0.76, y: tailY - tailHeight * 0.28)
+            )
+            path.addCurve(
+                to: CGPoint(x: maxX, y: tailY + tailHeight * 0.5),
+                control1: CGPoint(x: maxX + tailWidth * 0.76, y: tailY + tailHeight * 0.28),
+                control2: CGPoint(x: maxX + tailWidth * 0.28, y: tailY + tailHeight * 0.38)
+            )
+            path.addLine(to: CGPoint(x: maxX, y: maxY - cornerRadius))
+            path.addQuadCurve(to: CGPoint(x: maxX - cornerRadius, y: maxY), control: CGPoint(x: maxX, y: maxY))
+            path.addLine(to: CGPoint(x: minX + cornerRadius, y: maxY))
+            path.addQuadCurve(to: CGPoint(x: minX, y: maxY - cornerRadius), control: CGPoint(x: minX, y: maxY))
+            path.addLine(to: CGPoint(x: minX, y: minY + cornerRadius))
+            path.addQuadCurve(to: CGPoint(x: minX + cornerRadius, y: minY), control: CGPoint(x: minX, y: minY))
+            path.closeSubpath()
+        case .left:
+            path.move(to: CGPoint(x: maxX - cornerRadius, y: minY))
+            path.addLine(to: CGPoint(x: minX + cornerRadius, y: minY))
+            path.addQuadCurve(to: CGPoint(x: minX, y: minY + cornerRadius), control: CGPoint(x: minX, y: minY))
+            path.addLine(to: CGPoint(x: minX, y: tailY - tailHeight * 0.5))
+            path.addCurve(
+                to: CGPoint(x: rect.minX, y: tailY),
+                control1: CGPoint(x: minX - tailWidth * 0.28, y: tailY - tailHeight * 0.38),
+                control2: CGPoint(x: minX - tailWidth * 0.76, y: tailY - tailHeight * 0.28)
+            )
+            path.addCurve(
+                to: CGPoint(x: minX, y: tailY + tailHeight * 0.5),
+                control1: CGPoint(x: minX - tailWidth * 0.76, y: tailY + tailHeight * 0.28),
+                control2: CGPoint(x: minX - tailWidth * 0.28, y: tailY + tailHeight * 0.38)
+            )
+            path.addLine(to: CGPoint(x: minX, y: maxY - cornerRadius))
+            path.addQuadCurve(to: CGPoint(x: minX + cornerRadius, y: maxY), control: CGPoint(x: minX, y: maxY))
+            path.addLine(to: CGPoint(x: maxX - cornerRadius, y: maxY))
+            path.addQuadCurve(to: CGPoint(x: maxX, y: maxY - cornerRadius), control: CGPoint(x: maxX, y: maxY))
+            path.addLine(to: CGPoint(x: maxX, y: minY + cornerRadius))
+            path.addQuadCurve(to: CGPoint(x: maxX - cornerRadius, y: minY), control: CGPoint(x: maxX, y: minY))
+            path.closeSubpath()
+        }
+
+        return path
+    }
+}
+
+private struct HermesMarkdownMessage: View {
     let content: String
     let theme: IOSThemeTokens
 
@@ -365,46 +926,184 @@ private struct HermesMessageContent: View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 switch block {
-                case .text(let text):
-                    Text(text)
-                        .font(.body)
+                case .paragraph(let text):
+                    Text(inlineMarkdown(text))
+                        .font(theme.bodyFont)
                         .foregroundStyle(theme.textPrimary)
                         .textSelection(.enabled)
+                case .heading(let level, let text):
+                    Text(inlineMarkdown(text))
+                        .font(headingFont(for: level))
+                        .foregroundStyle(theme.textPrimary)
+                        .textSelection(.enabled)
+                case .listItem(let text):
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("\u{2022}")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(theme.brandPrimary)
+                        Text(inlineMarkdown(text))
+                            .font(theme.bodyFont)
+                            .foregroundStyle(theme.textPrimary)
+                            .textSelection(.enabled)
+                    }
+                case .quote(let text):
+                    HStack(spacing: 8) {
+                        Rectangle()
+                            .fill(theme.brandPrimary.opacity(0.46))
+                            .frame(width: 3)
+                        Text(inlineMarkdown(text))
+                            .font(theme.bodyFont)
+                            .foregroundStyle(theme.textSecondary)
+                            .textSelection(.enabled)
+                    }
                 case .code(let language, let code):
                     HermesCodeBlock(language: language, code: code, theme: theme)
+                case .table(let headers, let rows):
+                    HermesTableView(headers: headers, rows: rows, theme: theme)
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var blocks: [HermesRenderedBlock] {
-        let parts = content.components(separatedBy: "```")
-        var result: [HermesRenderedBlock] = []
+    private var blocks: [HermesMarkdownBlock] {
+        HermesMarkdownParser.parse(content)
+    }
 
-        for index in parts.indices {
-            let part = parts[index].trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !part.isEmpty else { continue }
+    private func inlineMarkdown(_ text: String) -> AttributedString {
+        (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
+    }
 
-            if index.isMultiple(of: 2) {
-                result.append(.text(part))
-            } else {
-                let lines = part.components(separatedBy: .newlines)
-                let firstLine = lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                if lines.count > 1, !firstLine.isEmpty, firstLine.range(of: #"^[A-Za-z0-9_+-]+$"#, options: .regularExpression) != nil {
-                    result.append(.code(firstLine, lines.dropFirst().joined(separator: "\n")))
-                } else {
-                    result.append(.code("code", part))
-                }
-            }
+    private func headingFont(for level: Int) -> Font {
+        switch level {
+        case 1:
+            return .title3.weight(.bold)
+        case 2:
+            return .headline.weight(.semibold)
+        default:
+            return .subheadline.weight(.semibold)
         }
-
-        return result.isEmpty ? [.text(content)] : result
     }
 }
 
-private enum HermesRenderedBlock: Equatable {
-    case text(String)
+private enum HermesMarkdownBlock: Equatable {
+    case paragraph(String)
+    case heading(Int, String)
+    case listItem(String)
+    case quote(String)
     case code(String, String)
+    case table([String], [[String]])
+}
+
+private enum HermesMarkdownParser {
+    static func parse(_ source: String) -> [HermesMarkdownBlock] {
+        let lines = source.components(separatedBy: .newlines)
+        var blocks: [HermesMarkdownBlock] = []
+        var index = 0
+
+        while index < lines.count {
+            let line = lines[index]
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed.isEmpty {
+                index += 1
+                continue
+            }
+
+            if trimmed.hasPrefix("```") {
+                let language = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespacesAndNewlines)
+                var codeLines: [String] = []
+                index += 1
+                while index < lines.count, !lines[index].trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+                    codeLines.append(lines[index])
+                    index += 1
+                }
+                blocks.append(.code(language.isEmpty ? "code" : language, codeLines.joined(separator: "\n")))
+                index += 1
+                continue
+            }
+
+            if let level = headingLevel(trimmed) {
+                let text = String(trimmed.dropFirst(level)).trimmingCharacters(in: .whitespaces)
+                blocks.append(.heading(level, text))
+                index += 1
+                continue
+            }
+
+            if isTableStart(lines, index: index) {
+                let headers = tableCells(from: lines[index])
+                index += 2
+                var rows: [[String]] = []
+                while index < lines.count, lines[index].contains("|"), !lines[index].trimmingCharacters(in: .whitespaces).isEmpty {
+                    rows.append(tableCells(from: lines[index]))
+                    index += 1
+                }
+                blocks.append(.table(headers, rows))
+                continue
+            }
+
+            if trimmed.hasPrefix(">") {
+                blocks.append(.quote(String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)))
+                index += 1
+                continue
+            }
+
+            if let listText = listItemText(trimmed) {
+                blocks.append(.listItem(listText))
+                index += 1
+                continue
+            }
+
+            var paragraph = [trimmed]
+            index += 1
+            while index < lines.count {
+                let next = lines[index].trimmingCharacters(in: .whitespaces)
+                if next.isEmpty || next.hasPrefix("```") || next.hasPrefix(">") || headingLevel(next) != nil || listItemText(next) != nil || isTableStart(lines, index: index) {
+                    break
+                }
+                paragraph.append(next)
+                index += 1
+            }
+            blocks.append(.paragraph(paragraph.joined(separator: "\n")))
+        }
+
+        return blocks.isEmpty ? [.paragraph(source)] : blocks
+    }
+
+    private static func headingLevel(_ line: String) -> Int? {
+        let count = line.prefix(while: { $0 == "#" }).count
+        guard (1...3).contains(count), line.dropFirst(count).first == " " else { return nil }
+        return count
+    }
+
+    private static func listItemText(_ line: String) -> String? {
+        if line.hasPrefix("- ") || line.hasPrefix("* ") {
+            return String(line.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+        }
+        guard let dotIndex = line.firstIndex(of: ".") else { return nil }
+        let prefix = line[..<dotIndex]
+        guard !prefix.isEmpty, prefix.allSatisfy(\.isNumber) else { return nil }
+        let afterDot = line[line.index(after: dotIndex)...]
+        guard afterDot.first == " " else { return nil }
+        return String(afterDot.dropFirst()).trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func isTableStart(_ lines: [String], index: Int) -> Bool {
+        guard index + 1 < lines.count else { return false }
+        guard lines[index].contains("|") else { return false }
+        let divider = lines[index + 1].trimmingCharacters(in: .whitespaces)
+        guard divider.contains("|"), divider.contains("-") else { return false }
+        let allowed = CharacterSet(charactersIn: "|-: ")
+        return divider.unicodeScalars.allSatisfy { allowed.contains($0) }
+    }
+
+    private static func tableCells(from line: String) -> [String] {
+        var value = line.trimmingCharacters(in: .whitespaces)
+        if value.hasPrefix("|") { value.removeFirst() }
+        if value.hasSuffix("|") { value.removeLast() }
+        return value.split(separator: "|", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+    }
 }
 
 private struct HermesCodeBlock: View {
@@ -426,7 +1125,6 @@ private struct HermesCodeBlock: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(theme.textSecondary)
-                .accessibilityLabel("Copy \(language) code")
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -438,10 +1136,228 @@ private struct HermesCodeBlock: View {
             }
         }
         .padding(10)
-        .background(theme.backgroundSecondary.opacity(0.65), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(theme.borderSubtle, lineWidth: 1)
-        )
+        .background(theme.surfaceSecondary.opacity(theme.isGeek ? 0.76 : 1), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(theme.borderSubtle.opacity(0.7), lineWidth: 1)
+        }
+    }
+}
+
+private struct HermesHTMLPreview: UIViewRepresentable {
+    let html: String
+    let theme: IOSThemeTokens
+
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        webView.scrollView.showsHorizontalScrollIndicator = false
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        webView.loadHTMLString(wrappedHTML, baseURL: nil)
+    }
+
+    private var wrappedHTML: String {
+        let background = theme.isGeek ? "#111827" : "#ffffff"
+        let foreground = theme.isGeek ? "#e5e7eb" : "#111827"
+        let border = theme.isGeek ? "rgba(148, 163, 184, 0.28)" : "rgba(17, 24, 39, 0.12)"
+        return """
+        <!doctype html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+          <style>
+            html, body {
+              margin: 0;
+              padding: 0;
+              background: \(background);
+              color: \(foreground);
+              font: -apple-system-body;
+              overflow-wrap: anywhere;
+            }
+            body {
+              padding: 14px;
+              border: 1px solid \(border);
+              border-radius: 12px;
+              box-sizing: border-box;
+            }
+            img, video, iframe, table {
+              max-width: 100%;
+            }
+            button, input, select, textarea {
+              font: inherit;
+            }
+          </style>
+        </head>
+        <body>
+        \(html)
+        </body>
+        </html>
+        """
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: WKWebView, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 280, height: 260)
+    }
+}
+
+private enum HermesHTMLExtractor {
+    static func extract(from source: String) -> String? {
+        if let fenced = firstHTMLFence(in: source) {
+            return fenced
+        }
+
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard looksLikeHTML(trimmed) else { return nil }
+        return trimmed
+    }
+
+    private static func firstHTMLFence(in source: String) -> String? {
+        let lines = source.components(separatedBy: .newlines)
+        var index = 0
+
+        while index < lines.count {
+            let trimmed = lines[index].trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("```") else {
+                index += 1
+                continue
+            }
+
+            let language = trimmed.dropFirst(3).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            index += 1
+            var codeLines: [String] = []
+            while index < lines.count, !lines[index].trimmingCharacters(in: .whitespaces).hasPrefix("```") {
+                codeLines.append(lines[index])
+                index += 1
+            }
+
+            if language == "html" || language == "htm" {
+                let html = codeLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+                return html.isEmpty ? nil : html
+            }
+
+            index += 1
+        }
+
+        return nil
+    }
+
+    private static func looksLikeHTML(_ source: String) -> Bool {
+        guard source.contains("<"), source.contains(">") else { return false }
+        let lowercased = source.lowercased()
+        let tags = ["<!doctype html", "<html", "<body", "<div", "<p", "<h1", "<h2", "<h3", "<ul", "<ol", "<li", "<table", "<button", "<style"]
+        return tags.contains { lowercased.contains($0) }
+    }
+}
+
+private struct IOSHermesPressToTalkTouchSurface: UIViewRepresentable {
+    var onChanged: (CGSize) -> Void
+    var onEnded: (CGSize) -> Void
+    var onCancelled: () -> Void
+
+    func makeUIView(context: Context) -> TouchView {
+        let view = TouchView()
+        view.backgroundColor = .clear
+        view.isMultipleTouchEnabled = false
+        return view
+    }
+
+    func updateUIView(_ uiView: TouchView, context: Context) {
+        uiView.onChanged = onChanged
+        uiView.onEnded = onEnded
+        uiView.onCancelled = onCancelled
+    }
+
+    final class TouchView: UIView {
+        var onChanged: ((CGSize) -> Void)?
+        var onEnded: ((CGSize) -> Void)?
+        var onCancelled: (() -> Void)?
+        private var startLocation: CGPoint?
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+            guard let touch = touches.first else { return }
+            let location = touch.location(in: self)
+            startLocation = location
+            onChanged?(.zero)
+        }
+
+        override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+            guard let touch = touches.first, let startLocation else { return }
+            let location = touch.location(in: self)
+            onChanged?(CGSize(width: location.x - startLocation.x, height: location.y - startLocation.y))
+        }
+
+        override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+            guard let touch = touches.first, let startLocation else {
+                onEnded?(.zero)
+                self.startLocation = nil
+                return
+            }
+            let location = touch.location(in: self)
+            onEnded?(CGSize(width: location.x - startLocation.x, height: location.y - startLocation.y))
+            self.startLocation = nil
+        }
+
+        override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+            onCancelled?()
+            startLocation = nil
+        }
+    }
+}
+
+private struct HermesTableView: View {
+    let headers: [String]
+    let rows: [[String]]
+    let theme: IOSThemeTokens
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: true) {
+            Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
+                GridRow {
+                    ForEach(headers.indices, id: \.self) { index in
+                        tableCell(headers[index], isHeader: true)
+                    }
+                }
+
+                ForEach(rows.indices, id: \.self) { rowIndex in
+                    GridRow {
+                        ForEach(0..<columnCount, id: \.self) { columnIndex in
+                            tableCell(value(rowIndex: rowIndex, columnIndex: columnIndex), isHeader: false)
+                        }
+                    }
+                }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(theme.borderSubtle.opacity(0.9), lineWidth: 1)
+            }
+        }
+    }
+
+    private var columnCount: Int {
+        max(headers.count, rows.map(\.count).max() ?? 0)
+    }
+
+    private func value(rowIndex: Int, columnIndex: Int) -> String {
+        guard rows.indices.contains(rowIndex), rows[rowIndex].indices.contains(columnIndex) else { return "" }
+        return rows[rowIndex][columnIndex]
+    }
+
+    private func tableCell(_ text: String, isHeader: Bool) -> some View {
+        Text(text.isEmpty ? " " : text)
+            .font(isHeader ? .caption.weight(.semibold) : .caption)
+            .foregroundStyle(theme.textPrimary)
+            .textSelection(.enabled)
+            .frame(minWidth: 92, maxWidth: 180, alignment: .leading)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(isHeader ? theme.surfaceSecondary.opacity(0.8) : theme.surfacePrimary.opacity(0.45))
+            .border(theme.borderSubtle.opacity(0.72), width: 0.5)
     }
 }

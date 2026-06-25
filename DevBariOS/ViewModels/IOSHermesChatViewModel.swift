@@ -86,9 +86,6 @@ final class IOSHermesChatViewModel: ObservableObject {
     func cancel() {
         activeTask?.cancel()
         activeTask = nil
-        if let index = messages.lastIndex(where: { $0.role == .assistant && !$0.isComplete }) {
-            messages[index].isComplete = true
-        }
         status = .idle
     }
 
@@ -100,25 +97,24 @@ final class IOSHermesChatViewModel: ObservableObject {
 
         activeTask?.cancel()
         lastPrompt = prompt
+        status = isStreamingEnabled ? .streaming : .sending
 
         let userMessage = Message(role: .user, content: prompt)
-        let assistantMessage = Message(role: .assistant, content: "", isComplete: false)
         messages.append(userMessage)
-        messages.append(assistantMessage)
-        let assistantID = assistantMessage.id
 
         activeTask = Task { [weak self] in
             guard let self else { return }
-            await self.performSend(assistantID: assistantID)
+            await self.performSend()
         }
     }
 
-    private func performSend(assistantID: UUID) async {
+    private func performSend() async {
         let requestMessages = messages
-            .filter { $0.id != assistantID && !$0.content.isEmpty }
+            .filter { !$0.content.isEmpty }
             .map { HermesChatRequestMessage(role: $0.role, content: $0.content) }
 
         do {
+            var assistantContent = ""
             if isStreamingEnabled {
                 status = .streaming
                 for try await delta in client.streamMessage(
@@ -127,43 +123,27 @@ final class IOSHermesChatViewModel: ObservableObject {
                     messages: requestMessages
                 ) {
                     guard !Task.isCancelled else { return }
-                    append(delta, toAssistantMessage: assistantID)
+                    assistantContent += delta
                 }
             } else {
                 status = .sending
-                let content = try await client.sendMessage(
+                assistantContent = try await client.sendMessage(
                     baseURL: baseURL,
                     apiKey: apiKey,
                     messages: requestMessages,
                     stream: false
                 )
-                replaceAssistantMessage(assistantID, content: content)
             }
 
-            completeAssistantMessage(assistantID)
+            let trimmedContent = assistantContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmedContent.isEmpty {
+                messages.append(Message(role: .assistant, content: trimmedContent))
+            }
             status = .idle
         } catch is CancellationError {
-            completeAssistantMessage(assistantID)
             status = .idle
         } catch {
-            replaceAssistantMessage(assistantID, content: error.localizedDescription)
-            completeAssistantMessage(assistantID)
             status = .failed(error.localizedDescription)
         }
-    }
-
-    private func append(_ delta: String, toAssistantMessage id: UUID) {
-        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[index].content += delta
-    }
-
-    private func replaceAssistantMessage(_ id: UUID, content: String) {
-        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[index].content = content
-    }
-
-    private func completeAssistantMessage(_ id: UUID) {
-        guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
-        messages[index].isComplete = true
     }
 }
