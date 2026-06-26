@@ -47,7 +47,18 @@ struct DevBariOSApp: App {
                     shortcutStore.handle(action)
                 }
         }
-        .modelContainer(for: [IOSAPIRecord.self, IOSWebHistoryRecord.self, IOSMemoItem.self, IOSMarkdownDocument.self], isAutosaveEnabled: true, isUndoEnabled: false)
+        .modelContainer(
+            for: [
+                IOSAPIRecord.self,
+                IOSWebHistoryRecord.self,
+                IOSMemoItem.self,
+                IOSMarkdownDocument.self,
+                IOSHermesConversation.self,
+                IOSHermesMessage.self,
+            ],
+            isAutosaveEnabled: true,
+            isUndoEnabled: false
+        )
     }
 
     /// SwiftData's default `ModelConfiguration` uses `groupContainer: .automatic`. Because this app

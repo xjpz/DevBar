@@ -23,6 +23,7 @@ final class IOSAppViewModel: ObservableObject {
     enum TabSelection: Hashable {
         case dashboard
         case webkit
+        case chatbot
         case tools
     }
 

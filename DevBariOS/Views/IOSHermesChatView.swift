@@ -1,5 +1,6 @@
 import DevBarCore
 import PhotosUI
+import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
@@ -8,8 +9,9 @@ import WebKit
 struct IOSHermesChatView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @Environment(\.themeTokens) private var theme
+    @Environment(\.modelContext) private var modelContext
     @FocusState private var isComposerFocused: Bool
-    @AppStorage("ios_hermes_chat_remark") private var chatRemark = ""
+    @State private var draftRemark: String
     @State private var isSettingsPresented = false
     @State private var isAttachmentPanelPresented = false
     @State private var isCameraPresented = false
@@ -20,6 +22,13 @@ struct IOSHermesChatView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @StateObject private var speechManager = IOSSpeechManager()
     @StateObject private var viewModel = IOSHermesChatViewModel()
+
+    private let initialConversation: IOSHermesConversation?
+
+    init(conversation: IOSHermesConversation? = nil) {
+        self.initialConversation = conversation
+        _draftRemark = State(initialValue: conversation?.remark ?? "")
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -80,7 +89,7 @@ struct IOSHermesChatView: View {
             bottomInputArea
         }
         .navigationDestination(isPresented: $isSettingsPresented) {
-            IOSHermesChatSettingsView(remark: $chatRemark, theme: theme)
+            IOSHermesChatSettingsView(remark: remarkBinding, theme: theme)
         }
         .fullScreenCover(isPresented: $isCameraPresented) {
             IOSHermesCameraPicker { name in
@@ -116,6 +125,9 @@ struct IOSHermesChatView: View {
             }
         }
         .onAppear {
+            if viewModel.conversation == nil {
+                viewModel.load(conversation: initialConversation)
+            }
             configureViewModel()
         }
         .onChange(of: appViewModel.hermesSettings) { _, _ in
@@ -224,7 +236,7 @@ struct IOSHermesChatView: View {
                 if viewModel.canSend {
                     isComposerFocused = false
                     isAttachmentPanelPresented = false
-                    viewModel.sendDraft()
+                    _ = viewModel.sendDraft(modelContext: modelContext, draftRemark: draftRemark)
                 } else {
                     isComposerFocused = false
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -234,9 +246,13 @@ struct IOSHermesChatView: View {
             } label: {
                 Image(systemName: trailingButtonImage)
                     .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(trailingButtonForeground)
                     .frame(width: 34, height: 34)
                     .background(sendButtonColor, in: Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(composerRoundButtonBorder, lineWidth: 1)
+                    }
             }
             .disabled(viewModel.isBusy == false && viewModel.isConfigured == false)
             .accessibilityIdentifier("ios.hermes.chat.send")
@@ -264,9 +280,13 @@ struct IOSHermesChatView: View {
     private func inputModeIcon(systemName: String, size: CGFloat) -> some View {
         Image(systemName: systemName)
             .font(.system(size: size, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(composerRoundButtonForeground)
             .frame(width: 34, height: 34)
-            .background(theme.surfaceSecondary.opacity(0.92), in: Circle())
+            .background(composerRoundButtonBackground, in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(composerRoundButtonBorder, lineWidth: 1)
+            }
             .frame(width: 36, height: 36)
     }
 
@@ -366,8 +386,26 @@ struct IOSHermesChatView: View {
     }
 
     private var sendButtonColor: Color {
-        if viewModel.isBusy { return theme.surfaceSecondary.opacity(0.92) }
-        return viewModel.canSend ? theme.brandPrimary : theme.surfaceSecondary.opacity(0.92)
+        if viewModel.canSend {
+            return theme.brandPrimary
+        }
+        return composerRoundButtonBackground
+    }
+
+    private var trailingButtonForeground: Color {
+        viewModel.canSend ? .white : composerRoundButtonForeground
+    }
+
+    private var composerRoundButtonForeground: Color {
+        theme.isGeek ? .white : theme.textPrimary
+    }
+
+    private var composerRoundButtonBackground: Color {
+        theme.isGeek ? theme.surfaceSecondary.opacity(0.92) : theme.surfacePrimary.opacity(0.98)
+    }
+
+    private var composerRoundButtonBorder: Color {
+        theme.borderSubtle.opacity(theme.isGeek ? 0.24 : 0.42)
     }
 
     private var trailingButtonImage: String {
@@ -413,8 +451,21 @@ struct IOSHermesChatView: View {
 
     private var headerTitle: LocalizedStringKey {
         if viewModel.isBusy { return "ios_hermes_replying" }
-        let trimmed = chatRemark.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = currentRemark.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "ios_hermes_title" : LocalizedStringKey(trimmed)
+    }
+
+    private var currentRemark: String {
+        viewModel.conversation?.remark ?? draftRemark
+    }
+
+    private var remarkBinding: Binding<String> {
+        Binding {
+            currentRemark
+        } set: { newValue in
+            draftRemark = newValue
+            viewModel.updateRemark(newValue, modelContext: modelContext)
+        }
     }
 
     private var navigationTitleView: some View {

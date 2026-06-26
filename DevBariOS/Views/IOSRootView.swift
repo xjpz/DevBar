@@ -44,6 +44,14 @@ struct IOSRootView: View {
                 }
 
                 NavigationStack {
+                    IOSHermesConversationListView()
+                }
+                .tabItem {
+                    Label("ios_tab_chatbot", systemImage: "bubble.left.and.bubble.right.fill")
+                }
+                .tag(IOSAppViewModel.TabSelection.chatbot)
+
+                NavigationStack {
                     IOSToolsView()
                 }
                 .tabItem {
@@ -135,7 +143,7 @@ struct IOSRootView: View {
         switch appViewModel.selectedTab {
         case .dashboard:
             theme.backgroundPrimary
-        case .webkit, .tools:
+        case .webkit, .chatbot, .tools:
             theme.backgroundSecondary
         }
     }

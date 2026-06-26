@@ -2522,6 +2522,9 @@
         }
       }
     },
+    "Hermes Chat history is saved on this iPhone." : {
+
+    },
     "Hi, %@" : {
       "localizations" : {
         "en" : {
@@ -3226,37 +3229,8 @@
         }
       }
     },
-    "ios_hermes_html_render" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Render"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "渲染"
-          }
-        }
-      }
-    },
-    "ios_hermes_html_show_source" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Source"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "原文"
-          }
-        }
-      }
+    "ios_common_delete" : {
+
     },
     "ios_common_done" : {
       "localizations" : {
@@ -4046,6 +4020,38 @@
         }
       }
     },
+    "ios_hermes_html_render" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Render"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "渲染"
+          }
+        }
+      }
+    },
+    "ios_hermes_html_show_source" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Source"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原文"
+          }
+        }
+      }
+    },
     "ios_hermes_input_hint" : {
       "localizations" : {
         "en" : {
@@ -4267,13 +4273,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hermes Chat"
+            "value" : "Hermes"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hermes Chat"
+            "value" : "Hermes"
           }
         }
       }
@@ -6555,7 +6561,6 @@
       }
     },
     "ios_tab_chatbot" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9347,6 +9352,9 @@
           }
         }
       }
+    },
+    "New Chat" : {
+
     },
     "new_version_found" : {
       "localizations" : {
@@ -12868,7 +12876,6 @@
       }
     },
     "完成" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

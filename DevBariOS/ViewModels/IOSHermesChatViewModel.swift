@@ -1,6 +1,7 @@
 import Combine
 import DevBarCore
 import Foundation
+import SwiftData
 
 @MainActor
 final class IOSHermesChatViewModel: ObservableObject {
@@ -35,6 +36,7 @@ final class IOSHermesChatViewModel: ObservableObject {
 
     @Published private(set) var messages: [Message] = []
     @Published private(set) var status: Status = .idle
+    @Published private(set) var conversation: IOSHermesConversation?
     @Published var draft = ""
 
     private let client: HermesAPIClient
@@ -71,16 +73,37 @@ final class IOSHermesChatViewModel: ObservableObject {
         isStreamingEnabled = settings.isStreamingEnabled
     }
 
-    func sendDraft() {
-        let prompt = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty else { return }
-        draft = ""
-        send(prompt)
+    func load(conversation: IOSHermesConversation?) {
+        self.conversation = conversation
+        guard let conversation else {
+            messages = []
+            return
+        }
+
+        messages = conversation.messages
+            .sorted { $0.createdAt < $1.createdAt }
+            .map {
+                Message(
+                    id: $0.id,
+                    role: $0.role,
+                    content: $0.content,
+                    createdAt: $0.createdAt,
+                    isComplete: $0.isComplete
+                )
+            }
     }
 
-    func retryLastPrompt() {
+    func sendDraft(modelContext: ModelContext, draftRemark: String) -> IOSHermesConversation? {
+        let prompt = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !prompt.isEmpty else { return conversation }
+        draft = ""
+        send(prompt, modelContext: modelContext, draftRemark: draftRemark)
+        return conversation
+    }
+
+    func retryLastPrompt(modelContext: ModelContext, draftRemark: String) {
         guard let lastPrompt else { return }
-        send(lastPrompt)
+        send(lastPrompt, modelContext: modelContext, draftRemark: draftRemark)
     }
 
     func cancel() {
@@ -89,7 +112,15 @@ final class IOSHermesChatViewModel: ObservableObject {
         status = .idle
     }
 
-    private func send(_ prompt: String) {
+    func updateRemark(_ remark: String, modelContext: ModelContext) {
+        guard let conversation else { return }
+        conversation.remark = remark
+        conversation.updatedAt = Date()
+        try? modelContext.save()
+        objectWillChange.send()
+    }
+
+    private func send(_ prompt: String, modelContext: ModelContext, draftRemark: String) {
         guard isConfigured else {
             status = .failed(String(localized: "ios_hermes_missing_config_detail"))
             return
@@ -99,20 +130,26 @@ final class IOSHermesChatViewModel: ObservableObject {
         lastPrompt = prompt
         status = isStreamingEnabled ? .streaming : .sending
 
-        let userMessage = Message(role: .user, content: prompt)
+        let conversation = ensureConversation(modelContext: modelContext, draftRemark: draftRemark)
+        let userMessage = persistMessage(
+            role: .user,
+            content: prompt,
+            contentFormat: .plain,
+            conversation: conversation,
+            modelContext: modelContext
+        )
         messages.append(userMessage)
-
-        activeTask = Task { [weak self] in
-            guard let self else { return }
-            await self.performSend()
-        }
-    }
-
-    private func performSend() async {
         let requestMessages = messages
             .filter { !$0.content.isEmpty }
             .map { HermesChatRequestMessage(role: $0.role, content: $0.content) }
 
+        activeTask = Task { [weak self] in
+            guard let self else { return }
+            await self.performSend(requestMessages: requestMessages, modelContext: modelContext)
+        }
+    }
+
+    private func performSend(requestMessages: [HermesChatRequestMessage], modelContext: ModelContext) async {
         do {
             var assistantContent = ""
             if isStreamingEnabled {
@@ -137,7 +174,18 @@ final class IOSHermesChatViewModel: ObservableObject {
 
             let trimmedContent = assistantContent.trimmingCharacters(in: .whitespacesAndNewlines)
             if !trimmedContent.isEmpty {
-                messages.append(Message(role: .assistant, content: trimmedContent))
+                guard let conversation else {
+                    status = .idle
+                    return
+                }
+                let assistantMessage = persistMessage(
+                    role: .assistant,
+                    content: trimmedContent,
+                    contentFormat: IOSHermesMessageContentFormat.detected(for: trimmedContent),
+                    conversation: conversation,
+                    modelContext: modelContext
+                )
+                messages.append(assistantMessage)
             }
             status = .idle
         } catch is CancellationError {
@@ -145,5 +193,49 @@ final class IOSHermesChatViewModel: ObservableObject {
         } catch {
             status = .failed(error.localizedDescription)
         }
+    }
+
+    private func ensureConversation(modelContext: ModelContext, draftRemark: String) -> IOSHermesConversation {
+        if let conversation {
+            return conversation
+        }
+
+        let trimmedRemark = draftRemark.trimmingCharacters(in: .whitespacesAndNewlines)
+        let newConversation = IOSHermesConversation(remark: trimmedRemark)
+        modelContext.insert(newConversation)
+        conversation = newConversation
+        try? modelContext.save()
+        return newConversation
+    }
+
+    private func persistMessage(
+        role: HermesChatRole,
+        content: String,
+        contentFormat: IOSHermesMessageContentFormat,
+        conversation: IOSHermesConversation,
+        modelContext: ModelContext
+    ) -> Message {
+        let now = Date()
+        let persisted = IOSHermesMessage(
+            role: role,
+            content: content,
+            contentFormat: contentFormat,
+            isComplete: true,
+            createdAt: now,
+            completedAt: now,
+            conversation: nil
+        )
+        modelContext.insert(persisted)
+        conversation.messages.append(persisted)
+        conversation.recordMessage(content: content, at: now)
+        try? modelContext.save()
+
+        return Message(
+            id: persisted.id,
+            role: role,
+            content: content,
+            createdAt: now,
+            isComplete: true
+        )
     }
 }
