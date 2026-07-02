@@ -225,14 +225,15 @@ struct IOSSettingsView: View {
     }
 
     private var hermesSummary: String {
-        if appViewModel.isHermesConfigured {
-            return localized("ios_settings_hermes_configured")
-        }
         if !appViewModel.hermesSettings.apiBaseURL.isEmpty,
            HermesAPIClient.chatURL(from: appViewModel.hermesSettings.apiBaseURL) == nil {
             return localized("ios_settings_hermes_invalid_url")
         }
-        return localized("ios_settings_hermes_api_key_required")
+        if appViewModel.isHermesConfigured {
+            let model = appViewModel.hermesSettings.hermesModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            return model.isEmpty ? "Hermes HTTP" : "Hermes HTTP · \(model)"
+        }
+        return "未配置"
     }
 
     private var liveActivitySummary: String {
@@ -537,11 +538,16 @@ private struct IOSPushSettingsView: View {
 private struct IOSHermesSettingsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @Environment(\.themeTokens) private var theme
+    @State private var hermesModel = ""
     @State private var apiBaseURL = ""
     @State private var apiKey = ""
     @State private var isStreamingEnabled = true
-    @State private var errorMessage: String?
-    @State private var didSave = false
+    @State private var discoveredModels: [HermesModel] = []
+    @State private var discoveredCapabilities: HermesAPIServerCapabilities?
+    @State private var isRefreshingHermesMetadata = false
+    @State private var toast: IOSStatusToastKind?
+
+    private let hermesClient = HermesAPIClient()
 
     var body: some View {
         Form {
@@ -568,47 +574,63 @@ private struct IOSHermesSettingsView: View {
                         .accessibilityIdentifier("ios.settings.hermes.apiKey")
                 }
 
+                Button {
+                    Task { await refreshHermesMetadata() }
+                } label: {
+                    Label(isRefreshingHermesMetadata ? "Checking..." : "Check", systemImage: "arrow.clockwise")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .disabled(isRefreshingHermesMetadata || apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if let discoveredCapabilities {
+                    capabilityStatus(discoveredCapabilities)
+                }
+
+                if !discoveredModels.isEmpty {
+                    Picker(selection: $hermesModel) {
+                        ForEach(discoveredModels) { model in
+                            Text(model.id).tag(model.id)
+                        }
+                    } label: {
+                        Label("Model", systemImage: "cpu")
+                    }
+                    .accessibilityIdentifier("ios.settings.hermes.modelPicker")
+                }
+
                 Toggle(isOn: $isStreamingEnabled) {
                     Label("ios_settings_hermes_streaming", systemImage: "dot.radiowaves.left.and.right")
                 }
                 .accessibilityIdentifier("ios.settings.hermes.streaming")
+            } header: {
+                Text("Hermes")
             } footer: {
                 Text("ios_settings_hermes_footer")
             }
 
-            if let errorMessage {
-                Section {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                        .foregroundStyle(theme.danger)
-                }
-            }
-
-            if didSave {
-                Section {
-                    Label("ios_settings_hermes_saved", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(theme.success)
-                }
-            }
-
             Section {
-                Button {
-                    save()
-                } label: {
-                    Label("ios_settings_hermes_save", systemImage: "checkmark.circle")
+                HStack(spacing: 10) {
+                    Button {
+                        save()
+                    } label: {
+                        HStack(spacing: 7) {
+                            Image(systemName: "checkmark")
+                                .font(.body.weight(.bold))
+                            Text("Save")
+                        }
                         .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
+                    }
+                    .buttonStyle(.borderedProminent)
 
-                Button(role: .destructive) {
-                    appViewModel.clearHermesSettings()
-                    loadCurrentSettings()
-                    didSave = false
-                    errorMessage = nil
-                } label: {
-                    Label("ios_settings_hermes_clear", systemImage: "trash")
-                        .frame(maxWidth: .infinity)
+                    Button(role: .destructive) {
+                        appViewModel.clearHermesSettings()
+                        loadCurrentSettings()
+                        toast = nil
+                    } label: {
+                        Label("Clear", systemImage: "trash")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
             }
         }
         .scrollContentBackground(.hidden)
@@ -617,15 +639,48 @@ private struct IOSHermesSettingsView: View {
         .navigationTitle("ios_settings_hermes_title")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("ios.settings.hermes.screen")
+        .overlay {
+            if let toast {
+                IOSStatusToast(toastTitle(for: toast), kind: toast, theme: theme)
+                    .transition(.scale(scale: 0.94).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(.easeOut(duration: 0.22), value: toast)
         .onAppear {
             loadCurrentSettings()
         }
     }
 
     private func loadCurrentSettings() {
+        hermesModel = appViewModel.hermesSettings.hermesModel
         apiBaseURL = appViewModel.hermesSettings.apiBaseURL
         apiKey = appViewModel.hermesAPIKey
         isStreamingEnabled = appViewModel.hermesSettings.isStreamingEnabled
+    }
+
+    private func refreshHermesMetadata() async {
+        let trimmedBaseURL = apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedBaseURL.isEmpty, !trimmedAPIKey.isEmpty else { return }
+
+        isRefreshingHermesMetadata = true
+        defer { isRefreshingHermesMetadata = false }
+
+        do {
+            async let capabilities = hermesClient.fetchCapabilities(baseURL: trimmedBaseURL, apiKey: trimmedAPIKey)
+            async let models = hermesClient.fetchModels(baseURL: trimmedBaseURL, apiKey: trimmedAPIKey)
+            let resolvedCapabilities = try await capabilities
+            let resolvedModels = try await models
+            discoveredCapabilities = resolvedCapabilities
+            discoveredModels = resolvedModels
+            let selectedModel = hermesModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !resolvedModels.contains(where: { $0.id == selectedModel }) {
+                hermesModel = resolvedModels.first?.id ?? ""
+            }
+        } catch {
+            showToast(.failure)
+        }
     }
 
     private func save() {
@@ -633,15 +688,80 @@ private struct IOSHermesSettingsView: View {
             try appViewModel.saveHermesSettings(
                 apiBaseURL: apiBaseURL,
                 apiKey: apiKey,
+                hermesModel: hermesModel,
+                hermesProvider: "",
                 isStreamingEnabled: isStreamingEnabled
             )
             loadCurrentSettings()
-            errorMessage = nil
-            didSave = true
+            showToast(.success)
         } catch {
-            didSave = false
-            errorMessage = error.localizedDescription
+            showToast(.failure)
         }
+    }
+
+    private func showToast(_ toast: IOSStatusToastKind) {
+        withAnimation {
+            self.toast = toast
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.25) {
+            withAnimation {
+                if self.toast == toast {
+                    self.toast = nil
+                }
+            }
+        }
+    }
+
+    private func toastTitle(for toast: IOSStatusToastKind) -> String {
+        switch toast {
+        case .success:
+            return "Saved"
+        case .failure:
+            return "Failed"
+        }
+    }
+
+    private func capabilityStatus(_ capabilities: HermesAPIServerCapabilities) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.seal.fill")
+                    .foregroundStyle(theme.success)
+                Text("Connected")
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 0)
+                if let model = capabilities.model?.trimmingCharacters(in: .whitespacesAndNewlines), !model.isEmpty {
+                    Text(model)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(theme.textTertiary)
+                        .lineLimit(1)
+                }
+            }
+
+            HStack(spacing: 6) {
+                capabilityChip("Responses", isEnabled: capabilities.features.responsesAPI)
+                capabilityChip("Chat", isEnabled: capabilities.features.chatCompletions)
+                if capabilities.features.runEventsSSE {
+                    capabilityChip("SSE", isEnabled: true)
+                }
+                if capabilities.features.runStop {
+                    capabilityChip("Stop", isEnabled: true)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func capabilityChip(_ title: String, isEnabled: Bool) -> some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(isEnabled ? theme.success : theme.textTertiary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                (isEnabled ? theme.success.opacity(0.14) : theme.surfaceSecondary.opacity(0.7)),
+                in: Capsule()
+            )
     }
 
     private func localized(_ key: String.LocalizationValue) -> String {

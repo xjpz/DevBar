@@ -319,6 +319,18 @@ final class IOSAppViewModel: ObservableObject {
         HermesAPIClient.chatURL(from: hermesSettings.apiBaseURL) != nil && !hermesAPIKey.isEmpty
     }
 
+    var chatTabProvider: ChatBotProviderKind {
+        hermesSettings.normalizedChatTabProvider
+    }
+
+    var toolsChatProviders: [ChatBotProviderKind] {
+        hermesSettings.toolsChatProviders
+    }
+
+    func isChatProviderConfigured(_ provider: ChatBotProviderKind) -> Bool {
+        isHermesConfigured
+    }
+
     func syncedQuotaSnapshot(for provider: QuotaProvider) -> ProviderQuotaSnapshot? {
         providerAccounts
             .filter { $0.provider == provider }
@@ -332,10 +344,20 @@ final class IOSAppViewModel: ObservableObject {
               !snapshot.limits.isEmpty else {
             return nil
         }
-        guard let localLastUpdated else {
-            return snapshot
+        return snapshot.shouldReplace(existing: nil, localLastUpdated: localLastUpdated) ? snapshot : nil
+    }
+
+    private func localQuotaLastUpdated(for provider: QuotaProvider) -> Date? {
+        switch provider {
+        case .glm:
+            return quotaViewModel.lastUpdated
+        case .openai:
+            return openAIQuotaViewModel.lastUpdated
+        case .mimo:
+            return mimoQuotaViewModel.lastUpdated
+        case .deepseek:
+            return deepSeekQuotaViewModel.lastUpdated
         }
-        return snapshot.fetchedAt >= localLastUpdated ? snapshot : nil
     }
 
     func hasAuthenticatedSession(for provider: QuotaProvider) -> Bool {
@@ -663,28 +685,82 @@ final class IOSAppViewModel: ObservableObject {
         Task { await syncLiveActivity() }
     }
 
-    func saveHermesSettings(apiBaseURL: String, apiKey: String, isStreamingEnabled: Bool) throws {
+    func saveHermesSettings(
+        apiBaseURL: String,
+        apiKey: String,
+        hermesModel: String = "",
+        hermesProvider: String = "",
+        isStreamingEnabled: Bool,
+        chatTabProvider: ChatBotProviderKind = .hermes
+    ) throws {
         let trimmedBaseURL = apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard HermesAPIClient.chatURL(from: trimmedBaseURL) != nil else {
+        if !trimmedBaseURL.isEmpty, HermesAPIClient.chatURL(from: trimmedBaseURL) == nil {
             throw CredentialsError.invalidHermesBaseURL
         }
 
         let trimmedAPIKey = apiKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedAPIKey.isEmpty else {
+        if !trimmedBaseURL.isEmpty, trimmedAPIKey.isEmpty {
             throw CredentialsError.emptyHermesAPIKey
         }
 
-        guard KeychainService.shared.save(
+        let trimmedHermesModel = hermesModel.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedHermesProvider = hermesProvider.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if !trimmedAPIKey.isEmpty,
+           KeychainService.shared.save(
             key: DevBarCoreConstants.Keychain.hermesAPIKeyKey,
             value: trimmedAPIKey
-        ) == errSecSuccess else {
+           ) != errSecSuccess {
             throw CredentialsError.keychainSaveFailed
         }
+        if trimmedAPIKey.isEmpty {
+            KeychainService.shared.delete(key: DevBarCoreConstants.Keychain.hermesAPIKeyKey)
+        }
 
-        hermesSettings = HermesSettings(
+        let normalizedSettings = HermesSettings(
             apiBaseURL: trimmedBaseURL,
-            isStreamingEnabled: isStreamingEnabled
+            hermesModel: trimmedHermesModel,
+            hermesProvider: trimmedHermesProvider,
+            isStreamingEnabled: isStreamingEnabled,
+            chatTabProvider: chatTabProvider,
+            hermesChatRemark: hermesSettings.hermesChatRemark,
+            hermesChatTag: hermesSettings.hermesChatTag
         )
+        hermesSettings = HermesSettings(
+            apiBaseURL: normalizedSettings.apiBaseURL,
+            hermesModel: normalizedSettings.hermesModel,
+            hermesProvider: normalizedSettings.hermesProvider,
+            isStreamingEnabled: normalizedSettings.isStreamingEnabled,
+            chatTabProvider: normalizedSettings.normalizedChatTabProvider,
+            hermesChatRemark: normalizedSettings.hermesChatRemark,
+            hermesChatTag: normalizedSettings.hermesChatTag
+        )
+        hermesSettingsRevision += 1
+    }
+
+    func updateHermesModelSelection(model: String?, provider: String?) {
+        let trimmedModel = model?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let trimmedProvider = provider?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        hermesSettings = HermesSettings(
+            apiBaseURL: hermesSettings.apiBaseURL,
+            hermesModel: trimmedModel,
+            hermesProvider: trimmedProvider,
+            isStreamingEnabled: hermesSettings.isStreamingEnabled,
+            chatTabProvider: hermesSettings.normalizedChatTabProvider,
+            hermesChatRemark: hermesSettings.hermesChatRemark,
+            hermesChatTag: hermesSettings.hermesChatTag
+        )
+        hermesSettingsRevision += 1
+    }
+
+    func updateChatProviderMetadata(provider: ChatBotProviderKind, remark: String, tag: String) {
+        let trimmedRemark = remark.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTag = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch provider {
+        case .hermes:
+            hermesSettings.hermesChatRemark = trimmedRemark
+            hermesSettings.hermesChatTag = trimmedTag
+        }
         hermesSettingsRevision += 1
     }
 
@@ -1269,7 +1345,10 @@ final class IOSAppViewModel: ObservableObject {
               accountForIncomingQuotaSnapshot(snapshot) != nil else {
             return
         }
-        let didApply = WidgetDataManager.shared.applyQuotaSnapshot(snapshot)
+        let didApply = WidgetDataManager.shared.applyQuotaSnapshot(
+            snapshot,
+            localLastUpdated: localQuotaLastUpdated(for: snapshot.provider)
+        )
         if didApply {
             WidgetDataManager.shared.saveAndReload(snapshot)
             var snapshots = syncedQuotaSnapshots

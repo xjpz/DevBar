@@ -15,6 +15,8 @@ final class IOSHermesMessage {
     var content: String
     var contentFormatRawValue: String
     var isComplete: Bool
+    var remoteMessageId: String?
+    var sortIndex: Int?
     var createdAt: Date
     var completedAt: Date?
     var errorMessage: String?
@@ -26,6 +28,8 @@ final class IOSHermesMessage {
         content: String,
         contentFormat: IOSHermesMessageContentFormat,
         isComplete: Bool = true,
+        remoteMessageId: String? = nil,
+        sortIndex: Int? = nil,
         createdAt: Date = Date(),
         completedAt: Date? = nil,
         errorMessage: String? = nil,
@@ -36,6 +40,8 @@ final class IOSHermesMessage {
         self.content = content
         self.contentFormatRawValue = contentFormat.rawValue
         self.isComplete = isComplete
+        self.remoteMessageId = remoteMessageId
+        self.sortIndex = sortIndex
         self.createdAt = createdAt
         self.completedAt = completedAt
         self.errorMessage = errorMessage

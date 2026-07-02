@@ -113,7 +113,7 @@ struct IOSMemoListView: View {
         .navigationTitle("ios_tools_memo")
         .toolbarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("ios_tools_memo")
@@ -129,6 +129,7 @@ struct IOSMemoListView: View {
                     isShowingNewMemo = true
                 } label: {
                     Image(systemName: "plus")
+                        .iosToolToolbarIcon(theme)
                 }
             }
 
@@ -296,7 +297,7 @@ struct IOSMemoEditView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("ios_tools_memo_save") {

@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import DevBarCore
 
@@ -50,4 +51,40 @@ func openAIWindowDisplayNameUsesWindowLength() {
     #expect(!weekly.displayName.isEmpty)
     #expect(!daily.displayName.isEmpty)
     #expect(weekly.displayName != daily.displayName)
+}
+
+@Test
+func providerQuotaSnapshotDoesNotReplaceNewerLocalData() {
+    let localUpdatedAt = Date(timeIntervalSince1970: 200)
+    let staleRelaySnapshot = ProviderQuotaSnapshot(
+        accountID: "openai",
+        provider: .openai,
+        displayName: "OpenAI",
+        limits: [
+            WidgetQuotaLimit(
+                type: "OPENAI_SESSION",
+                displayName: "Session",
+                percentage: 20,
+                unitDescription: nil,
+                formattedResetTime: nil
+            ),
+        ],
+        level: "Pro",
+        subscriptionName: nil,
+        subscriptionExpireDate: nil,
+        fetchedAt: Date(timeIntervalSince1970: 100)
+    )
+    let freshRelaySnapshot = ProviderQuotaSnapshot(
+        accountID: "openai",
+        provider: .openai,
+        displayName: "OpenAI",
+        limits: staleRelaySnapshot.limits,
+        level: "Pro",
+        subscriptionName: nil,
+        subscriptionExpireDate: nil,
+        fetchedAt: localUpdatedAt
+    )
+
+    #expect(staleRelaySnapshot.shouldReplace(existing: nil as ProviderQuotaSnapshot?, localLastUpdated: localUpdatedAt) == false)
+    #expect(freshRelaySnapshot.shouldReplace(existing: nil as ProviderQuotaSnapshot?, localLastUpdated: localUpdatedAt) == true)
 }

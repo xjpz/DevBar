@@ -175,7 +175,7 @@ struct IOSSpeechToTextView: View {
         .navigationTitle("ios_tools_speech")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -184,6 +184,7 @@ struct IOSSpeechToTextView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
+                        .iosToolToolbarIcon(theme)
                 }
             }
         }

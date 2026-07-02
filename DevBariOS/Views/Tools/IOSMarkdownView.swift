@@ -118,11 +118,12 @@ struct IOSMarkdownView: View {
         .navigationTitle(currentDocument.title.isEmpty ? String(localized: "ios_tools_md_untitled") : currentDocument.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { createNewDocument() } label: {
                     Image(systemName: "plus")
+                        .iosToolToolbarIcon(theme)
                 }
             }
         }

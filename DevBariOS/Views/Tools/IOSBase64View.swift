@@ -40,7 +40,7 @@ struct IOSBase64View: View {
         .navigationTitle("Base64")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(.easeInOut(duration: 0.25)) { isKeyboardVisible = true }
         }

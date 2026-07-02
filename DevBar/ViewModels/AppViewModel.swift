@@ -265,6 +265,15 @@ final class AppViewModel: ObservableObject {
         providerAccounts[index].updatedAt = Date()
     }
 
+    func updateProviderAccountCredentialSync(id accountID: String, isEnabled: Bool) {
+        guard let index = providerAccounts.firstIndex(where: { $0.id == accountID }) else { return }
+        providerAccounts[index].syncPolicy.credentialSyncEnabled = isEnabled
+        providerAccounts[index].updatedAt = Date()
+        if isEnabled {
+            broadcastCredentialIfPossible(for: providerAccounts[index])
+        }
+    }
+
     @discardableResult
     func saveCredential(
         for accountID: String,
@@ -285,7 +294,7 @@ final class AppViewModel: ObservableObject {
         guard KeychainService.shared.saveProviderCredential(credential, for: account) else {
             return nil
         }
-        broadcastCredentialIfPossible(for: account.provider)
+        broadcastCredentialIfPossible(for: account)
         syncAuthState()
         updateStatusText()
         return account
@@ -1108,7 +1117,7 @@ final class AppViewModel: ObservableObject {
             revision: currentRevision + 1
         )
         _ = KeychainService.shared.saveProviderCredential(credential, for: account)
-        broadcastCredentialIfPossible(for: provider)
+        broadcastCredentialIfPossible(for: account)
         return account
     }
 
@@ -1268,8 +1277,8 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    private func broadcastCredentialIfPossible(for provider: QuotaProvider) {
-        guard let account = providerAccounts.first(where: { $0.provider == provider && $0.syncPolicy.credentialSyncEnabled }),
+    private func broadcastCredentialIfPossible(for account: ProviderAccount) {
+        guard account.syncPolicy.credentialSyncEnabled,
               let credential = KeychainService.shared.loadProviderCredential(for: account) else {
             return
         }
@@ -1369,7 +1378,8 @@ final class AppViewModel: ObservableObject {
     private func makeQuotaSnapshot(for account: ProviderAccount) -> ProviderQuotaSnapshot? {
         switch account.provider {
         case .glm:
-            guard let limits = quotaViewModel.quotaData?.limits else { return nil }
+            guard let limits = quotaViewModel.quotaData?.limits,
+                  let fetchedAt = quotaViewModel.lastUpdated else { return nil }
             return ProviderQuotaSnapshot(
                 accountID: account.id,
                 provider: .glm,
@@ -1378,9 +1388,11 @@ final class AppViewModel: ObservableObject {
                 level: quotaViewModel.quotaData?.level,
                 subscriptionName: quotaViewModel.subscription?.productName,
                 subscriptionExpireDate: quotaViewModel.subscription?.formattedNextRenewDate,
+                fetchedAt: fetchedAt,
                 sourceDeviceID: deviceRelayManager.localDeviceID
             )
         case .openai:
+            guard let fetchedAt = openAIQuotaViewModel.lastUpdated else { return nil }
             return ProviderQuotaSnapshot(
                 accountID: account.id,
                 provider: .openai,
@@ -1398,9 +1410,11 @@ final class AppViewModel: ObservableObject {
                 subscriptionName: nil,
                 subscriptionExpireDate: nil,
                 availableResetCount: openAIQuotaViewModel.availableResetCount,
+                fetchedAt: fetchedAt,
                 sourceDeviceID: deviceRelayManager.localDeviceID
             )
         case .mimo:
+            guard let fetchedAt = mimoQuotaViewModel.lastUpdated else { return nil }
             return ProviderQuotaSnapshot(
                 accountID: account.id,
                 provider: .mimo,
@@ -1417,10 +1431,12 @@ final class AppViewModel: ObservableObject {
                 level: mimoQuotaViewModel.planName,
                 subscriptionName: mimoQuotaViewModel.planName,
                 subscriptionExpireDate: mimoQuotaViewModel.planDetail?.currentPeriodEnd,
+                fetchedAt: fetchedAt,
                 sourceDeviceID: deviceRelayManager.localDeviceID
             )
         case .deepseek:
-            guard let data = deepSeekQuotaViewModel.usageData else { return nil }
+            guard let data = deepSeekQuotaViewModel.usageData,
+                  let fetchedAt = deepSeekQuotaViewModel.lastUpdated else { return nil }
             return ProviderQuotaSnapshot(
                 accountID: account.id,
                 provider: .deepseek,
@@ -1437,6 +1453,7 @@ final class AppViewModel: ObservableObject {
                 level: nil,
                 subscriptionName: nil,
                 subscriptionExpireDate: nil,
+                fetchedAt: fetchedAt,
                 sourceDeviceID: deviceRelayManager.localDeviceID
             )
         }

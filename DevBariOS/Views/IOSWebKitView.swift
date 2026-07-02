@@ -437,27 +437,9 @@ private struct IOSBrowserView: View {
             }
 
             if isShowingSaveToast {
-                VStack(spacing: 18) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 56, weight: .semibold))
-                        .foregroundStyle(.white)
-
-                    Text("Saved")
-                        .font(.title2.weight(.semibold))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 220, height: 220)
-                .background(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .fill(Color.black.opacity(0.82))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 28, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.28), radius: 24, y: 12)
-                .transition(.scale(scale: 0.96).combined(with: .opacity))
-                .allowsHitTesting(false)
+                IOSStatusToast("Saved", kind: .success, theme: theme)
+                    .transition(.scale(scale: 0.94).combined(with: .opacity))
+                    .allowsHitTesting(false)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -517,7 +499,7 @@ private struct IOSBrowserView: View {
             translator.resetState()
         }
         .background(TranslationBridgeView(translator: translator))
-        .animation(.spring(response: 0.24, dampingFraction: 0.9), value: isShowingSaveToast)
+        .animation(.easeOut(duration: 0.22), value: isShowingSaveToast)
     }
 
     // MARK: - Toolbar Items

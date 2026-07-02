@@ -137,7 +137,7 @@ struct IOSAPIClientView: View {
         .navigationTitle(apiClientNavigationTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -152,6 +152,7 @@ struct IOSAPIClientView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
+                        .iosToolToolbarIcon(theme)
                 }
             }
         }
@@ -370,7 +371,7 @@ struct IOSToolsAPIRecordsView: View {
         .navigationTitle("API Records")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .navigationDestination(item: $selectedRecord) { record in
             IOSAPIClientView(record: record)
         }

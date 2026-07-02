@@ -33,7 +33,7 @@ struct IOSOCRView: View {
         .navigationTitle("ios_tools_ocr")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -43,6 +43,7 @@ struct IOSOCRView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
+                        .iosToolToolbarIcon(theme)
                 }
             }
         }

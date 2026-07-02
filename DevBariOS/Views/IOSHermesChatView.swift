@@ -11,23 +11,32 @@ struct IOSHermesChatView: View {
     @Environment(\.themeTokens) private var theme
     @Environment(\.modelContext) private var modelContext
     @FocusState private var isComposerFocused: Bool
-    @State private var draftRemark: String
-    @State private var isSettingsPresented = false
     @State private var isAttachmentPanelPresented = false
     @State private var isCameraPresented = false
     @State private var isFileImporterPresented = false
     @State private var isVoiceInputMode = false
     @State private var isPressingVoiceInput = false
     @State private var isVoiceInputCancelled = false
+    @State private var draftBeforeVoiceInput = ""
     @State private var selectedPhotoItem: PhotosPickerItem?
     @StateObject private var speechManager = IOSSpeechManager()
     @StateObject private var viewModel = IOSHermesChatViewModel()
 
+    private let provider: ChatBotProviderKind
     private let initialConversation: IOSHermesConversation?
+    private let initialDraft: String
+    private let onBack: (() -> Void)?
 
-    init(conversation: IOSHermesConversation? = nil) {
+    init(
+        provider: ChatBotProviderKind = .hermes,
+        conversation: IOSHermesConversation? = nil,
+        initialDraft: String = "",
+        onBack: (() -> Void)? = nil
+    ) {
+        self.provider = conversation?.chatProvider ?? provider
         self.initialConversation = conversation
-        _draftRemark = State(initialValue: conversation?.remark ?? "")
+        self.initialDraft = initialDraft
+        self.onBack = onBack
     }
 
     var body: some View {
@@ -56,11 +65,10 @@ struct IOSHermesChatView: View {
                     .padding(.vertical, 18)
                 }
                 .scrollDismissesKeyboard(.interactively)
-                .simultaneousGesture(
-                    DragGesture(minimumDistance: 12).onChanged { _ in
-                        isComposerFocused = false
-                    }
-                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    dismissChatInput()
+                }
                 .onChange(of: viewModel.messages) { _, messages in
                     guard let lastID = messages.last?.id else { return }
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -88,9 +96,6 @@ struct IOSHermesChatView: View {
         .safeAreaInset(edge: .bottom) {
             bottomInputArea
         }
-        .navigationDestination(isPresented: $isSettingsPresented) {
-            IOSHermesChatSettingsView(remark: remarkBinding, theme: theme)
-        }
         .fullScreenCover(isPresented: $isCameraPresented) {
             IOSHermesCameraPicker { name in
                 appendAttachmentReference(name: name, type: String(localized: "ios_hermes_attachment_photo_label"))
@@ -108,25 +113,22 @@ struct IOSHermesChatView: View {
             selectedPhotoItem = nil
         }
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .iosToolNavigationChrome(theme, showsBackButton: true, backAction: onBack)
         .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 navigationTitleView
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    isSettingsPresented = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.textPrimary)
-            }
         }
         .onAppear {
             if viewModel.conversation == nil {
                 viewModel.load(conversation: initialConversation)
+            }
+            if viewModel.messages.isEmpty,
+               viewModel.draft.isEmpty,
+               !initialDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                viewModel.draft = initialDraft
+                isComposerFocused = true
             }
             configureViewModel()
         }
@@ -135,10 +137,6 @@ struct IOSHermesChatView: View {
         }
         .onChange(of: appViewModel.hermesSettingsRevision) { _, _ in
             configureViewModel()
-        }
-        .onChange(of: speechManager.recognizedText) { _, text in
-            guard !isPressingVoiceInput else { return }
-            commitRecognizedSpeech(text)
         }
         .onDisappear {
             resetVoiceInput()
@@ -164,7 +162,7 @@ struct IOSHermesChatView: View {
             Label("ios_hermes_missing_config_title", systemImage: "key")
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(theme.textPrimary)
-            Text("ios_hermes_missing_config_detail")
+            Text(missingConfigText)
                 .font(.subheadline)
                 .foregroundStyle(theme.textSecondary)
             NavigationLink {
@@ -182,6 +180,10 @@ struct IOSHermesChatView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(theme.borderSubtle, lineWidth: 1)
         }
+    }
+
+    private var missingConfigText: String {
+        String(localized: "ios_hermes_missing_config_detail")
     }
 
     private func errorBanner(_ message: String) -> some View {
@@ -205,20 +207,18 @@ struct IOSHermesChatView: View {
 
     private var composer: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            Button {
-                toggleVoiceInputMode()
-            } label: {
-                composerModeButtonIcon
-            }
-            .buttonStyle(.plain)
-
             if isVoiceInputMode {
                 voiceInputButton
+                    .overlay(alignment: .trailing) {
+                        composerModeButton
+                            .padding(.trailing, 3)
+                    }
             } else {
                 TextField(String(localized: "ios_hermes_input_hint"), text: $viewModel.draft, axis: .vertical)
                     .focused($isComposerFocused)
                     .lineLimit(1...4)
-                    .padding(.horizontal, 12)
+                    .padding(.leading, 12)
+                    .padding(.trailing, 48)
                     .padding(.vertical, 10)
                     .foregroundStyle(theme.textPrimary)
                     .tint(theme.brandPrimary)
@@ -229,6 +229,10 @@ struct IOSHermesChatView: View {
                     }
                     .textInputAutocapitalization(.sentences)
                     .accessibilityIdentifier("ios.hermes.chat.input")
+                    .overlay(alignment: .trailing) {
+                        composerModeButton
+                            .padding(.trailing, 3)
+                    }
             }
 
             Button {
@@ -236,7 +240,7 @@ struct IOSHermesChatView: View {
                 if viewModel.canSend {
                     isComposerFocused = false
                     isAttachmentPanelPresented = false
-                    _ = viewModel.sendDraft(modelContext: modelContext, draftRemark: draftRemark)
+                    _ = viewModel.sendDraft(modelContext: modelContext, title: providerDisplayTitle)
                 } else {
                     isComposerFocused = false
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -268,26 +272,31 @@ struct IOSHermesChatView: View {
         }
     }
 
+    private var composerModeButton: some View {
+        Button {
+            toggleVoiceInputMode()
+        } label: {
+            composerModeButtonIcon
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("ios.hermes.chat.voiceMode")
+    }
+
     @ViewBuilder
     private var composerModeButtonIcon: some View {
         if isVoiceInputMode {
-            inputModeIcon(systemName: "keyboard", size: 17)
+            inputModeIcon(systemName: "keyboard", size: 15)
         } else {
-            inputModeIcon(systemName: "microphone", size: 18)
+            inputModeIcon(systemName: "microphone", size: 15)
         }
     }
 
     private func inputModeIcon(systemName: String, size: CGFloat) -> some View {
         Image(systemName: systemName)
             .font(.system(size: size, weight: .semibold))
-            .foregroundStyle(composerRoundButtonForeground)
+            .foregroundStyle(theme.textSecondary)
             .frame(width: 34, height: 34)
-            .background(composerRoundButtonBackground, in: Circle())
-            .overlay {
-                Circle()
-                    .stroke(composerRoundButtonBorder, lineWidth: 1)
-            }
-            .frame(width: 36, height: 36)
+            .contentShape(Circle())
     }
 
     private var bottomInputArea: some View {
@@ -451,20 +460,42 @@ struct IOSHermesChatView: View {
 
     private var headerTitle: LocalizedStringKey {
         if viewModel.isBusy { return "ios_hermes_replying" }
-        let trimmed = currentRemark.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "ios_hermes_title" : LocalizedStringKey(trimmed)
+        let trimmed = providerRemark.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "ChatBot" : LocalizedStringKey(trimmed)
     }
 
-    private var currentRemark: String {
-        viewModel.conversation?.remark ?? draftRemark
+    private var providerRemark: String {
+        appViewModel.hermesSettings.chatRemark(for: provider)
+    }
+
+    private var providerDisplayTitle: String {
+        let trimmed = providerRemark.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "ChatBot" : trimmed
+    }
+
+    private var currentTag: String {
+        let tag = appViewModel.hermesSettings.chatTag(for: provider)
+        let trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? provider.title : trimmed
+    }
+
+    private var currentEditableTag: String {
+        appViewModel.hermesSettings.chatTag(for: provider)
     }
 
     private var remarkBinding: Binding<String> {
         Binding {
-            currentRemark
+            providerRemark
         } set: { newValue in
-            draftRemark = newValue
-            viewModel.updateRemark(newValue, modelContext: modelContext)
+            appViewModel.updateChatProviderMetadata(provider: provider, remark: newValue, tag: currentEditableTag)
+        }
+    }
+
+    private var tagBinding: Binding<String> {
+        Binding {
+            currentEditableTag
+        } set: { newValue in
+            appViewModel.updateChatProviderMetadata(provider: provider, remark: providerRemark, tag: newValue)
         }
     }
 
@@ -475,9 +506,10 @@ struct IOSHermesChatView: View {
                 .foregroundStyle(theme.textPrimary)
                 .lineLimit(1)
             if !viewModel.isBusy {
-                Text("AI")
+                Text(currentTag)
                     .font(.system(size: 9, weight: .bold, design: .rounded))
                     .foregroundStyle(theme.backgroundPrimary)
+                    .lineLimit(1)
                     .padding(.horizontal, 3)
                     .padding(.vertical, 1)
                     .background(theme.brandPrimary.opacity(theme.isGeek ? 0.86 : 0.65), in: RoundedRectangle(cornerRadius: 3, style: .continuous))
@@ -543,8 +575,14 @@ struct IOSHermesChatView: View {
     private func configureViewModel() {
         viewModel.configure(
             settings: appViewModel.hermesSettings,
-            apiKey: appViewModel.hermesAPIKey
+            apiKey: appViewModel.hermesAPIKey,
+            provider: provider
         )
+    }
+
+    private func dismissChatInput() {
+        isComposerFocused = false
+        isAttachmentPanelPresented = false
     }
 
     private func toggleVoiceInputMode() {
@@ -574,6 +612,7 @@ struct IOSHermesChatView: View {
         guard !isPressingVoiceInput, !speechManager.isRecording else { return }
         isPressingVoiceInput = true
         isVoiceInputCancelled = false
+        draftBeforeVoiceInput = viewModel.draft
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         speechManager.clear()
         speechManager.startRecording()
@@ -586,14 +625,17 @@ struct IOSHermesChatView: View {
 
     private func stopPressToTalk(cancelled: Bool = false) {
         guard isPressingVoiceInput || speechManager.isRecording else { return }
+        let recognizedSpeech = speechTextSnapshot()
         isPressingVoiceInput = false
         isVoiceInputCancelled = false
-        speechManager.stopRecording(commit: !cancelled)
+        speechManager.stopRecording(commit: false)
         if cancelled {
             speechManager.clear()
         } else {
-            commitRecognizedSpeech(speechManager.recognizedText)
+            speechManager.clear()
+            commitRecognizedSpeech(recognizedSpeech, baseDraft: draftBeforeVoiceInput)
         }
+        draftBeforeVoiceInput = ""
     }
 
     private func resetVoiceInput() {
@@ -604,19 +646,56 @@ struct IOSHermesChatView: View {
         isVoiceInputCancelled = false
     }
 
-    private func commitRecognizedSpeech(_ text: String) {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func speechTextSnapshot() -> String {
+        [speechManager.recognizedText, speechManager.partialText]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    private func commitRecognizedSpeech(_ text: String, baseDraft: String) {
+        let trimmed = collapsedRecognizedSpeech(text)
         guard !trimmed.isEmpty else { return }
-        if viewModel.draft.isEmpty {
+
+        let base = baseDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if base.isEmpty {
             viewModel.draft = trimmed
-        } else if !viewModel.draft.contains(trimmed) {
-            viewModel.draft += " " + trimmed
+        } else if trimmed.hasPrefix(base) {
+            viewModel.draft = trimmed
+        } else if !base.hasSuffix(trimmed) {
+            viewModel.draft = base + " " + trimmed
         }
         isVoiceInputMode = false
         isAttachmentPanelPresented = false
         DispatchQueue.main.async {
             isComposerFocused = true
         }
+    }
+
+    private func collapsedRecognizedSpeech(_ text: String) -> String {
+        let parts = text
+            .replacingOccurrences(of: "\n", with: " ")
+            .split { $0.isWhitespace }
+            .map(String.init)
+
+        let collapsed = parts.reduce(into: [String]()) { result, part in
+            guard let last = result.last else {
+                result.append(part)
+                return
+            }
+
+            if part == last || last.hasPrefix(part) {
+                return
+            }
+
+            if part.hasPrefix(last) {
+                result[result.count - 1] = part
+            } else {
+                result.append(part)
+            }
+        }
+
+        return collapsed.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func appendAttachmentReference(name: String, type: String) {
@@ -671,51 +750,111 @@ private struct HermesChatRow: View {
             } else {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 10) {
-                        if let htmlContent {
-                            HStack {
+                        if showsAssistantActionRow {
+                            HStack(spacing: 8) {
                                 Spacer(minLength: 0)
-                                Button {
-                                    withAnimation(.easeOut(duration: 0.18)) {
-                                        isHTMLPreviewPresented.toggle()
-                                    }
-                                } label: {
-                                    Label(
-                                        isHTMLPreviewPresented ? "ios_hermes_html_show_source" : "ios_hermes_html_render",
-                                        systemImage: isHTMLPreviewPresented ? "text.alignleft" : "safari"
-                                    )
-                                    .labelStyle(.titleAndIcon)
-                                    .font(theme.captionFont.weight(.semibold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 5)
-                                    .background(theme.surfaceSecondary.opacity(theme.isGeek ? 0.74 : 0.9), in: Capsule())
+                                assistantActionButton(title: "ios_common_copy", systemImage: "doc.on.doc") {
+                                    UIPasteboard.general.string = message.content
                                 }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(theme.brandPrimary)
+                                assistantActionButton(
+                                    title: isHTMLPreviewPresented ? "ios_hermes_html_show_source" : "ios_hermes_html_render",
+                                    systemImage: isHTMLPreviewPresented ? "text.alignleft" : "safari"
+                                ) {
+                                    toggleHTMLPreview()
+                                }
                             }
                         }
 
                         if isHTMLPreviewPresented, let htmlContent {
                             HermesHTMLPreview(html: htmlContent, theme: theme)
                         } else {
-                            HermesMarkdownMessage(content: message.content, theme: theme)
+                            HermesMarkdownMessage(
+                                content: message.content,
+                                theme: theme,
+                                htmlRenderControl: htmlContent == nil ? nil : .init(
+                                    title: isHTMLPreviewPresented ? "ios_hermes_html_show_source" : "ios_hermes_html_render",
+                                    systemImage: isHTMLPreviewPresented ? "text.alignleft" : "safari",
+                                    action: toggleHTMLPreview
+                                )
+                            )
                         }
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
                     .padding(.leading, 5)
-                        .background(assistantBubbleBackground, in: HermesBubbleShape(direction: .left))
-                        .overlay {
-                            HermesBubbleShape(direction: .left)
-                                .stroke(theme.borderSubtle.opacity(theme.isGeek ? 0.78 : 0.45), lineWidth: 1)
+                    .modifier(AssistantBubbleWidthModifier(
+                        maxWidth: assistantBubbleMaxWidth,
+                        usesIntrinsicWidth: usesIntrinsicAssistantBubbleWidth
+                    ))
+                    .background(assistantBubbleBackground, in: HermesBubbleShape(direction: .left))
+                    .overlay {
+                        HermesBubbleShape(direction: .left)
+                            .stroke(theme.borderSubtle.opacity(theme.isGeek ? 0.78 : 0.45), lineWidth: 1)
+                    }
+                    .contextMenu {
+                        Button("ios_common_copy") {
+                            UIPasteboard.general.string = message.content
                         }
-                        .contextMenu {
-                            Button("ios_common_copy") {
-                                UIPasteboard.general.string = message.content
-                            }
-                        }
-                    Spacer(minLength: 54)
+                    }
+                    Spacer(minLength: 32)
                 }
             }
+        }
+    }
+
+    private func assistantActionButton(
+        title: LocalizedStringKey,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(theme.textSecondary)
+                .frame(width: 28, height: 28)
+                .background(theme.surfaceSecondary.opacity(theme.isGeek ? 0.62 : 0.88), in: Circle())
+                .overlay {
+                    Circle()
+                        .stroke(theme.borderSubtle.opacity(theme.isGeek ? 0.28 : 0.16), lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(title))
+    }
+
+    private var containsCodeBlock: Bool {
+        message.content.contains("```")
+    }
+
+    private var showsAssistantActionRow: Bool {
+        htmlContent != nil && !containsCodeBlock
+    }
+
+    private var assistantBubbleMaxWidth: CGFloat {
+        max(220, min(UIScreen.main.bounds.width - 56, 620))
+    }
+
+    private var usesIntrinsicAssistantBubbleWidth: Bool {
+        guard message.role == .assistant,
+              htmlContent == nil,
+              !showsAssistantActionRow else {
+            return false
+        }
+
+        let trimmed = message.content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              trimmed.count <= 96,
+              trimmed.rangeOfCharacter(from: .newlines) == nil else {
+            return false
+        }
+
+        return !["```", "`", "|", "#", "* ", "- ", "1."].contains { trimmed.contains($0) }
+    }
+
+    private func toggleHTMLPreview() {
+        withAnimation(.easeOut(duration: 0.18)) {
+            isHTMLPreviewPresented.toggle()
         }
     }
 
@@ -748,8 +887,30 @@ private struct HermesChatRow: View {
     }
 }
 
-private struct IOSHermesChatSettingsView: View {
+private struct AssistantBubbleWidthModifier: ViewModifier {
+    let maxWidth: CGFloat
+    let usesIntrinsicWidth: Bool
+
+    func body(content: Content) -> some View {
+        if usesIntrinsicWidth {
+            ViewThatFits(in: .horizontal) {
+                content
+                    .fixedSize(horizontal: true, vertical: false)
+                content
+                    .frame(width: maxWidth, alignment: .leading)
+            }
+        } else {
+            content
+                .frame(maxWidth: maxWidth, alignment: .leading)
+        }
+    }
+}
+
+struct IOSHermesChatSettingsView: View {
+    @EnvironmentObject private var appViewModel: IOSAppViewModel
+    let provider: ChatBotProviderKind
     @Binding var remark: String
+    @Binding var tag: String
     let theme: IOSThemeTokens
 
     var body: some View {
@@ -790,6 +951,24 @@ private struct IOSHermesChatSettingsView: View {
                         TextField(String(localized: "ios_hermes_chat_remark_placeholder"), text: $remark)
                             .multilineTextAlignment(.trailing)
                             .textInputAutocapitalization(.sentences)
+                            .foregroundStyle(theme.textPrimary)
+                            .tint(theme.brandPrimary)
+                    }
+                    .frame(minHeight: 52)
+                    .padding(.horizontal, 16)
+                    .background(settingsRowBackground, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(theme.borderSubtle.opacity(theme.isGeek ? 0.42 : 0.18), lineWidth: 1)
+                    }
+
+                    HStack(spacing: 12) {
+                        Text("ios_hermes_chat_tag")
+                            .font(theme.bodyFont)
+                            .foregroundStyle(theme.textPrimary)
+                        TextField(String(localized: "ios_hermes_chat_tag_placeholder"), text: $tag)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.words)
                             .foregroundStyle(theme.textPrimary)
                             .tint(theme.brandPrimary)
                     }
@@ -972,6 +1151,13 @@ private struct HermesBubbleShape: Shape {
 private struct HermesMarkdownMessage: View {
     let content: String
     let theme: IOSThemeTokens
+    let htmlRenderControl: HermesCodeBlockAction?
+
+    init(content: String, theme: IOSThemeTokens, htmlRenderControl: HermesCodeBlockAction? = nil) {
+        self.content = content
+        self.theme = theme
+        self.htmlRenderControl = htmlRenderControl
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -1008,13 +1194,17 @@ private struct HermesMarkdownMessage: View {
                             .textSelection(.enabled)
                     }
                 case .code(let language, let code):
-                    HermesCodeBlock(language: language, code: code, theme: theme)
+                    HermesCodeBlock(
+                        language: language,
+                        code: code,
+                        theme: theme,
+                        htmlRenderControl: htmlControl(for: language, code: code)
+                    )
                 case .table(let headers, let rows):
                     HermesTableView(headers: headers, rows: rows, theme: theme)
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var blocks: [HermesMarkdownBlock] {
@@ -1035,6 +1225,22 @@ private struct HermesMarkdownMessage: View {
             return .subheadline.weight(.semibold)
         }
     }
+
+    private func htmlControl(for language: String, code: String) -> HermesCodeBlockAction? {
+        guard let htmlRenderControl else { return nil }
+        let normalizedLanguage = language.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalizedCode = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalizedLanguage.contains("html") || normalizedCode.hasPrefix("<!doctype html") || normalizedCode.hasPrefix("<html") {
+            return htmlRenderControl
+        }
+        return nil
+    }
+}
+
+private struct HermesCodeBlockAction {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let action: () -> Void
 }
 
 private enum HermesMarkdownBlock: Equatable {
@@ -1161,6 +1367,19 @@ private struct HermesCodeBlock: View {
     let language: String
     let code: String
     let theme: IOSThemeTokens
+    let htmlRenderControl: HermesCodeBlockAction?
+
+    init(
+        language: String,
+        code: String,
+        theme: IOSThemeTokens,
+        htmlRenderControl: HermesCodeBlockAction? = nil
+    ) {
+        self.language = language
+        self.code = code
+        self.theme = theme
+        self.htmlRenderControl = htmlRenderControl
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1169,13 +1388,18 @@ private struct HermesCodeBlock: View {
                     .font(.caption.monospaced().weight(.semibold))
                     .foregroundStyle(theme.textSecondary)
                 Spacer()
-                Button {
-                    UIPasteboard.general.string = code
-                } label: {
-                    Image(systemName: "doc.on.doc")
+                HStack(spacing: 10) {
+                    codeActionButton(title: "ios_common_copy", systemImage: "doc.on.doc") {
+                        UIPasteboard.general.string = code
+                    }
+                    if let htmlRenderControl {
+                        codeActionButton(
+                            title: htmlRenderControl.title,
+                            systemImage: htmlRenderControl.systemImage,
+                            action: htmlRenderControl.action
+                        )
+                    }
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(theme.textSecondary)
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -1193,11 +1417,33 @@ private struct HermesCodeBlock: View {
                 .stroke(theme.borderSubtle.opacity(0.7), lineWidth: 1)
         }
     }
+
+    private func codeActionButton(
+        title: LocalizedStringKey,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(theme.textSecondary)
+                .frame(width: 22, height: 22)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(title))
+    }
 }
 
 private struct HermesHTMLPreview: UIViewRepresentable {
     let html: String
     let theme: IOSThemeTokens
+
+    private var estimatedHeight: CGFloat {
+        let explicitLines = html.components(separatedBy: .newlines).count
+        let wrappedLines = max(explicitLines, html.count / 44)
+        return min(420, max(180, CGFloat(wrappedLines * 18 + 86)))
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -1254,7 +1500,7 @@ private struct HermesHTMLPreview: UIViewRepresentable {
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: WKWebView, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? 280, height: 260)
+        CGSize(width: proposal.width ?? 280, height: estimatedHeight)
     }
 }
 

@@ -31,7 +31,7 @@ struct IOSTranslationView: View {
         .navigationTitle("ios_tools_translate")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -44,6 +44,7 @@ struct IOSTranslationView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
+                        .iosToolToolbarIcon(theme)
                 }
             }
         }

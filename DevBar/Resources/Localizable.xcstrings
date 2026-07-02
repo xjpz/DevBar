@@ -1221,9 +1221,6 @@
         }
       }
     },
-    "AI" : {
-
-    },
     "AI 额度" : {
       "localizations" : {
         "en" : {
@@ -1423,6 +1420,12 @@
         }
       }
     },
+    "ChatBot" : {
+
+    },
+    "Check" : {
+
+    },
     "check_for_updates" : {
       "localizations" : {
         "en" : {
@@ -1454,6 +1457,9 @@
           }
         }
       }
+    },
+    "Checking..." : {
+
     },
     "choose" : {
       "extractionState" : "stale",
@@ -1534,6 +1540,9 @@
           }
         }
       }
+    },
+    "Clear" : {
+
     },
     "CLI" : {
       "localizations" : {
@@ -1707,6 +1716,9 @@
           }
         }
       }
+    },
+    "Connected" : {
+
     },
     "Convert to Date" : {
       "localizations" : {
@@ -2522,7 +2534,7 @@
         }
       }
     },
-    "Hermes Chat history is saved on this iPhone." : {
+    "Hermes" : {
 
     },
     "Hi, %@" : {
@@ -3197,6 +3209,22 @@
         }
       }
     },
+    "ios_common_back" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回"
+          }
+        }
+      }
+    },
     "ios_common_cancel" : {
       "localizations" : {
         "en" : {
@@ -3230,7 +3258,20 @@
       }
     },
     "ios_common_delete" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delete"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除"
+          }
+        }
+      }
     },
     "ios_common_done" : {
       "localizations" : {
@@ -4004,6 +4045,89 @@
         }
       }
     },
+    "ios_hermes_chat_tag" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tag"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标签"
+          }
+        }
+      }
+    },
+    "ios_hermes_chat_tag_placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hermes, MiMo, Work..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hermes、MiMo、工作..."
+          }
+        }
+      }
+    },
+    "ios_hermes_conversation_message_count" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d messages"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 条消息"
+          }
+        }
+      }
+    },
+    "ios_hermes_conversation_new" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New conversation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新会话"
+          }
+        }
+      }
+    },
+    "ios_hermes_conversation_untitled" : {
+
+    },
+    "ios_hermes_empty_subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hermes keeps conversations on this iPhone and helps organize problems, logs, and context."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hermes 会将会话保存在本机，帮你整理问题、日志和上下文。"
+          }
+        }
+      }
+    },
     "ios_hermes_empty_title" : {
       "localizations" : {
         "en" : {
@@ -4057,13 +4181,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ask Hermes..."
+            "value" : "Ask, paste logs, or describe a task..."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "输入你的问题..."
+            "value" : "输入问题、日志或任务..."
           }
         }
       }
@@ -4235,6 +4359,342 @@
         }
       }
     },
+    "ios_hermes_quick_add" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add quick start"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增快捷项"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_context_prompt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summarize my recent task context and list the next actions."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帮我总结最近的任务上下文，并列出下一步行动。"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_context_subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn scattered context into a compact brief"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把零散上下文整理成简洁摘要"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_context_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Summarize context"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "总结上下文"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_duplicate" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制一份"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_edit" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Edit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "编辑"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_empty_subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Add reusable prompts for common Hermes tasks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加常用 Hermes 提示词"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_empty_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No quick starts"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂无快捷项"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_error_prompt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Help me diagnose this error. I will paste the logs or error message below:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帮我诊断这个错误，我会在下面粘贴日志或报错信息："
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_error_subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Paste logs or an error message"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "粘贴日志或报错信息"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_error_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Explain an error"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "解释报错"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_icon_field" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SF Symbol"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "图标"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_manage" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage quick starts"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "管理快捷项"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_plan_prompt" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create a clear repair plan for this issue:"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "针对这个问题生成一份清晰的修复计划："
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_plan_subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Break a problem into concrete steps"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把问题拆成可执行步骤"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_plan_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Create a plan"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "生成计划"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_prompt_field" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prompt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提示词"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_restore_defaults" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore defaults"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复默认"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_start_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quick start"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快捷开始"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_subtitle_field" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subtitle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "描述"
+          }
+        }
+      }
+    },
+    "ios_hermes_quick_title_field" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Title"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标题"
+          }
+        }
+      }
+    },
     "ios_hermes_regenerate" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4264,6 +4724,70 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在回复..."
+          }
+        }
+      }
+    },
+    "ios_hermes_time_hours_ago" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d hr ago"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 小时前"
+          }
+        }
+      }
+    },
+    "ios_hermes_time_minutes_ago" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d min ago"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 分钟前"
+          }
+        }
+      }
+    },
+    "ios_hermes_time_now" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Just now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刚刚"
+          }
+        }
+      }
+    },
+    "ios_hermes_time_yesterday" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yesterday"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "昨天"
           }
         }
       }
@@ -4345,6 +4869,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "松开 取消"
+          }
+        }
+      }
+    },
+    "ios_hermes_workspace_subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar AI workspace"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DevBar AI 工作空间"
           }
         }
       }
@@ -5511,6 +6051,7 @@
       }
     },
     "ios_settings_hermes_api_key_required" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5543,6 +6084,7 @@
       }
     },
     "ios_settings_hermes_clear" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5559,6 +6101,7 @@
       }
     },
     "ios_settings_hermes_configured" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5607,6 +6150,7 @@
       }
     },
     "ios_settings_hermes_save" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5623,6 +6167,7 @@
       }
     },
     "ios_settings_hermes_saved" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7780,6 +8325,7 @@
       }
     },
     "ios_tools_qr_saved" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9321,6 +9867,9 @@
         }
       }
     },
+    "Model" : {
+
+    },
     "network_error" : {
       "localizations" : {
         "en" : {
@@ -9352,9 +9901,6 @@
           }
         }
       }
-    },
-    "New Chat" : {
-
     },
     "new_version_found" : {
       "localizations" : {
@@ -10502,6 +11048,9 @@
         }
       }
     },
+    "Save" : {
+
+    },
     "Save pages from the browser detail view." : {
       "localizations" : {
         "en" : {
@@ -10513,6 +11062,7 @@
       }
     },
     "Saved" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -12721,6 +13271,9 @@
         }
       }
     },
+    "同步凭证到已配对 iPhone" : {
+
+    },
     "启用 Agent Watcher" : {
       "localizations" : {
         "en" : {
@@ -13056,6 +13609,9 @@
           }
         }
       }
+    },
+    "开启后，Mac 会通过 Relay 把此账号的 token/cookie 同步到 iPhone。请只用于自己的可信设备。" : {
+
     },
     "当前使用安全中继：账号凭证已在本机加密，服务端只临时保存密文。" : {
       "localizations" : {

@@ -109,7 +109,7 @@ struct IOSMacRelayView: View {
         .navigationTitle("Mac Relay")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
         .toolbar {
             ToolbarItem(placement: .principal) {
                 titleStatusView
@@ -122,6 +122,7 @@ struct IOSMacRelayView: View {
                     }
                 } label: {
                     Image(systemName: "arrow.clockwise")
+                        .iosToolToolbarIcon(theme)
                 }
                 .accessibilityLabel("刷新")
             }

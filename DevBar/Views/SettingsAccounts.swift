@@ -355,13 +355,26 @@ struct SettingsAccounts: View {
     }
 
     private func accountMetadataEditor(for account: ProviderAccount) -> some View {
-        fieldBlock(title: "备注小标签") {
-            TextField(account.provider.localizedName, text: accountDisplayNameBinding(for: account))
-                .textFieldStyle(.roundedBorder)
-        } footer: {
-            Text("用于区分同一个 Provider 下的多个账号")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            fieldBlock(title: "备注小标签") {
+                TextField(account.provider.localizedName, text: accountDisplayNameBinding(for: account))
+                    .textFieldStyle(.roundedBorder)
+            } footer: {
+                Text("用于区分同一个 Provider 下的多个账号")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            Toggle(isOn: credentialSyncBinding(for: account)) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("同步凭证到已配对 iPhone")
+                        .font(.caption.weight(.semibold))
+                    Text("开启后，Mac 会通过 Relay 把此账号的 token/cookie 同步到 iPhone。请只用于自己的可信设备。")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
         }
         .padding(10)
         .background(
@@ -745,6 +758,23 @@ struct SettingsAccounts: View {
         Binding(
             get: { accountDisplayNameInputs[account.id] ?? account.displayName },
             set: { accountDisplayNameInputs[account.id] = $0 }
+        )
+    }
+
+    private func credentialSyncBinding(for account: ProviderAccount) -> Binding<Bool> {
+        Binding(
+            get: {
+                appViewModel.providerAccounts
+                    .first(where: { $0.id == account.id })?
+                    .syncPolicy
+                    .credentialSyncEnabled ?? account.syncPolicy.credentialSyncEnabled
+            },
+            set: { enabled in
+                appViewModel.updateProviderAccountCredentialSync(
+                    id: account.id,
+                    isEnabled: enabled
+                )
+            }
         )
     }
 

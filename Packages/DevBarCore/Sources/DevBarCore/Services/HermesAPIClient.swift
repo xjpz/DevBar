@@ -23,12 +23,14 @@ public final class HermesAPIClient: Sendable {
         baseURL: String,
         apiKey: String,
         messages: [HermesChatRequestMessage],
+        model: String? = nil,
         stream: Bool = false
     ) async throws -> String {
         var request = try makeRequest(
             baseURL: baseURL,
             apiKey: apiKey,
             messages: messages,
+            model: model,
             stream: stream
         )
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -45,7 +47,8 @@ public final class HermesAPIClient: Sendable {
     public func streamMessage(
         baseURL: String,
         apiKey: String,
-        messages: [HermesChatRequestMessage]
+        messages: [HermesChatRequestMessage],
+        model: String? = nil
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
@@ -54,6 +57,7 @@ public final class HermesAPIClient: Sendable {
                         baseURL: baseURL,
                         apiKey: apiKey,
                         messages: messages,
+                        model: model,
                         stream: true
                     )
                     request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
@@ -81,7 +85,75 @@ public final class HermesAPIClient: Sendable {
         }
     }
 
+    public func fetchModels(baseURL: String, apiKey: String) async throws -> [HermesModel] {
+        let request = try makeGETRequest(url: Self.modelsURL(from: baseURL), apiKey: apiKey)
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+        return try decoder.decode(HermesModelsResponse.self, from: data).data
+    }
+
+    public func fetchCapabilities(baseURL: String, apiKey: String) async throws -> HermesAPIServerCapabilities {
+        let request = try makeGETRequest(url: Self.capabilitiesURL(from: baseURL), apiKey: apiKey)
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+        return try decoder.decode(HermesAPIServerCapabilities.self, from: data)
+    }
+
+    public func sendResponse(
+        baseURL: String,
+        apiKey: String,
+        input: String,
+        model: String? = nil,
+        conversation: String
+    ) async throws -> String {
+        guard let url = Self.responsesURL(from: baseURL) else {
+            throw APIError.invalidResponse
+        }
+
+        let authorization = BigModelAPIClient.normalizedBearerToken(apiKey)
+        guard !authorization.isEmpty else {
+            throw APIError.unauthorized
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = Self.defaultRequestTimeout
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(authorization, forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(HermesResponsesRequest(
+            model: model,
+            input: input,
+            conversation: conversation,
+            store: true
+        ))
+
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+        let decoded = try decoder.decode(HermesResponsesResponse.self, from: data)
+        guard !decoded.assistantContent.isEmpty else {
+            throw APIError.invalidResponse
+        }
+        return decoded.assistantContent
+    }
+
     public static func chatURL(from baseURL: String) -> URL? {
+        endpointURL(from: baseURL, appending: "chat/completions")
+    }
+
+    public static func modelsURL(from baseURL: String) -> URL? {
+        endpointURL(from: baseURL, appending: "models")
+    }
+
+    public static func capabilitiesURL(from baseURL: String) -> URL? {
+        endpointURL(from: baseURL, appending: "capabilities")
+    }
+
+    public static func responsesURL(from baseURL: String) -> URL? {
+        endpointURL(from: baseURL, appending: "responses")
+    }
+
+    private static func endpointURL(from baseURL: String, appending endpoint: String) -> URL? {
         let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
               var components = URLComponents(string: trimmed),
@@ -95,8 +167,15 @@ public final class HermesAPIClient: Sendable {
         while path.hasSuffix("/") {
             path.removeLast()
         }
-        if !path.hasSuffix("/chat/completions") {
-            path += "/chat/completions"
+        for knownEndpoint in ["chat/completions", "responses", "models", "capabilities"] {
+            let suffix = "/\(knownEndpoint)"
+            if path.hasSuffix(suffix) {
+                path.removeLast(suffix.count)
+                break
+            }
+        }
+        if !path.hasSuffix("/\(endpoint)") {
+            path += "/\(endpoint)"
         }
         components.path = path
         return components.url
@@ -133,6 +212,7 @@ public final class HermesAPIClient: Sendable {
         baseURL: String,
         apiKey: String,
         messages: [HermesChatRequestMessage],
+        model: String?,
         stream: Bool
     ) throws -> URLRequest {
         guard let url = Self.chatURL(from: baseURL) else {
@@ -149,7 +229,29 @@ public final class HermesAPIClient: Sendable {
         request.timeoutInterval = Self.defaultRequestTimeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(authorization, forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(HermesChatRequest(messages: messages, stream: stream))
+        request.httpBody = try JSONEncoder().encode(HermesChatRequest(
+            messages: messages,
+            model: model,
+            stream: stream
+        ))
+        return request
+    }
+
+    private func makeGETRequest(url: URL?, apiKey: String) throws -> URLRequest {
+        guard let url else {
+            throw APIError.invalidResponse
+        }
+
+        let authorization = BigModelAPIClient.normalizedBearerToken(apiKey)
+        guard !authorization.isEmpty else {
+            throw APIError.unauthorized
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = Self.defaultRequestTimeout
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(authorization, forHTTPHeaderField: "Authorization")
         return request
     }
 

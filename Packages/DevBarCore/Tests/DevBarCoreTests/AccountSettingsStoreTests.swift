@@ -76,3 +76,31 @@ func providerAccountsAllowMultipleAccountsForSameProvider() {
     #expect(openAIAccounts.map(\.id).contains("openai-a"))
     #expect(openAIAccounts.map(\.id).contains("openai-b"))
 }
+
+@Test
+func providerAccountsPersistCredentialSyncPolicy() {
+    let suiteName = "DevBarCoreTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defaults.removePersistentDomain(forName: suiteName)
+
+    let store = UserDefaultsAccountSettingsStore(defaults: defaults)
+    store.saveProviderAccounts([
+        ProviderAccount(
+            id: "openai-primary",
+            provider: .openai,
+            displayName: "OpenAI",
+            isEnabled: true,
+            order: 0,
+            syncPolicy: ProviderAccountSyncPolicy(
+                quotaSyncEnabled: true,
+                credentialSyncEnabled: true
+            )
+        ),
+    ])
+
+    let account = store.loadProviderAccounts()
+        .first { $0.id == "openai-primary" }
+
+    #expect(account?.syncPolicy.quotaSyncEnabled == true)
+    #expect(account?.syncPolicy.credentialSyncEnabled == true)
+}

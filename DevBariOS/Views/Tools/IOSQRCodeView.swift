@@ -10,7 +10,7 @@ struct IOSQRCodeView: View {
     @State private var backgroundColor: Color = .white
     @State private var correctionLevel: QRCorrectionLevel = .high
     @State private var copyFeedback = false
-    @State private var saveFeedback: Bool? = nil
+    @State private var statusToast: IOSStatusToastKind?
 
     var body: some View {
         ScrollView {
@@ -26,7 +26,15 @@ struct IOSQRCodeView: View {
         .navigationTitle("ios_tools_qr_code")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .overlay {
+            if let statusToast {
+                IOSStatusToast(toastTitle(for: statusToast), kind: statusToast, theme: theme)
+                    .transition(.scale(scale: 0.94).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
+        }
+        .animation(.easeOut(duration: 0.22), value: statusToast)
     }
 
     // MARK: - Input
@@ -147,17 +155,11 @@ struct IOSQRCodeView: View {
             Button {
                 saveToPhotos()
             } label: {
-                if saveFeedback == true {
-                    Label("ios_tools_qr_saved", systemImage: "checkmark")
-                        .frame(maxWidth: .infinity)
-                } else {
-                    Label("ios_tools_qr_save", systemImage: "square.and.arrow.down")
-                        .frame(maxWidth: .infinity)
-                }
+                Label("ios_tools_qr_save", systemImage: "square.and.arrow.down")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .foregroundStyle(saveFeedback == true ? theme.success : theme.brandPrimary)
-            .animation(.easeOut(duration: 0.25), value: saveFeedback)
+            .foregroundStyle(theme.brandPrimary)
             .disabled(generateQRImage() == nil)
         }
     }
@@ -202,9 +204,29 @@ struct IOSQRCodeView: View {
     private func saveToPhotos() {
         guard let image = generateQRImage() else { return }
         UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-        saveFeedback = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            saveFeedback = nil
+        showToast(.success)
+    }
+
+    private func showToast(_ toast: IOSStatusToastKind) {
+        withAnimation {
+            self.statusToast = toast
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.25) {
+            withAnimation {
+                if self.statusToast == toast {
+                    self.statusToast = nil
+                }
+            }
+        }
+    }
+
+    private func toastTitle(for toast: IOSStatusToastKind) -> String {
+        switch toast {
+        case .success:
+            return "Saved"
+        case .failure:
+            return "Failed"
         }
     }
 }

@@ -135,6 +135,13 @@ public struct ProviderQuotaSnapshot: Codable, Sendable, Identifiable, Equatable 
     }
 
     public func shouldReplace(_ existing: ProviderQuotaSnapshot?) -> Bool {
+        shouldReplace(existing: existing, localLastUpdated: nil)
+    }
+
+    public func shouldReplace(existing: ProviderQuotaSnapshot?, localLastUpdated: Date?) -> Bool {
+        if let localLastUpdated, fetchedAt < localLastUpdated {
+            return false
+        }
         guard let existing else { return true }
         if revision != existing.revision {
             return revision > existing.revision

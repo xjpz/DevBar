@@ -1,15 +1,63 @@
 import Foundation
 
+public enum ChatBotProviderKind: String, Codable, CaseIterable, Identifiable, Equatable, Sendable {
+    case hermes
+
+    public var id: String { rawValue }
+}
+
 public struct HermesSettings: Equatable, Sendable {
     public var apiBaseURL: String
+    public var hermesModel: String
+    public var hermesProvider: String
     public var isStreamingEnabled: Bool
+    public var chatTabProvider: ChatBotProviderKind
+    public var hermesChatRemark: String
+    public var hermesChatTag: String
 
-    public init(apiBaseURL: String = "", isStreamingEnabled: Bool = true) {
+    public init(
+        apiBaseURL: String = "",
+        hermesModel: String = "",
+        hermesProvider: String = "",
+        isStreamingEnabled: Bool = true,
+        chatTabProvider: ChatBotProviderKind = .hermes,
+        hermesChatRemark: String = "",
+        hermesChatTag: String = ""
+    ) {
         self.apiBaseURL = apiBaseURL
+        self.hermesModel = hermesModel
+        self.hermesProvider = hermesProvider
         self.isStreamingEnabled = isStreamingEnabled
+        self.chatTabProvider = chatTabProvider
+        self.hermesChatRemark = hermesChatRemark
+        self.hermesChatTag = hermesChatTag
     }
 
     public static let defaults = HermesSettings()
+
+    public var enabledChatProviders: [ChatBotProviderKind] {
+        [.hermes]
+    }
+
+    public var normalizedChatTabProvider: ChatBotProviderKind {
+        .hermes
+    }
+
+    public var toolsChatProviders: [ChatBotProviderKind] {
+        []
+    }
+
+    public func isChatProviderEnabled(_ provider: ChatBotProviderKind) -> Bool {
+        provider == .hermes
+    }
+
+    public func chatRemark(for provider: ChatBotProviderKind) -> String {
+        hermesChatRemark
+    }
+
+    public func chatTag(for provider: ChatBotProviderKind) -> String {
+        hermesChatTag
+    }
 }
 
 public enum HermesChatRole: String, Codable, Equatable, Sendable {
@@ -30,11 +78,98 @@ public struct HermesChatRequestMessage: Codable, Equatable, Sendable {
 
 public struct HermesChatRequest: Encodable, Sendable {
     public var messages: [HermesChatRequestMessage]
+    public var model: String?
     public var stream: Bool
 
-    public init(messages: [HermesChatRequestMessage], stream: Bool) {
+    public init(messages: [HermesChatRequestMessage], model: String? = nil, stream: Bool) {
         self.messages = messages
+        self.model = model?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         self.stream = stream
+    }
+}
+
+public struct HermesModel: Decodable, Equatable, Identifiable, Sendable {
+    public let id: String
+    public let object: String?
+}
+
+public struct HermesModelsResponse: Decodable, Equatable, Sendable {
+    public let object: String?
+    public let data: [HermesModel]
+}
+
+public struct HermesAPIServerCapabilities: Decodable, Equatable, Sendable {
+    public struct Auth: Decodable, Equatable, Sendable {
+        public let type: String?
+        public let required: Bool
+    }
+
+    public struct Features: Decodable, Equatable, Sendable {
+        public let chatCompletions: Bool
+        public let responsesAPI: Bool
+        public let runSubmission: Bool
+        public let runEventsSSE: Bool
+        public let runStop: Bool
+
+        private enum CodingKeys: String, CodingKey {
+            case chatCompletions = "chat_completions"
+            case responsesAPI = "responses_api"
+            case runSubmission = "run_submission"
+            case runEventsSSE = "run_events_sse"
+            case runStop = "run_stop"
+        }
+    }
+
+    public let object: String?
+    public let platform: String?
+    public let model: String?
+    public let auth: Auth
+    public let features: Features
+}
+
+public struct HermesResponsesRequest: Encodable, Sendable {
+    public var model: String?
+    public var input: String
+    public var conversation: String
+    public var store: Bool
+
+    public init(model: String? = nil, input: String, conversation: String, store: Bool = true) {
+        self.model = model?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.input = input
+        self.conversation = conversation.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.store = store
+    }
+}
+
+public struct HermesResponsesResponse: Decodable, Equatable, Sendable {
+    public struct OutputItem: Decodable, Equatable, Sendable {
+        public struct ContentItem: Decodable, Equatable, Sendable {
+            public let type: String?
+            public let text: String?
+        }
+
+        public let type: String?
+        public let role: String?
+        public let content: [ContentItem]?
+    }
+
+    public let id: String?
+    public let object: String?
+    public let status: String?
+    public let model: String?
+    public let output: [OutputItem]?
+
+    public var assistantContent: String {
+        output?
+            .filter { $0.type == nil || $0.type == "message" }
+            .filter { $0.role == nil || $0.role == "assistant" }
+            .compactMap { item in
+                item.content?
+                    .compactMap(\.text)
+                    .filter { !$0.isEmpty }
+                    .joined()
+            }
+            .first(where: { !$0.isEmpty }) ?? ""
     }
 }
 
@@ -80,5 +215,11 @@ public struct HermesStreamResponse: Decodable, Equatable, Sendable {
         choices?.compactMap { choice in
             choice.delta?.content ?? choice.text
         }.first(where: { !$0.isEmpty }) ?? content ?? message ?? response
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

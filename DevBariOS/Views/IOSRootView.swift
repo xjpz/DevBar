@@ -44,7 +44,7 @@ struct IOSRootView: View {
                 }
 
                 NavigationStack {
-                    IOSHermesConversationListView()
+                    IOSHermesConversationListView(provider: appViewModel.chatTabProvider)
                 }
                 .tabItem {
                     Label("ios_tab_chatbot", systemImage: "bubble.left.and.bubble.right.fill")

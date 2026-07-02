@@ -72,9 +72,13 @@ public final class WidgetDataManager {
         return try? JSONDecoder().decode(ProviderQuotaSnapshot.self, from: data)
     }
 
-    public func applyQuotaSnapshot(_ snapshot: ProviderQuotaSnapshot, mirrorProviderKey: Bool = true) -> Bool {
+    public func applyQuotaSnapshot(
+        _ snapshot: ProviderQuotaSnapshot,
+        mirrorProviderKey: Bool = true,
+        localLastUpdated: Date? = nil
+    ) -> Bool {
         let existing = loadQuotaSnapshot(accountID: snapshot.accountID)
-        guard snapshot.shouldReplace(existing) else { return false }
+        guard snapshot.shouldReplace(existing: existing, localLastUpdated: localLastUpdated) else { return false }
         saveQuotaSnapshot(snapshot, mirrorProviderKey: mirrorProviderKey)
         return true
     }

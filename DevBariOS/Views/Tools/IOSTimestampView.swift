@@ -41,7 +41,7 @@ struct IOSTimestampView: View {
         .navigationTitle("ios_tools_timestamp")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme)
+        .iosToolNavigationChrome(theme, showsBackButton: true)
     }
 
     private func toolPanel<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {

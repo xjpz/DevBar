@@ -224,7 +224,7 @@ struct IOSDashboardView: View {
     }
 
     private func iosAssetName(for provider: QuotaProvider) -> String {
-        provider == .mimo ? "MiMO" : provider.assetName
+        provider.assetName
     }
 
     private func lastRefreshText(for provider: QuotaProvider) -> String {

@@ -495,7 +495,7 @@ struct IOSAccountsView: View {
     }
 
     private func iosAssetName(for provider: QuotaProvider) -> String {
-        provider == .mimo ? "MiMO" : provider.assetName
+        provider.assetName
     }
 
     private func savingState(for provider: QuotaProvider) -> Bool {

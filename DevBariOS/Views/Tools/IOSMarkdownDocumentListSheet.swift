@@ -110,6 +110,7 @@ struct IOSMarkdownDocumentListSheet: View {
                         withAnimation { isSearching.toggle(); searchText = "" }
                     } label: {
                         Image(systemName: isSearching ? "xmark.circle.fill" : "magnifyingglass")
+                            .iosToolToolbarIcon(theme)
                     }
                 }
             }
