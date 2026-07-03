@@ -32,9 +32,16 @@ struct DevBariOSApp: App {
                     await appViewModel.startDeferredLaunchWork()
                 }
                 .onChange(of: scenePhase) { _, newPhase in
-                    guard newPhase == .active else { return }
-                    Task {
-                        await appViewModel.refreshOnForeground()
+                    switch newPhase {
+                    case .active:
+                        IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: false)
+                        Task {
+                            await appViewModel.refreshOnForeground()
+                        }
+                    case .background:
+                        IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: true)
+                    default:
+                        break
                     }
                 }
                 .onChange(of: languageManager.selectedLanguage) { _, _ in
@@ -55,6 +62,7 @@ struct DevBariOSApp: App {
                 IOSMarkdownDocument.self,
                 IOSHermesConversation.self,
                 IOSHermesMessage.self,
+                IOSTerminalServer.self,
             ],
             isAutosaveEnabled: true,
             isUndoEnabled: false

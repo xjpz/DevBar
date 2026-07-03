@@ -11,6 +11,9 @@
         }
       }
     },
+    "·" : {
+
+    },
     "%@" : {
       "localizations" : {
         "en" : {
@@ -220,6 +223,12 @@
           }
         }
       }
+    },
+    "%lld Sessions" : {
+
+    },
+    "%lld SSH" : {
+
     },
     "%lld 个任务" : {
       "localizations" : {
@@ -1190,6 +1199,12 @@
         }
       }
     },
+    "Add a server configuration to start an SSH terminal." : {
+
+    },
+    "Add Server" : {
+
+    },
     "Agent Watcher" : {
       "localizations" : {
         "en" : {
@@ -1308,6 +1323,9 @@
           }
         }
       }
+    },
+    "Authentication" : {
+
     },
     "authorized" : {
       "localizations" : {
@@ -2191,6 +2209,9 @@
         }
       }
     },
+    "Edit" : {
+
+    },
     "enable_exhausted_alert" : {
       "localizations" : {
         "en" : {
@@ -2572,6 +2593,9 @@
           }
         }
       }
+    },
+    "Host" : {
+
     },
     "HTTP" : {
       "localizations" : {
@@ -9470,6 +9494,9 @@
         }
       }
     },
+    "Method" : {
+
+    },
     "Method: %@" : {
       "localizations" : {
         "en" : {
@@ -9870,6 +9897,9 @@
     "Model" : {
 
     },
+    "Name" : {
+
+    },
     "network_error" : {
       "localizations" : {
         "en" : {
@@ -9918,6 +9948,9 @@
         }
       }
     },
+    "Next" : {
+
+    },
     "No API Records yet" : {
       "localizations" : {
         "en" : {
@@ -9937,6 +9970,9 @@
           }
         }
       }
+    },
+    "No Servers" : {
+
     },
     "No Tabs" : {
       "localizations" : {
@@ -10548,6 +10584,9 @@
         }
       }
     },
+    "Port" : {
+
+    },
     "PowerPoint 演示 (.pptx)" : {
       "localizations" : {
         "en" : {
@@ -10860,6 +10899,9 @@
         }
       }
     },
+    "Reconnect" : {
+
+    },
     "refresh" : {
       "localizations" : {
         "en" : {
@@ -11082,6 +11124,9 @@
         }
       }
     },
+    "Saving..." : {
+
+    },
     "scan_or_account_login" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -11128,6 +11173,12 @@
           }
         }
       }
+    },
+    "Server" : {
+
+    },
+    "Server Actions" : {
+
     },
     "settings" : {
       "localizations" : {
@@ -11207,6 +11258,9 @@
         }
       }
     },
+    "SSH" : {
+
+    },
     "status" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -11239,6 +11293,9 @@
           }
         }
       }
+    },
+    "System" : {
+
     },
     "tab_about" : {
       "extractionState" : "stale",
@@ -11362,6 +11419,9 @@
           }
         }
       }
+    },
+    "Terminal" : {
+
     },
     "test_connection" : {
       "extractionState" : "stale",
@@ -11653,6 +11713,9 @@
           }
         }
       }
+    },
+    "Username" : {
+
     },
     "Value" : {
       "localizations" : {

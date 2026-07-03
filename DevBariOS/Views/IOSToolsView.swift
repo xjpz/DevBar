@@ -66,6 +66,7 @@ struct IOSToolsView: View {
             IOSToolDefinition(id: "markdown", title: "Markdown", subtitle: "编辑 / 预览", systemImage: "doc.richtext", iconColor: .orange),
             IOSToolDefinition(id: "qr-code", title: "二维码", subtitle: "QR Code", systemImage: "qrcode", iconColor: .blue),
             IOSToolDefinition(id: "mac-relay", title: "Mac 中继", subtitle: "Relay", systemImage: "macbook.and.iphone", iconColor: .green),
+            IOSToolDefinition(id: "terminal", title: "终端", subtitle: "Terminal", systemImage: "terminal.fill", iconColor: .green),
         ]
 
         if #available(iOS 18.0, *) {
@@ -165,6 +166,8 @@ struct IOSToolsView: View {
                 IOSQRCodeView()
             case "mac-relay":
                 IOSMacRelayView()
+            case "terminal":
+                IOSTerminalServerListView()
             case "translation":
                 if #available(iOS 18.0, *) {
                     IOSTranslationView()
