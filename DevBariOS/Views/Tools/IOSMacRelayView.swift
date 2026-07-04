@@ -4,6 +4,7 @@ import SwiftUI
 struct IOSMacRelayView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @State private var relayPrompt = ""
     @State private var relaySendError: String?
     @State private var isSendingRelayPrompt = false
@@ -107,12 +108,14 @@ struct IOSMacRelayView: View {
         .scrollDismissesKeyboard(.interactively)
         .iosGeekScreenBackground(theme)
         .navigationTitle("Mac Relay")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                titleStatusView
+            if toolEntryContext == .pushed {
+                ToolbarItem(placement: .principal) {
+                    titleStatusView
+                }
             }
 
             ToolbarItem(placement: .topBarTrailing) {

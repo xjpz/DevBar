@@ -65,6 +65,7 @@ enum FormatterOp: String, CaseIterable, Identifiable {
 
 struct IOSFormatterView: View {
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @State private var format: FormatterFormat = .json
     @State private var input = "{\"name\":\"DevBar\",\"version\":1,\"features\":[\"quota\",\"tools\"]}"
     @State private var output = ""
@@ -106,9 +107,9 @@ struct IOSFormatterView: View {
         .background(Color.clear)
         .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_formatter")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(.easeInOut(duration: 0.25)) { isKeyboardVisible = true }
         }

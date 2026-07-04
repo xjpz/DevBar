@@ -109,6 +109,7 @@ final class IOSSpeechManager: ObservableObject {
 
 struct IOSSpeechToTextView: View {
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @StateObject private var manager = IOSSpeechManager()
     @State private var copyFeedback = false
 
@@ -173,9 +174,9 @@ struct IOSSpeechToTextView: View {
         .background(Color.clear)
             .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_speech")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

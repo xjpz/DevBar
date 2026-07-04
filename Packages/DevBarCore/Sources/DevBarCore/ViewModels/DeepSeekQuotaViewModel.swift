@@ -47,7 +47,7 @@ public final class DeepSeekQuotaViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let response = try await apiClient.fetchUsage(token: token, cookieString: cookieString)
+            let response = try await fetchUsageInBackground(token: token, cookieString: cookieString)
             usageResponse = response
             lastUpdated = Date()
             persistCache()
@@ -62,6 +62,20 @@ public final class DeepSeekQuotaViewModel: ObservableObject {
             errorMessage = error.localizedDescription
             isLoading = false
             isRefreshing = false
+        }
+    }
+
+    private func fetchUsageInBackground(token: String, cookieString: String) async throws -> DeepSeekUsageResponse {
+        let apiClient = self.apiClient
+        let task = Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            return try await apiClient.fetchUsage(token: token, cookieString: cookieString)
+        }
+
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
         }
     }
 

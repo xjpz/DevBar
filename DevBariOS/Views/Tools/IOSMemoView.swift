@@ -8,6 +8,7 @@ import CryptoKit
 struct IOSMemoListView: View {
     @Environment(\.themeTokens) private var theme
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @Query(sort: \IOSMemoItem.updatedAt, order: .reverse) private var memos: [IOSMemoItem]
     @StateObject private var vault = IOSMemoVault()
 
@@ -111,16 +112,18 @@ struct IOSMemoListView: View {
         .background(Color.clear)
             .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_memo")
-        .toolbarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text("ios_tools_memo")
-                    .font(.headline)
-                    .foregroundStyle(theme.textPrimary)
-                    .onTapGesture {
-                        handleTitleTap()
+            if toolEntryContext == .pushed {
+                ToolbarItem(placement: .principal) {
+                    Text("ios_tools_memo")
+                        .font(.headline)
+                        .foregroundStyle(theme.textPrimary)
+                        .onTapGesture {
+                            handleTitleTap()
+                        }
                     }
             }
 

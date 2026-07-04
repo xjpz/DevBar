@@ -29,27 +29,15 @@ struct IOSRootView: View {
                 }
                 .tag(IOSAppViewModel.TabSelection.dashboard)
 
-                if appViewModel.isWebKitTabEnabled {
+                ForEach(pinnedTools) { tool in
                     NavigationStack {
-                        if #available(iOS 18.0, *) {
-                            IOSWebKitView()
-                        } else {
-                            ContentUnavailableView("Requires iOS 18+", systemImage: "globe")
-                        }
+                        IOSToolDestinationView(toolID: tool.id, entryContext: .tabRoot)
                     }
                     .tabItem {
-                        Label("WebKit", systemImage: "globe")
+                        Label(tool.tabTitle, systemImage: tool.systemImage)
                     }
-                    .tag(IOSAppViewModel.TabSelection.webkit)
+                    .tag(IOSAppViewModel.TabSelection.tool(tool.id))
                 }
-
-                NavigationStack {
-                    IOSHermesConversationListView(provider: appViewModel.chatTabProvider)
-                }
-                .tabItem {
-                    Label("ios_tab_chatbot", systemImage: "bubble.left.and.bubble.right.fill")
-                }
-                .tag(IOSAppViewModel.TabSelection.chatbot)
 
                 NavigationStack {
                     IOSToolsView()
@@ -143,8 +131,18 @@ struct IOSRootView: View {
         switch appViewModel.selectedTab {
         case .dashboard:
             theme.backgroundPrimary
-        case .webkit, .chatbot, .tools:
+        case .tool, .tools:
             theme.backgroundSecondary
         }
+    }
+
+    private var pinnedTools: [IOSToolDefinition] {
+        let tools = IOSToolCatalog.availableTools()
+        let toolByID = Dictionary(uniqueKeysWithValues: tools.map { ($0.id, $0) })
+        let pinnedIDs = appViewModel.resolvedPinnedToolTabs(
+            availableToolIDs: tools.filter(\.isPinnedTabEligible).map(\.id)
+        )
+
+        return pinnedIDs.compactMap { toolByID[$0] }
     }
 }

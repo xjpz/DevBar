@@ -1,0 +1,7 @@
+name: devbar-service
+version: 0.1.0
+description: "Dashboard auth provider and hidden dashboard API for DevBar service-token ws-ticket minting. Activates when HERMES_DEVBAR_SERVICE_TOKEN is set to a high-entropy token."
+author: DevBar
+kind: backend
+requires_env:
+  - HERMES_DEVBAR_SERVICE_TOKEN

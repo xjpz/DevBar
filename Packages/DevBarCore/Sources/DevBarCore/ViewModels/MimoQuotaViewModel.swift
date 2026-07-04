@@ -65,7 +65,7 @@ public final class MimoQuotaViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let response = try await apiClient.fetchUsage(serviceToken: serviceToken)
+            let response = try await fetchUsageInBackground(serviceToken: serviceToken)
             usageResponse = response
             lastUpdated = Date()
             persistCache()
@@ -84,6 +84,20 @@ public final class MimoQuotaViewModel: ObservableObject {
             isLoading = false
             isRefreshing = false
             throw error
+        }
+    }
+
+    private func fetchUsageInBackground(serviceToken: String) async throws -> MimoUsageResponse {
+        let apiClient = self.apiClient
+        let task = Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            return try await apiClient.fetchUsage(serviceToken: serviceToken)
+        }
+
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
         }
     }
 
@@ -131,7 +145,7 @@ public final class MimoQuotaViewModel: ObservableObject {
         }
 
         do {
-            let response = try await apiClient.fetchPlanDetail(serviceToken: serviceToken)
+            let response = try await fetchPlanDetailInBackground(serviceToken: serviceToken)
             planDetail = response.data
             detailLastFetchedAt = Date()
             persistCache()
@@ -139,6 +153,20 @@ public final class MimoQuotaViewModel: ObservableObject {
             if errorMessage == nil {
                 errorMessage = (error as? APIError)?.errorDescription ?? error.localizedDescription
             }
+        }
+    }
+
+    private func fetchPlanDetailInBackground(serviceToken: String) async throws -> MimoPlanDetailResponse {
+        let apiClient = self.apiClient
+        let task = Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            return try await apiClient.fetchPlanDetail(serviceToken: serviceToken)
+        }
+
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
         }
     }
 

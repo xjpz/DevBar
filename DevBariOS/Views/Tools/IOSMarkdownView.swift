@@ -7,6 +7,7 @@ import UIKit
 struct IOSMarkdownView: View {
     @Environment(\.themeTokens) private var theme
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @Query(sort: \IOSMarkdownDocument.updatedAt, order: .reverse) private var documents: [IOSMarkdownDocument]
 
     @State private var currentDocument: IOSMarkdownDocument = IOSMarkdownDocument()
@@ -115,10 +116,10 @@ struct IOSMarkdownView: View {
         .animation(.easeInOut(duration: 0.25), value: isScrolledDown)
         .background(Color.clear)
             .toolbarBackground(.hidden, for: .navigationBar)
-        .navigationTitle(currentDocument.title.isEmpty ? String(localized: "ios_tools_md_untitled") : currentDocument.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .navigationTitle("Markdown")
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { createNewDocument() } label: {

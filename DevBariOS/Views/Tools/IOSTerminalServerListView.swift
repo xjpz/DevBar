@@ -5,10 +5,13 @@ import SwiftUI
 struct IOSTerminalServerListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @Query(sort: \IOSTerminalServer.updatedAt, order: .reverse) private var servers: [IOSTerminalServer]
     @State private var editorMode: IOSTerminalServerEditorMode?
+    @State private var openConnectionIDs: Set<UUID> = []
 
     private let credentialStore = TerminalCredentialStore()
+    private let sessionRegistry = IOSTerminalSessionRegistry.shared
 
     var body: some View {
         Group {
@@ -20,9 +23,9 @@ struct IOSTerminalServerListView: View {
         }
         .iosGeekScreenBackground(theme)
         .navigationTitle("Terminal")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
@@ -38,6 +41,9 @@ struct IOSTerminalServerListView: View {
             NavigationStack {
                 IOSTerminalServerEditorView(mode: mode)
             }
+        }
+        .onAppear {
+            refreshOpenConnections()
         }
         .accessibilityIdentifier("ios.tools.terminal.servers")
     }
@@ -65,6 +71,14 @@ struct IOSTerminalServerListView: View {
                                 delete(server)
                             } label: {
                                 Label("Delete", systemImage: "trash")
+                            }
+
+                            if openConnectionIDs.contains(server.id) {
+                                Button {
+                                    close(server)
+                                } label: {
+                                    Label("Close", systemImage: "xmark.circle")
+                                }
                             }
                         } label: {
                             Image(systemName: "ellipsis")
@@ -119,8 +133,19 @@ struct IOSTerminalServerListView: View {
     }
 
     private func delete(_ server: IOSTerminalServer) {
+        sessionRegistry.closeSession(serverID: server.id)
+        refreshOpenConnections()
         credentialStore.deleteSecrets(serverID: server.id)
         modelContext.delete(server)
+    }
+
+    private func close(_ server: IOSTerminalServer) {
+        sessionRegistry.closeSession(serverID: server.id)
+        refreshOpenConnections()
+    }
+
+    private func refreshOpenConnections() {
+        openConnectionIDs = sessionRegistry.openConnectionIDs()
     }
 }
 

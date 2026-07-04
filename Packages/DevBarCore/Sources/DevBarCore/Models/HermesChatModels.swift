@@ -66,11 +66,90 @@ public enum HermesChatRole: String, Codable, Equatable, Sendable {
     case assistant
 }
 
+public struct HermesChatImageURL: Codable, Equatable, Sendable {
+    public var url: String
+    public var detail: String?
+
+    public init(url: String, detail: String? = nil) {
+        self.url = url
+        self.detail = detail?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+}
+
+public enum HermesChatContentPart: Codable, Equatable, Sendable {
+    case text(String)
+    case imageURL(String)
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case text
+        case imageURL = "image_url"
+    }
+
+    private enum ContentType: String, Codable {
+        case text
+        case imageURL = "image_url"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(ContentType.self, forKey: .type)
+        switch type {
+        case .text:
+            self = .text(try container.decode(String.self, forKey: .text))
+        case .imageURL:
+            let imageURL = try container.decode(HermesChatImageURL.self, forKey: .imageURL)
+            self = .imageURL(imageURL.url)
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .text(let text):
+            try container.encode(ContentType.text, forKey: .type)
+            try container.encode(text, forKey: .text)
+        case .imageURL(let url):
+            try container.encode(ContentType.imageURL, forKey: .type)
+            try container.encode(HermesChatImageURL(url: url), forKey: .imageURL)
+        }
+    }
+}
+
+public enum HermesChatMessageContent: Codable, Equatable, Sendable {
+    case text(String)
+    case parts([HermesChatContentPart])
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let text = try? container.decode(String.self) {
+            self = .text(text)
+        } else {
+            self = .parts(try container.decode([HermesChatContentPart].self))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .text(let text):
+            try container.encode(text)
+        case .parts(let parts):
+            try container.encode(parts)
+        }
+    }
+}
+
 public struct HermesChatRequestMessage: Codable, Equatable, Sendable {
     public var role: HermesChatRole
-    public var content: String
+    public var content: HermesChatMessageContent
 
     public init(role: HermesChatRole, content: String) {
+        self.role = role
+        self.content = .text(content)
+    }
+
+    public init(role: HermesChatRole, content: HermesChatMessageContent) {
         self.role = role
         self.content = content
     }

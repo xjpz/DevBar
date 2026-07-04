@@ -99,6 +99,46 @@ func hermesAPIClientIncludesModelAndOmitsProviderInChatRequestBody() async throw
 }
 
 @Test
+func hermesAPIClientEncodesImageURLContentPartsInChatRequestBody() async throws {
+    let store = HermesAPIRequestStore()
+    let session = URLSession(configuration: .hermesAPIMock(id: store.id))
+    HermesAPIMockURLProtocol.register(id: store.id, responseBody: """
+    {"choices":[{"message":{"role":"assistant","content":"ok"}}]}
+    """.data(using: .utf8)!) { [store] request, body in
+        store.request = request
+        store.body = body
+    }
+
+    let client = HermesAPIClient(session: session)
+    let content = try await client.sendMessage(
+        baseURL: "https://hermes.example.test/v1",
+        apiKey: "test-key",
+        messages: [
+            HermesChatRequestMessage(
+                role: .user,
+                content: .parts([
+                    .text("请分析这张图片"),
+                    .imageURL("data:image/jpeg;base64,abc123")
+                ])
+            )
+        ],
+        model: "hermes-agent",
+        stream: false
+    )
+
+    #expect(content == "ok")
+    let body = try #require(store.body)
+    let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+    let messages = try #require(json?["messages"] as? [[String: Any]])
+    let contentParts = try #require(messages.first?["content"] as? [[String: Any]])
+    #expect(contentParts.first?["type"] as? String == "text")
+    #expect(contentParts.first?["text"] as? String == "请分析这张图片")
+    #expect(contentParts.last?["type"] as? String == "image_url")
+    let imageURL = try #require(contentParts.last?["image_url"] as? [String: Any])
+    #expect(imageURL["url"] as? String == "data:image/jpeg;base64,abc123")
+}
+
+@Test
 func hermesAPIClientDiscoversModels() async throws {
     let store = HermesAPIRequestStore()
     let session = URLSession(configuration: .hermesAPIMock(id: store.id))

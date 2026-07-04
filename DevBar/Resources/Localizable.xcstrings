@@ -1205,6 +1205,9 @@
     "Add Server" : {
 
     },
+    "Add to bottom tab" : {
+
+    },
     "Agent Watcher" : {
       "localizations" : {
         "en" : {
@@ -4216,6 +4219,22 @@
         }
       }
     },
+    "ios_hermes_send" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送"
+          }
+        }
+      }
+    },
     "ios_hermes_memory_detail" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -6659,6 +6678,7 @@
       }
     },
     "ios_settings_navigation_section" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -6871,6 +6891,7 @@
       }
     },
     "ios_settings_show_webkit_tab" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -7130,6 +7151,7 @@
       }
     },
     "ios_tab_chatbot" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -8109,6 +8131,7 @@
       }
     },
     "ios_tools_ocr" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -9436,6 +9459,9 @@
         }
       }
     },
+    "Markdown" : {
+
+    },
     "Markdown (.md)" : {
       "localizations" : {
         "en" : {
@@ -10217,6 +10243,9 @@
         }
       }
     },
+    "OCR" : {
+
+    },
     "OK" : {
       "localizations" : {
         "en" : {
@@ -10953,6 +10982,9 @@
           }
         }
       }
+    },
+    "Remove from bottom tab" : {
+
     },
     "Request URL" : {
       "localizations" : {
@@ -13363,6 +13395,9 @@
         }
       }
     },
+    "固定" : {
+
+    },
     "在 AI 额度小组件内切换 Provider 分页。" : {
       "localizations" : {
         "en" : {
@@ -13813,6 +13848,9 @@
         }
       }
     },
+    "排序" : {
+
+    },
     "接入状态" : {
       "localizations" : {
         "en" : {
@@ -13965,6 +14003,9 @@
           }
         }
       }
+    },
+    "更多工具操作" : {
+
     },
     "未检测到" : {
       "localizations" : {

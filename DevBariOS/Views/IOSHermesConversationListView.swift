@@ -12,11 +12,11 @@ struct IOSHermesConversationListView: View {
     private var conversations: [IOSHermesConversation]
 
     @State private var destination: ChatDestination?
-    @State private var selectedConversation: IOSHermesConversation?
     @State private var isSettingsPresented = false
     @State private var isQuickStartManagerPresented = false
     @State private var quickStartItems: [HermesQuickStartItem] = []
     @State private var quickStartDraft: IOSHermesQuickStartDraft?
+    @State private var hasRegisteredHermesInteraction = false
 
     private let hermesSettingsStore = UserDefaultsHermesSettingsStore()
 
@@ -78,7 +78,12 @@ struct IOSHermesConversationListView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
-                    destination = .new(id: UUID())
+                    destination = ChatDestination(
+                        id: "new.\(UUID().uuidString)",
+                        kind: .new,
+                        settings: appViewModel.hermesSettings,
+                        apiKey: appViewModel.hermesAPIKey
+                    )
                 } label: {
                     Image(systemName: "square.and.pencil")
                         .iosToolToolbarIcon(theme)
@@ -88,7 +93,7 @@ struct IOSHermesConversationListView: View {
                 Button {
                     isSettingsPresented = true
                 } label: {
-                    Image(systemName: "gearshape")
+                    Image(systemName: "ellipsis")
                         .iosToolToolbarIcon(theme)
                 }
                 .buttonStyle(.plain)
@@ -103,17 +108,8 @@ struct IOSHermesConversationListView: View {
                 theme: theme
             )
         }
-        .navigationDestination(item: $destination) { destination in
-            switch destination {
-            case .new:
-                IOSHermesChatView(provider: provider)
-            case .conversation:
-                if let selectedConversation {
-                    IOSHermesChatView(provider: provider, conversation: selectedConversation)
-                }
-            case .quickStart(_, let prompt):
-                IOSHermesChatView(provider: provider, initialDraft: prompt)
-            }
+        .navigationDestination(isPresented: chatDestinationPresentedBinding) {
+            chatDestinationView
         }
         .sheet(isPresented: $isQuickStartManagerPresented) {
             IOSHermesQuickStartManagerView(
@@ -129,7 +125,11 @@ struct IOSHermesConversationListView: View {
             }
         }
         .onAppear {
+            registerHermesInteractionIfNeeded()
             loadQuickStartItems()
+        }
+        .onDisappear {
+            unregisterHermesInteractionIfNeeded()
         }
         .accessibilityIdentifier("ios.hermes.conversation.list")
     }
@@ -273,15 +273,101 @@ struct IOSHermesConversationListView: View {
     private func open(_ item: HermesConversationListItem) {
         switch item {
         case .local(let conversation):
-            debugLog("open local id=\(conversation.id.uuidString)")
-            selectedConversation = conversation
-            destination = .conversation(id: conversation.id)
+            let start = CFAbsoluteTimeGetCurrent()
+            debugLog("open tap local id=\(conversation.id.uuidString) messages=\(conversation.messages.count)")
+            let snapshot = IOSHermesChatViewModel.messageSnapshot(in: conversation)
+            debugLog("open snapshot ready local id=\(conversation.id.uuidString) count=\(snapshot.count) dt=\(elapsedMilliseconds(since: start))ms")
+            destination = ChatDestination(
+                id: "conversation.\(conversation.id.uuidString)",
+                kind: .conversation(conversation, snapshot),
+                settings: appViewModel.hermesSettings,
+                apiKey: appViewModel.hermesAPIKey
+            )
+            debugLog("open destination set local id=\(conversation.id.uuidString) dt=\(elapsedMilliseconds(since: start))ms")
         }
+    }
+
+    private var chatDestinationPresentedBinding: Binding<Bool> {
+        Binding {
+            destination != nil
+        } set: { isPresented in
+            if !isPresented {
+                destination = nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var chatDestinationView: some View {
+        if let destination {
+            let start = CFAbsoluteTimeGetCurrent()
+            switch destination.kind {
+            case .new:
+                IOSHermesChatView(
+                    provider: provider,
+                    initialSettings: destination.settings,
+                    initialAPIKey: destination.apiKey
+                )
+                .onAppear {
+                    debugLog("destination appear id=\(destination.id) dt=\(elapsedMilliseconds(since: start))ms")
+                }
+            case .conversation(let conversation, let messages):
+                IOSHermesChatView(
+                    provider: provider,
+                    conversation: conversation,
+                    initialMessages: messages,
+                    initialSettings: destination.settings,
+                    initialAPIKey: destination.apiKey
+                )
+                .onAppear {
+                    debugLog("destination appear id=\(destination.id) dt=\(elapsedMilliseconds(since: start))ms")
+                }
+            case .quickStart(let prompt):
+                IOSHermesChatView(
+                    provider: provider,
+                    initialSettings: destination.settings,
+                    initialAPIKey: destination.apiKey,
+                    initialDraft: prompt
+                )
+                .onAppear {
+                    debugLog("destination appear id=\(destination.id) dt=\(elapsedMilliseconds(since: start))ms")
+                }
+            }
+        } else {
+            EmptyView()
+        }
+    }
+
+    private func registerHermesInteractionIfNeeded() {
+        guard !hasRegisteredHermesInteraction else { return }
+        hasRegisteredHermesInteraction = true
+        if !appViewModel.claimHermesChatInteractionReservation(reason: "conversation list appear") {
+            appViewModel.beginHermesChatInteraction(reason: "conversation list appear")
+        }
+    }
+
+    private func unregisterHermesInteractionIfNeeded() {
+        guard hasRegisteredHermesInteraction else { return }
+        guard !isNavigatingInsideHermes else {
+            debugLog("keep interaction for internal navigation destination=\(destination?.id ?? "-") settings=\(isSettingsPresented)")
+            return
+        }
+        hasRegisteredHermesInteraction = false
+        appViewModel.endHermesChatInteraction()
+    }
+
+    private var isNavigatingInsideHermes: Bool {
+        destination != nil || isSettingsPresented
     }
 
     private func quickStartRow(_ item: HermesQuickStartItem) -> some View {
         Button {
-            destination = .quickStart(id: UUID(), prompt: item.prompt)
+            destination = ChatDestination(
+                id: "quickStart.\(UUID().uuidString)",
+                kind: .quickStart(item.prompt),
+                settings: appViewModel.hermesSettings,
+                apiKey: appViewModel.hermesAPIKey
+            )
         } label: {
             HStack(spacing: 12) {
                 ZStack {
@@ -467,7 +553,11 @@ struct IOSHermesConversationListView: View {
     }
 
     private func debugLog(_ message: String) {
-        print("[DevBar:iOS:HermesSessions] \(message)")
+        IOSDebugLogger.log("HermesSessions", message)
+    }
+
+    private func elapsedMilliseconds(since start: CFAbsoluteTime) -> Int {
+        Int((CFAbsoluteTimeGetCurrent() - start) * 1_000)
     }
 
     @MainActor
@@ -533,21 +623,17 @@ struct IOSHermesConversationListView: View {
     private static let quickPlanID = UUID(uuidString: "4C9B6B2F-D663-4D96-A24C-05FBC4A81315")!
 }
 
-private enum ChatDestination: Hashable, Identifiable {
-    case new(id: UUID)
-    case conversation(id: UUID)
-    case quickStart(id: UUID, prompt: String)
-
-    var id: String {
-        switch self {
-        case .new(let id):
-            return "new.\(id.uuidString)"
-        case .conversation(let id):
-            return "conversation.\(id.uuidString)"
-        case .quickStart(let id, _):
-            return "quickStart.\(id.uuidString)"
-        }
+private struct ChatDestination: Identifiable {
+    enum Kind {
+        case new
+        case conversation(IOSHermesConversation, [IOSHermesChatViewModel.Message])
+        case quickStart(String)
     }
+
+    let id: String
+    let kind: Kind
+    let settings: HermesSettings
+    let apiKey: String
 }
 
 private enum HermesConversationListItem: Identifiable {

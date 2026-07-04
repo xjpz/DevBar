@@ -52,6 +52,10 @@ final class IOSTerminalSessionViewModel: ObservableObject {
         state == .connected
     }
 
+    var hasOpenConnection: Bool {
+        state == .connecting || state == .connected
+    }
+
     func updateViewport(columns: Int, rows: Int) {
         terminalColumns = min(120, max(24, columns))
         terminalRows = min(80, max(12, rows))

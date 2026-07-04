@@ -3,6 +3,7 @@ import UIKit
 
 struct IOSBase64View: View {
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @State private var input = ""
     @State private var output = ""
     @State private var mode: Base64Mode = .encode
@@ -38,9 +39,9 @@ struct IOSBase64View: View {
         .background(Color.clear)
         .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("Base64")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
             withAnimation(.easeInOut(duration: 0.25)) { isKeyboardVisible = true }
         }

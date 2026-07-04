@@ -1,0 +1,13 @@
+{
+  "name": "devbar-service",
+  "label": "DevBar Service",
+  "description": "Hidden service-token ws-ticket endpoint for DevBar.",
+  "icon": "KeyRound",
+  "version": "0.1.0",
+  "tab": {
+    "path": "/devbar-service",
+    "hidden": true
+  },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}

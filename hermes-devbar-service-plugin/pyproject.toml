@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hermes-devbar-service-plugin"
+version = "0.1.0"
+description = "DevBar service-token auth provider and ws-ticket endpoint for Hermes"
+requires-python = ">=3.10"
+
+[project.entry-points."hermes_agent.plugins"]
+devbar_service = "hermes_devbar_service_plugin:register"
+
+[tool.hatch.build.targets.wheel]
+packages = ["hermes_devbar_service_plugin"]

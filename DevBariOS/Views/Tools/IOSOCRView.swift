@@ -7,6 +7,7 @@ import PhotosUI
 
 struct IOSOCRView: View {
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @State private var selectedImage: UIImage?
     @State private var recognizedText = ""
     @State private var isRecognizing = false
@@ -30,10 +31,10 @@ struct IOSOCRView: View {
         }
         .background(Color.clear)
             .toolbarBackground(.hidden, for: .navigationBar)
-        .navigationTitle("ios_tools_ocr")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .navigationTitle("OCR")
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

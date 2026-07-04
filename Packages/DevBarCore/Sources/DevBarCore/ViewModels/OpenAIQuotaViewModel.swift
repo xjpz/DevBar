@@ -80,7 +80,7 @@ public final class OpenAIQuotaViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let response = try await apiClient.fetchUsage(accessToken: accessToken, accountId: accountId)
+            let response = try await fetchUsageInBackground(accessToken: accessToken, accountId: accountId)
             usageResponse = response
             lastUpdated = Date()
             persistCache()
@@ -98,6 +98,20 @@ public final class OpenAIQuotaViewModel: ObservableObject {
             isLoading = false
             isRefreshing = false
             throw error
+        }
+    }
+
+    private func fetchUsageInBackground(accessToken: String, accountId: String?) async throws -> OpenAIUsageResponse {
+        let apiClient = self.apiClient
+        let task = Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            return try await apiClient.fetchUsage(accessToken: accessToken, accountId: accountId)
+        }
+
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
         }
     }
 

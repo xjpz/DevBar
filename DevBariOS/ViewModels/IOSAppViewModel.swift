@@ -11,6 +11,18 @@ enum IOSScannedCodeResolution {
     case providerTransfer(preview: TransferImportPreview, relayURL: URL?)
 }
 
+enum IOSDebugLogger {
+    private static let processStart = CFAbsoluteTimeGetCurrent()
+
+    static func log(_ scope: String, _ message: String) {
+        print("[DevBar:iOS:\(scope)] t=\(timestamp()) \(message)")
+    }
+
+    private static func timestamp() -> String {
+        String(format: "%.3f", CFAbsoluteTimeGetCurrent() - processStart)
+    }
+}
+
 @MainActor
 final class IOSAppViewModel: ObservableObject {
     enum RefreshTrigger {
@@ -22,9 +34,19 @@ final class IOSAppViewModel: ObservableObject {
 
     enum TabSelection: Hashable {
         case dashboard
-        case webkit
-        case chatbot
+        case tool(String)
         case tools
+
+        var debugLabel: String {
+            switch self {
+            case .dashboard:
+                return "dashboard"
+            case .tool(let id):
+                return "tool.\(id)"
+            case .tools:
+                return "tools"
+            }
+        }
     }
 
     enum DevBarLiveMessageStatus: Equatable {
@@ -65,7 +87,11 @@ final class IOSAppViewModel: ObservableObject {
         }
     }
 
-    @Published var selectedTab: TabSelection = .dashboard
+    @Published var selectedTab: TabSelection = .dashboard {
+        didSet {
+            handleSelectedTabChange(from: oldValue)
+        }
+    }
     @Published var accountConfigs: [AccountConfig] {
         didSet {
             settingsStore.saveAccountConfigs(accountConfigs)
@@ -105,14 +131,7 @@ final class IOSAppViewModel: ObservableObject {
         }
     }
     @Published private(set) var hermesSettingsRevision = 0
-    @Published var isWebKitTabEnabled: Bool {
-        didSet {
-            hermesSettingsStore.saveWebKitTabEnabled(isWebKitTabEnabled)
-            if !isWebKitTabEnabled, selectedTab == .webkit {
-                selectedTab = .dashboard
-            }
-        }
-    }
+    @Published private(set) var pinnedToolTabIDs: [String]
     @Published var pushNotificationPreferences: PushNotificationPreferences {
         didSet {
             if !DevBarCoreConstants.Features.agentWatcherEnabled,
@@ -171,10 +190,18 @@ final class IOSAppViewModel: ObservableObject {
     private let settingsStore = UserDefaultsAccountSettingsStore()
     private let liveActivitySettingsStore = LiveActivitySettingsStore()
     private let hermesSettingsStore: UserDefaultsHermesSettingsStore
+    private let toolTabStore = IOSToolTabStore()
     private let macThemeWidgetAvatarStore = MacThemeWidgetAvatarStore()
     private var childObservers = Set<AnyCancellable>()
     private var hasStartedDeferredLaunchWork = false
     private var hasRefreshedOnLaunch = false
+    private var isLaunchRefreshInProgress = false
+    private var deferredLaunchRefreshTask: Task<Void, Never>?
+    private var activeLaunchRefreshTask: Task<Void, Never>?
+    private var deferredHermesInteractionEndTask: Task<Void, Never>?
+    private var hermesNavigationReservationTask: Task<Void, Never>?
+    private var hasPendingHermesNavigationReservation = false
+    private var hermesChatActivityDepth = 0
     private var lastRefreshAttemptAt: Date?
     private let automaticRefreshCooldown: TimeInterval = 20
     private var usesDefaultHomeScreenShortcutSelection: Bool
@@ -215,7 +242,7 @@ final class IOSAppViewModel: ObservableObject {
         let hermesStore = UserDefaultsHermesSettingsStore()
         self.hermesSettingsStore = hermesStore
         self.hermesSettings = hermesStore.load()
-        self.isWebKitTabEnabled = hermesStore.loadWebKitTabEnabled()
+        self.pinnedToolTabIDs = toolTabStore.load()
         var pushPreferences = IOSPushNotificationCoordinator.shared.loadPreferences()
         if !DevBarCoreConstants.Features.agentWatcherEnabled {
             pushPreferences.agentWatcherEnabled = false
@@ -327,6 +354,54 @@ final class IOSAppViewModel: ObservableObject {
         hermesSettings.toolsChatProviders
     }
 
+    func resolvedPinnedToolTabs(availableToolIDs: [String]) -> [String] {
+        IOSToolTabSelection.resolvedPinnedTabs(
+            savedIDs: pinnedToolTabIDs,
+            availableIDs: availableToolIDs
+        )
+    }
+
+    func isToolPinnedToTab(_ id: String, availableToolIDs: [String]) -> Bool {
+        resolvedPinnedToolTabs(availableToolIDs: availableToolIDs).contains(id)
+    }
+
+    func canPinMoreTools(availableToolIDs: [String]) -> Bool {
+        resolvedPinnedToolTabs(availableToolIDs: availableToolIDs).count < IOSToolTabSelection.defaultLimit
+    }
+
+    @discardableResult
+    func addPinnedToolTab(_ id: String, availableToolIDs: [String]) -> Bool {
+        let updatedIDs = IOSToolTabSelection.adding(
+            id,
+            to: pinnedToolTabIDs,
+            availableIDs: availableToolIDs
+        )
+
+        guard updatedIDs != resolvedPinnedToolTabs(availableToolIDs: availableToolIDs) else {
+            pinnedToolTabIDs = updatedIDs
+            toolTabStore.save(updatedIDs)
+            return false
+        }
+
+        pinnedToolTabIDs = updatedIDs
+        toolTabStore.save(updatedIDs)
+        return true
+    }
+
+    func removePinnedToolTab(_ id: String, availableToolIDs: [String]) {
+        let updatedIDs = IOSToolTabSelection.resolvedPinnedTabs(
+            savedIDs: IOSToolTabSelection.removing(id, from: pinnedToolTabIDs),
+            availableIDs: availableToolIDs
+        )
+
+        pinnedToolTabIDs = updatedIDs
+        toolTabStore.save(updatedIDs)
+
+        if selectedTab == .tool(id) {
+            selectedTab = .dashboard
+        }
+    }
+
     func isChatProviderConfigured(_ provider: ChatBotProviderKind) -> Bool {
         isHermesConfigured
     }
@@ -430,28 +505,235 @@ final class IOSAppViewModel: ObservableObject {
     }
 
     func refreshOnLaunch() async {
-        guard !hasRefreshedOnLaunch else { return }
-        hasRefreshedOnLaunch = true
+        guard !hasRefreshedOnLaunch, !isLaunchRefreshInProgress else {
+            debugLog("launch refresh skip refreshed=\(hasRefreshedOnLaunch) inProgress=\(isLaunchRefreshInProgress)")
+            return
+        }
+        guard !shouldDeferAutomaticLaunchRefresh else {
+            debugLog("launch refresh skip route=\(selectedTab.debugLabel) depth=\(hermesChatActivityDepth)")
+            return
+        }
+        guard !Task.isCancelled else { return }
+        isLaunchRefreshInProgress = true
+        defer { isLaunchRefreshInProgress = false }
+        let start = CFAbsoluteTimeGetCurrent()
+        debugLog("launch refresh begin")
         await refreshAll(trigger: .launch, silent: true)
+        guard !Task.isCancelled else {
+            debugLog("launch refresh cancelled dt=\(elapsedMilliseconds(since: start))ms")
+            return
+        }
+        debugLog("launch refresh end dt=\(elapsedMilliseconds(since: start))ms")
+        hasRefreshedOnLaunch = true
         await refreshHomeScreenShortcuts()
     }
 
     func startDeferredLaunchWork() async {
         guard !hasStartedDeferredLaunchWork else { return }
         hasStartedDeferredLaunchWork = true
+        debugLog("deferred launch work begin route=\(selectedTab.debugLabel)")
 
         try? await Task.sleep(for: .milliseconds(800))
 
         await startRelayIfNeeded()
+        debugLog("deferred launch work relay ready route=\(selectedTab.debugLabel)")
         syncPushStateInBackground(force: true)
         refreshDevBarLiveMessageReadiness()
         await refreshHomeScreenShortcuts()
         syncMacThemeWidgetSnapshot()
-        await refreshOnLaunch()
+        scheduleDeferredLaunchRefresh()
+        debugLog("deferred launch work end route=\(selectedTab.debugLabel)")
+    }
+
+    func reserveHermesChatInteraction(reason: String) {
+        if hasPendingHermesNavigationReservation {
+            cancelLaunchRefreshForHermes(reason: "reservation refresh \(reason)")
+            scheduleHermesNavigationReservationTimeout()
+            debugLog("hermes reservation refreshed reason=\(reason) depth=\(hermesChatActivityDepth)")
+            return
+        }
+
+        hasPendingHermesNavigationReservation = true
+        beginHermesChatInteraction(reason: "reservation \(reason)")
+        scheduleHermesNavigationReservationTimeout()
+        debugLog("hermes reservation begin reason=\(reason) depth=\(hermesChatActivityDepth)")
+    }
+
+    func claimHermesChatInteractionReservation(reason: String) -> Bool {
+        guard hasPendingHermesNavigationReservation else { return false }
+        hasPendingHermesNavigationReservation = false
+        hermesNavigationReservationTask?.cancel()
+        hermesNavigationReservationTask = nil
+        cancelLaunchRefreshForHermes(reason: "reservation claimed \(reason)")
+        debugLog("hermes reservation claimed reason=\(reason) depth=\(hermesChatActivityDepth)")
+        return true
+    }
+
+    func beginHermesChatInteraction(reason: String = "screen") {
+        if let deferredHermesInteractionEndTask {
+            deferredHermesInteractionEndTask.cancel()
+            self.deferredHermesInteractionEndTask = nil
+            debugLog("hermes interaction end cancelled by nested begin reason=\(reason) depth=\(hermesChatActivityDepth)")
+        } else {
+            hermesChatActivityDepth += 1
+        }
+        debugLog("hermes interaction begin reason=\(reason) depth=\(hermesChatActivityDepth)")
+        cancelLaunchRefreshForHermes(reason: "interaction \(reason)")
+    }
+
+    func endHermesChatInteraction() {
+        guard deferredHermesInteractionEndTask == nil else { return }
+        debugLog("hermes interaction end scheduled depth=\(hermesChatActivityDepth)")
+        deferredHermesInteractionEndTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .milliseconds(700))
+            guard !Task.isCancelled else {
+                self.deferredHermesInteractionEndTask = nil
+                self.debugLog("hermes interaction end cancelled before commit")
+                return
+            }
+            self.hermesChatActivityDepth = max(0, self.hermesChatActivityDepth - 1)
+            self.deferredHermesInteractionEndTask = nil
+            self.debugLog("hermes interaction end depth=\(self.hermesChatActivityDepth)")
+            if self.hermesChatActivityDepth == 0,
+               self.hasStartedDeferredLaunchWork,
+               !self.hasRefreshedOnLaunch {
+                self.scheduleDeferredLaunchRefresh()
+            }
+        }
+    }
+
+    var isHermesToolSelectionActive: Bool {
+        switch selectedTab {
+        case .tools, .tool("chatbot-hermes"):
+            return true
+        case .dashboard, .tool:
+            return false
+        }
+    }
+
+    func forceEndHermesChatInteraction(reason: String) {
+        deferredHermesInteractionEndTask?.cancel()
+        deferredHermesInteractionEndTask = nil
+        hermesNavigationReservationTask?.cancel()
+        hermesNavigationReservationTask = nil
+        hasPendingHermesNavigationReservation = false
+        hermesChatActivityDepth = 0
+        debugLog("hermes interaction force end reason=\(reason)")
+        if hasStartedDeferredLaunchWork, !hasRefreshedOnLaunch {
+            scheduleDeferredLaunchRefresh()
+        }
+    }
+
+    private func scheduleDeferredLaunchRefresh() {
+        guard deferredLaunchRefreshTask == nil else { return }
+        debugLog("deferred launch refresh scheduled route=\(selectedTab.debugLabel) depth=\(hermesChatActivityDepth)")
+        deferredLaunchRefreshTask = Task(priority: .utility) { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else {
+                self.deferredLaunchRefreshTask = nil
+                self.debugLog("deferred launch refresh cancelled before wake")
+                return
+            }
+            while self.shouldDeferAutomaticLaunchRefresh || self.isLaunchRefreshInProgress {
+                self.debugLog("deferred launch refresh waiting route=\(self.selectedTab.debugLabel) depth=\(self.hermesChatActivityDepth) inProgress=\(self.isLaunchRefreshInProgress)")
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else {
+                    self.deferredLaunchRefreshTask = nil
+                    self.debugLog("deferred launch refresh cancelled while waiting")
+                    return
+                }
+            }
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else {
+                self.deferredLaunchRefreshTask = nil
+                self.debugLog("deferred launch refresh cancelled before start")
+                return
+            }
+            self.debugLog("deferred launch refresh starting")
+            let refreshTask = Task(priority: .utility) { @MainActor [weak self] in
+                guard let self else { return }
+                await self.refreshOnLaunch()
+            }
+            self.activeLaunchRefreshTask = refreshTask
+            await refreshTask.value
+            self.activeLaunchRefreshTask = nil
+            self.deferredLaunchRefreshTask = nil
+        }
+    }
+
+    private var shouldDeferAutomaticLaunchRefresh: Bool {
+        hermesChatActivityDepth > 0 || isAutomaticRefreshDeferred(for: selectedTab)
+    }
+
+    private func isAutomaticRefreshDeferred(for tab: TabSelection) -> Bool {
+        switch tab {
+        case .tools, .tool("chatbot-hermes"):
+            return true
+        case .dashboard, .tool:
+            return false
+        }
+    }
+
+    private func handleSelectedTabChange(from oldValue: TabSelection) {
+        guard oldValue != selectedTab else { return }
+        debugLog("selected tab changed from=\(oldValue.debugLabel) to=\(selectedTab.debugLabel)")
+
+        if case .tool("chatbot-hermes") = selectedTab {
+            reserveHermesChatInteraction(reason: "tab selection")
+            return
+        }
+
+        if isAutomaticRefreshDeferred(for: selectedTab) {
+            cancelLaunchRefreshForHermes(reason: "tab selection \(selectedTab.debugLabel)")
+            return
+        }
+
+        if isAutomaticRefreshDeferred(for: oldValue),
+           hasStartedDeferredLaunchWork,
+           !hasRefreshedOnLaunch {
+            scheduleDeferredLaunchRefresh()
+        }
+    }
+
+    private func cancelLaunchRefreshForHermes(reason: String) {
+        guard !hasRefreshedOnLaunch else { return }
+        let hadDeferredTask = deferredLaunchRefreshTask != nil
+        let hadActiveTask = activeLaunchRefreshTask != nil
+
+        deferredLaunchRefreshTask?.cancel()
+        deferredLaunchRefreshTask = nil
+        activeLaunchRefreshTask?.cancel()
+        activeLaunchRefreshTask = nil
+
+        if hadDeferredTask || hadActiveTask {
+            debugLog("launch refresh cancelled reason=\(reason) deferred=\(hadDeferredTask) active=\(hadActiveTask)")
+        }
+    }
+
+    private func scheduleHermesNavigationReservationTimeout() {
+        hermesNavigationReservationTask?.cancel()
+        hermesNavigationReservationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: .seconds(8))
+            guard !Task.isCancelled, self.hasPendingHermesNavigationReservation else { return }
+            self.hasPendingHermesNavigationReservation = false
+            self.hermesNavigationReservationTask = nil
+            self.debugLog("hermes reservation timeout depth=\(self.hermesChatActivityDepth)")
+            self.endHermesChatInteraction()
+        }
     }
 
     func refreshOnForeground() async {
         guard hasStartedDeferredLaunchWork else { return }
+        debugLog("foreground refresh begin route=\(selectedTab.debugLabel) depth=\(hermesChatActivityDepth)")
+        guard !shouldDeferAutomaticLaunchRefresh else {
+            await syncLiveActivity()
+            debugLog("foreground refresh deferred route=\(selectedTab.debugLabel) depth=\(hermesChatActivityDepth)")
+            return
+        }
+
         await startRelayIfNeeded(resume: true)
         syncPushStateInBackground(force: true)
         refreshDevBarLiveMessageReadiness()
@@ -459,14 +741,19 @@ final class IOSAppViewModel: ObservableObject {
 
         guard let lastRefresh = latestRefreshDate else {
             await refreshAll(trigger: .foreground, silent: true)
+            debugLog("foreground refresh end missingLastRefresh")
             return
         }
-        guard refreshInterval > 0 else { return }
+        guard refreshInterval > 0 else {
+            debugLog("foreground refresh end disabled")
+            return
+        }
         if Date().timeIntervalSince(lastRefresh) >= refreshInterval {
             await refreshAll(trigger: .foreground, silent: true)
         } else {
             await syncLiveActivity()
         }
+        debugLog("foreground refresh end")
     }
 
     private func startRelayIfNeeded(resume: Bool = false) async {
@@ -512,44 +799,76 @@ final class IOSAppViewModel: ObservableObject {
         }
         lastRefreshAttemptAt = Date()
         lastRefreshTrigger = trigger
+        guard !Task.isCancelled else { return }
 
-        if isProviderEnabled(.glm), let glmCredentials {
-            if quotaViewModel.subscription == nil && quotaViewModel.quotaData == nil {
-                await quotaViewModel.loadInitialData(credentials: glmCredentials)
-            } else {
-                await quotaViewModel.fetchQuota(credentials: glmCredentials, silent: silent)
-            }
-        }
+        let glmRefresh = isProviderEnabled(.glm) ? glmCredentials : nil
+        let openAIRefresh = isProviderEnabled(.openai) && !openAIAccessToken.isEmpty
+            ? (accessToken: openAIAccessToken, accountId: settingsStore.loadOpenAIAccountId())
+            : nil
+        let mimoRefresh = isProviderEnabled(.mimo) && !mimoServiceToken.isEmpty ? mimoServiceToken : nil
+        let deepSeekRefresh = deepSeekRefreshCredentials()
 
-        if isProviderEnabled(.openai), !openAIAccessToken.isEmpty {
-            await openAIQuotaViewModel.fetchUsage(
-                storedAccessToken: openAIAccessToken,
-                storedAccountId: settingsStore.loadOpenAIAccountId(),
-                silent: silent
-            )
-        }
+        async let glmTask: Void = refreshGLMQuota(credentials: glmRefresh, silent: silent)
+        async let openAITask: Void = refreshOpenAIQuota(refresh: openAIRefresh, silent: silent)
+        async let mimoTask: Void = refreshMimoQuota(serviceToken: mimoRefresh, silent: silent)
+        async let deepSeekTask: Void = refreshDeepSeekQuota(refresh: deepSeekRefresh, silent: silent)
 
-        if isProviderEnabled(.mimo), !mimoServiceToken.isEmpty {
-            await mimoQuotaViewModel.fetchUsage(
-                storedServiceToken: mimoServiceToken,
-                silent: silent
-            )
-        }
+        _ = await (glmTask, openAITask, mimoTask, deepSeekTask)
 
-        if isProviderEnabled(.deepseek) {
-            if let account = providerAccounts.first(where: { $0.provider == .deepseek }),
-               let credential = KeychainService.shared.loadProviderCredential(for: account),
-               let token = credential.token, !token.isEmpty,
-               let cookie = credential.cookieString, !cookie.isEmpty {
-                await deepSeekQuotaViewModel.fetchUsage(
-                    token: token,
-                    cookieString: cookie,
-                    silent: silent
-                )
-            }
-        }
-
+        guard !Task.isCancelled else { return }
         await syncLiveActivity()
+    }
+
+    private func deepSeekRefreshCredentials() -> (token: String, cookieString: String)? {
+        guard isProviderEnabled(.deepseek),
+              let account = providerAccounts.first(where: { $0.provider == .deepseek }),
+              let credential = KeychainService.shared.loadProviderCredential(for: account),
+              let token = credential.token, !token.isEmpty,
+              let cookie = credential.cookieString, !cookie.isEmpty else {
+            return nil
+        }
+        return (token, cookie)
+    }
+
+    private func refreshGLMQuota(credentials: AuthCredentials?, silent: Bool) async {
+        guard let credentials else { return }
+        if quotaViewModel.subscription == nil && quotaViewModel.quotaData == nil {
+            await quotaViewModel.loadInitialData(credentials: credentials)
+        } else {
+            await quotaViewModel.fetchQuota(credentials: credentials, silent: silent)
+        }
+    }
+
+    private func refreshOpenAIQuota(
+        refresh: (accessToken: String, accountId: String?)?,
+        silent: Bool
+    ) async {
+        guard let refresh else { return }
+        await openAIQuotaViewModel.fetchUsage(
+            storedAccessToken: refresh.accessToken,
+            storedAccountId: refresh.accountId,
+            silent: silent
+        )
+    }
+
+    private func refreshMimoQuota(serviceToken: String?, silent: Bool) async {
+        guard let serviceToken else { return }
+        await mimoQuotaViewModel.fetchUsage(
+            storedServiceToken: serviceToken,
+            silent: silent
+        )
+    }
+
+    private func refreshDeepSeekQuota(
+        refresh: (token: String, cookieString: String)?,
+        silent: Bool
+    ) async {
+        guard let refresh else { return }
+        await deepSeekQuotaViewModel.fetchUsage(
+            token: refresh.token,
+            cookieString: refresh.cookieString,
+            silent: silent
+        )
     }
 
     func syncLiveActivity() async {
@@ -558,6 +877,14 @@ final class IOSAppViewModel: ObservableObject {
             configs: accountConfigs,
             dataByProvider: liveActivityProviderData()
         )
+    }
+
+    private func debugLog(_ message: String) {
+        IOSDebugLogger.log("App", message)
+    }
+
+    private func elapsedMilliseconds(since start: CFAbsoluteTime) -> Int {
+        Int((CFAbsoluteTimeGetCurrent() - start) * 1_000)
     }
 
     func saveGLMAPIKey(_ rawValue: String) async throws {

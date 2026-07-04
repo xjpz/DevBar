@@ -6,6 +6,18 @@ import UIKit
 
 typealias IOSChatBotProvider = ChatBotProviderKind
 
+struct IOSHermesImageAttachment: Equatable {
+    let id: UUID
+    var displayName: String
+    var dataURL: String
+
+    init(id: UUID = UUID(), displayName: String, dataURL: String) {
+        self.id = id
+        self.displayName = displayName
+        self.dataURL = dataURL
+    }
+}
+
 extension ChatBotProviderKind {
     var title: String {
         "Hermes"
@@ -65,9 +77,25 @@ final class IOSHermesChatViewModel: ObservableObject {
     private var cachedCapabilities: HermesAPIServerCapabilities?
     private var activeTask: Task<Void, Never>?
     private var lastPrompt: String?
+    private var lastImageAttachments: [IOSHermesImageAttachment] = []
 
-    init(client: HermesAPIClient = HermesAPIClient()) {
+    init(
+        client: HermesAPIClient = HermesAPIClient(),
+        conversation: IOSHermesConversation? = nil,
+        prefetchedMessages: [Message]? = nil,
+        settings: HermesSettings? = nil,
+        apiKey: String? = nil,
+        provider: IOSChatBotProvider = .hermes
+    ) {
         self.client = client
+        if let settings, let apiKey {
+            configure(settings: settings, apiKey: apiKey, provider: provider)
+        } else {
+            self.provider = provider
+        }
+        if let conversation {
+            load(conversation: conversation, prefetchedMessages: prefetchedMessages)
+        }
     }
 
     var isConfigured: Bool {
@@ -103,6 +131,11 @@ final class IOSHermesChatViewModel: ObservableObject {
     }
 
     func load(conversation: IOSHermesConversation?) {
+        load(conversation: conversation, prefetchedMessages: nil)
+    }
+
+    func load(conversation: IOSHermesConversation?, prefetchedMessages: [Message]?) {
+        let start = CFAbsoluteTimeGetCurrent()
         self.conversation = conversation
         guard let conversation else {
             messages = []
@@ -110,29 +143,27 @@ final class IOSHermesChatViewModel: ObservableObject {
             return
         }
 
-        messages = Self.orderedMessages(in: conversation).map {
-            Message(
-                id: $0.id,
-                role: $0.role,
-                content: $0.content,
-                createdAt: $0.createdAt,
-                isComplete: $0.isComplete
-            )
-        }
-        debugLog("load conversation localId=\(conversation.id.uuidString) remoteSessionId=\(conversation.remoteSessionId ?? "-") localMessages=\(messages.count)")
+        messages = prefetchedMessages ?? Self.messageSnapshot(in: conversation)
+        debugLog(
+            "load conversation localId=\(conversation.id.uuidString) remoteSessionId=\(conversation.remoteSessionId ?? "-") localMessages=\(messages.count) prefetched=\(prefetchedMessages != nil) chars=\(messages.reduce(0) { $0 + $1.content.count }) dt=\(elapsedMilliseconds(since: start))ms"
+        )
     }
 
-    func sendDraft(modelContext: ModelContext, title: String) -> IOSHermesConversation? {
+    func sendDraft(
+        modelContext: ModelContext,
+        title: String,
+        imageAttachments: [IOSHermesImageAttachment] = []
+    ) -> IOSHermesConversation? {
         let prompt = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !prompt.isEmpty else { return conversation }
         draft = ""
-        send(prompt, modelContext: modelContext, title: title)
+        send(prompt, imageAttachments: imageAttachments, modelContext: modelContext, title: title)
         return conversation
     }
 
     func retryLastPrompt(modelContext: ModelContext, title: String) {
         guard let lastPrompt else { return }
-        send(lastPrompt, modelContext: modelContext, title: title)
+        send(lastPrompt, imageAttachments: lastImageAttachments, modelContext: modelContext, title: title)
     }
 
     func cancel() {
@@ -141,7 +172,12 @@ final class IOSHermesChatViewModel: ObservableObject {
         status = .idle
     }
 
-    private func send(_ prompt: String, modelContext: ModelContext, title: String) {
+    private func send(
+        _ prompt: String,
+        imageAttachments: [IOSHermesImageAttachment],
+        modelContext: ModelContext,
+        title: String
+    ) {
         guard isConfigured else {
             status = .failed(String(localized: "ios_hermes_missing_config_detail"))
             return
@@ -149,6 +185,7 @@ final class IOSHermesChatViewModel: ObservableObject {
 
         activeTask?.cancel()
         lastPrompt = prompt
+        lastImageAttachments = imageAttachments
         status = isStreamingEnabled ? .streaming : .sending
 
         let conversation = ensureConversation(modelContext: modelContext)
@@ -160,15 +197,23 @@ final class IOSHermesChatViewModel: ObservableObject {
             modelContext: modelContext
         )
         messages.append(userMessage)
-        let requestMessages = messages
+        var requestMessages = messages
             .filter { !$0.content.isEmpty }
             .map { HermesChatRequestMessage(role: $0.role, content: $0.content) }
+        if !imageAttachments.isEmpty,
+           let userMessageIndex = requestMessages.indices.last(where: { requestMessages[$0].role == .user }) {
+            requestMessages[userMessageIndex].content = .parts(
+                [HermesChatContentPart.text(prompt)] +
+                imageAttachments.map { HermesChatContentPart.imageURL($0.dataURL) }
+            )
+        }
 
         activeTask = Task {
             await self.performSend(
                 prompt: prompt,
                 conversationID: conversation.id,
                 requestMessages: requestMessages,
+                hasImageAttachments: !imageAttachments.isEmpty,
                 modelContext: modelContext,
                 title: title
             )
@@ -179,6 +224,7 @@ final class IOSHermesChatViewModel: ObservableObject {
         prompt: String,
         conversationID: UUID,
         requestMessages: [HermesChatRequestMessage],
+        hasImageAttachments: Bool,
         modelContext: ModelContext,
         title: String
     ) async {
@@ -190,7 +236,7 @@ final class IOSHermesChatViewModel: ObservableObject {
 
         do {
             var assistantContent = ""
-            if await supportsResponsesAPI() {
+            if !hasImageAttachments, await supportsResponsesAPI() {
                 status = .sending
                 assistantContent = try await client.sendResponse(
                     baseURL: baseURL,
@@ -308,9 +354,13 @@ final class IOSHermesChatViewModel: ObservableObject {
     }
 }
 
-private extension IOSHermesChatViewModel {
+extension IOSHermesChatViewModel {
     func debugLog(_ message: String) {
-        print("[DevBar:iOS:HermesChat] \(message)")
+        IOSDebugLogger.log("HermesChat", message)
+    }
+
+    func elapsedMilliseconds(since start: CFAbsoluteTime) -> Int {
+        Int((CFAbsoluteTimeGetCurrent() - start) * 1_000)
     }
 
     func redacted(_ value: String) -> String {
@@ -334,6 +384,25 @@ private extension IOSHermesChatViewModel {
             }
             return lhs.id.uuidString < rhs.id.uuidString
         }
+    }
+
+    static func messageSnapshot(in conversation: IOSHermesConversation) -> [IOSHermesChatViewModel.Message] {
+        let start = CFAbsoluteTimeGetCurrent()
+        let snapshot = orderedMessages(in: conversation).map {
+            Message(
+                id: $0.id,
+                role: $0.role,
+                content: $0.content,
+                createdAt: $0.createdAt,
+                isComplete: $0.isComplete
+            )
+        }
+        let characterCount = snapshot.reduce(0) { $0 + $1.content.count }
+        IOSDebugLogger.log(
+            "HermesChat",
+            "snapshot localId=\(conversation.id.uuidString) messages=\(snapshot.count) chars=\(characterCount) dt=\(Int((CFAbsoluteTimeGetCurrent() - start) * 1_000))ms"
+        )
+        return snapshot
     }
 
     static func nextSortIndex(in conversation: IOSHermesConversation) -> Int {

@@ -24,6 +24,20 @@ final class IOSTerminalSessionRegistry {
         Array(sessions.values)
     }
 
+    func hasOpenConnection(serverID: UUID) -> Bool {
+        sessions[serverID]?.hasOpenConnection ?? false
+    }
+
+    func openConnectionIDs() -> Set<UUID> {
+        Set(sessions.compactMap { id, session in
+            session.hasOpenConnection ? id : nil
+        })
+    }
+
+    func closeSession(serverID: UUID) {
+        sessions[serverID]?.disconnect(shouldRecordOutput: true)
+    }
+
     func updateBackgroundState(isBackgrounded: Bool) {
         for session in sessions.values {
             session.updateLiveActivityForBackgroundState(isBackgrounded: isBackgrounded)

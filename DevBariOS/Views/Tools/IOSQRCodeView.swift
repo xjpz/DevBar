@@ -5,6 +5,7 @@ import UIKit
 
 struct IOSQRCodeView: View {
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @State private var inputText = "https://example.com"
     @State private var foregroundColor: Color = .black
     @State private var backgroundColor: Color = .white
@@ -24,9 +25,9 @@ struct IOSQRCodeView: View {
         .background(Color.clear)
             .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_qr_code")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .overlay {
             if let statusToast {
                 IOSStatusToast(toastTitle(for: statusToast), kind: statusToast, theme: theme)

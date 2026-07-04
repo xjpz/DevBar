@@ -9,7 +9,8 @@ struct IOSToolsView: View {
     @Environment(\.themeTokens) private var theme
     @State private var toolOrder = IOSToolOrderStore().load()
     @State private var draggedToolID: String?
-    @State private var isReordering = false
+    @State private var editMode: IOSToolsEditMode?
+    @State private var toastMessage: String?
 
     private let orderStore = IOSToolOrderStore()
 
@@ -19,27 +20,50 @@ struct IOSToolsView: View {
     ]
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(orderedTools) { tool in
-                    toolGridItem(tool)
+        ZStack {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(orderedTools) { tool in
+                        toolGridItem(tool)
+                    }
                 }
+                .padding(16)
             }
-            .padding(16)
+            .iosGeekScreenBackground(theme)
+
+            if let toastMessage {
+                IOSStatusToast(toastMessage, kind: .failure, theme: theme)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(1)
+            }
         }
-        .iosGeekScreenBackground(theme)
         .navigationTitle("ios_tab_tools")
         .toolbarTitleDisplayMode(.inlineLarge)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
-            if isReordering {
-                ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .topBarTrailing) {
+                if editMode != nil {
                     Button("完成") {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                            isReordering = false
-                            draggedToolID = nil
-                        }
+                        endEditing()
                     }
+                } else {
+                    Menu {
+                        Button {
+                            beginEditing(.sort)
+                        } label: {
+                            Label("排序", systemImage: "arrow.up.arrow.down")
+                        }
+
+                        Button {
+                            beginEditing(.pinTabs)
+                        } label: {
+                            Label("固定", systemImage: "pin")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .iosToolToolbarIcon(theme)
+                    }
+                    .accessibilityLabel("更多工具操作")
                 }
             }
         }
@@ -47,7 +71,7 @@ struct IOSToolsView: View {
     }
 
     private var orderedTools: [IOSToolDefinition] {
-        let tools = availableTools
+        let tools = IOSToolCatalog.availableTools()
         let toolByID = Dictionary(uniqueKeysWithValues: tools.map { ($0.id, $0) })
         let orderedIDs = IOSToolOrder.resolvedOrder(
             savedOrder: toolOrder,
@@ -57,39 +81,10 @@ struct IOSToolsView: View {
         return orderedIDs.compactMap { toolByID[$0] }
     }
 
-    private var availableTools: [IOSToolDefinition] {
-        var tools: [IOSToolDefinition] = [
-            IOSToolDefinition(id: "api-client", title: "API 调试", subtitle: "API Client", systemImage: "globe", iconColor: .cyan),
-            IOSToolDefinition(id: "formatter", title: "格式化", subtitle: "Formatter", systemImage: "curlybraces", iconColor: .yellow),
-            IOSToolDefinition(id: "base64", title: "Base64", subtitle: "编码 / 解码", systemImage: "lock.square", iconColor: .indigo),
-            IOSToolDefinition(id: "timestamp", title: "时间戳", subtitle: "Timestamp", systemImage: "clock", iconColor: .mint),
-            IOSToolDefinition(id: "markdown", title: "Markdown", subtitle: "编辑 / 预览", systemImage: "doc.richtext", iconColor: .orange),
-            IOSToolDefinition(id: "qr-code", title: "二维码", subtitle: "QR Code", systemImage: "qrcode", iconColor: .blue),
-            IOSToolDefinition(id: "mac-relay", title: "Mac 中继", subtitle: "Relay", systemImage: "macbook.and.iphone", iconColor: .green),
-            IOSToolDefinition(id: "terminal", title: "终端", subtitle: "Terminal", systemImage: "terminal.fill", iconColor: .green),
-        ]
-
-        if #available(iOS 18.0, *) {
-            tools.append(IOSToolDefinition(id: "translation", title: "翻译", subtitle: "Translate", systemImage: "character.book.closed", iconColor: .teal))
-        }
-
-        tools.append(contentsOf: [
-            IOSToolDefinition(id: "ocr", title: "文字识别", subtitle: "OCR", systemImage: "doc.text.viewfinder", iconColor: .purple),
-            IOSToolDefinition(id: "speech-to-text", title: "语音转文字", subtitle: "Speech to Text", systemImage: "mic.fill", iconColor: .pink),
-            IOSToolDefinition(id: "memo", title: "备忘录", subtitle: "Memo", systemImage: "note.text", iconColor: .brown),
-        ])
-
-        tools.append(contentsOf: appViewModel.toolsChatProviders.map { provider in
-            IOSToolDefinition(
-                id: "chatbot-\(provider.rawValue)",
-                title: provider.toolTitle,
-                subtitle: provider.toolSubtitle,
-                systemImage: "bubble.left.and.bubble.right.fill",
-                iconColor: .green
-            )
-        })
-
-        return tools
+    private var pinnableToolIDs: [String] {
+        IOSToolCatalog.availableTools()
+            .filter(\.isPinnedTabEligible)
+            .map(\.id)
     }
 
     @ViewBuilder
@@ -97,12 +92,26 @@ struct IOSToolsView: View {
         Group {
             if isReordering {
                 toolCard(tool)
+            } else if isPinningTabs {
+                ZStack(alignment: .topTrailing) {
+                    toolCard(tool)
+
+                    if tool.isPinnedTabEligible {
+                        pinButton(for: tool)
+                            .padding(8)
+                    }
+                }
             } else {
                 NavigationLink {
-                    destination(for: tool.id)
+                    IOSToolDestinationView(toolID: tool.id)
                 } label: {
                     toolCard(tool)
                 }
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        prepareForOpeningTool(tool)
+                    }
+                )
             }
         }
         .buttonStyle(.plain)
@@ -111,16 +120,12 @@ struct IOSToolsView: View {
         .simultaneousGesture(
             LongPressGesture(minimumDuration: 0.35)
                 .onEnded { _ in
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                        isReordering = true
-                    }
+                    beginEditing(.sort)
                 }
         )
         .onDrag {
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                isReordering = true
-                draggedToolID = tool.id
-            }
+            beginEditing(.sort)
+            draggedToolID = tool.id
             return NSItemProvider(object: tool.id as NSString)
         }
         .onDrop(
@@ -128,7 +133,7 @@ struct IOSToolsView: View {
             delegate: IOSToolDropDelegate(
                 targetID: tool.id,
                 draggedToolID: $draggedToolID,
-                isReordering: $isReordering,
+                isReordering: isReorderingBinding,
                 move: moveTool
             )
         )
@@ -146,48 +151,49 @@ struct IOSToolsView: View {
         )
     }
 
-    @ViewBuilder
-    private func destination(for id: String) -> some View {
-        if let provider = chatProvider(from: id) {
-            IOSHermesConversationListView(provider: provider)
-        } else {
-            switch id {
-            case "api-client":
-                IOSAPIClientView()
-            case "formatter":
-                IOSFormatterView()
-            case "base64":
-                IOSBase64View()
-            case "timestamp":
-                IOSTimestampView()
-            case "markdown":
-                IOSMarkdownView()
-            case "qr-code":
-                IOSQRCodeView()
-            case "mac-relay":
-                IOSMacRelayView()
-            case "terminal":
-                IOSTerminalServerListView()
-            case "translation":
-                if #available(iOS 18.0, *) {
-                    IOSTranslationView()
-                }
-            case "ocr":
-                IOSOCRView()
-            case "speech-to-text":
-                IOSSpeechToTextView()
-            case "memo":
-                IOSMemoListView()
-            default:
-                EmptyView()
-            }
-        }
+    private var isReordering: Bool {
+        editMode == .sort
     }
 
-    private func chatProvider(from id: String) -> ChatBotProviderKind? {
-        guard id.hasPrefix("chatbot-") else { return nil }
-        let rawValue = String(id.dropFirst("chatbot-".count))
-        return ChatBotProviderKind(rawValue: rawValue)
+    private var isPinningTabs: Bool {
+        editMode == .pinTabs
+    }
+
+    private var isReorderingBinding: Binding<Bool> {
+        Binding(
+            get: { isReordering },
+            set: { isEnabled in
+                if isEnabled {
+                    beginEditing(.sort)
+                } else if isReordering {
+                    endEditing()
+                }
+            }
+        )
+    }
+
+    private func pinButton(for tool: IOSToolDefinition) -> some View {
+        let isPinned = appViewModel.isToolPinnedToTab(tool.id, availableToolIDs: pinnableToolIDs)
+        let canAdd = appViewModel.canPinMoreTools(availableToolIDs: pinnableToolIDs)
+
+        return Button {
+            if isPinned {
+                appViewModel.removePinnedToolTab(tool.id, availableToolIDs: pinnableToolIDs)
+            } else if canAdd {
+                appViewModel.addPinnedToolTab(tool.id, availableToolIDs: pinnableToolIDs)
+            } else {
+                showToast("最多添加 3 个")
+            }
+        } label: {
+            Image(systemName: isPinned ? "checkmark.circle.fill" : "plus.circle")
+                .font(.system(size: 18, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(isPinned ? theme.brandPrimary : (canAdd ? theme.textSecondary : theme.textTertiary))
+                .frame(width: 32, height: 32)
+                .background(theme.surfaceSecondary.opacity(0.88), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isPinned ? "Remove from bottom tab" : "Add to bottom tab")
     }
 
     private func moveTool(_ sourceID: String, _ targetID: String) {
@@ -199,6 +205,45 @@ struct IOSToolsView: View {
         toolOrder = updatedOrder
         orderStore.save(updatedOrder)
     }
+
+    private func beginEditing(_ mode: IOSToolsEditMode) {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            editMode = mode
+            if mode != .sort {
+                draggedToolID = nil
+            }
+        }
+    }
+
+    private func endEditing() {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            editMode = nil
+            draggedToolID = nil
+        }
+    }
+
+    private func showToast(_ message: String) {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            toastMessage = message
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
+            guard toastMessage == message else { return }
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                toastMessage = nil
+            }
+        }
+    }
+
+    private func prepareForOpeningTool(_ tool: IOSToolDefinition) {
+        guard tool.id == "chatbot-hermes" else { return }
+        appViewModel.reserveHermesChatInteraction(reason: "tools grid tap")
+    }
+}
+
+private enum IOSToolsEditMode {
+    case sort
+    case pinTabs
 }
 
 struct IOSToolCard: View {
@@ -252,12 +297,159 @@ struct IOSToolCard: View {
     }
 }
 
-private struct IOSToolDefinition: Identifiable {
+struct IOSToolDefinition: Identifiable {
     let id: String
     let title: String
     let subtitle: String
     let systemImage: String
     let iconColor: Color
+    var tabTitle: String
+    var isPinnedTabEligible: Bool
+
+    init(
+        id: String,
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        iconColor: Color,
+        tabTitle: String? = nil,
+        isPinnedTabEligible: Bool = true
+    ) {
+        self.id = id
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.iconColor = iconColor
+        self.tabTitle = tabTitle ?? title
+        self.isPinnedTabEligible = isPinnedTabEligible
+    }
+}
+
+enum IOSToolCatalog {
+    static func availableTools() -> [IOSToolDefinition] {
+        var tools: [IOSToolDefinition] = [
+            IOSToolDefinition(id: "api-client", title: "API 调试", subtitle: "API Client", systemImage: "globe", iconColor: .cyan, tabTitle: "API"),
+            IOSToolDefinition(id: "formatter", title: "格式化", subtitle: "Formatter", systemImage: "curlybraces", iconColor: .yellow),
+            IOSToolDefinition(id: "base64", title: "Base64", subtitle: "编码 / 解码", systemImage: "lock.square", iconColor: .indigo),
+            IOSToolDefinition(id: "timestamp", title: "时间戳", subtitle: "Timestamp", systemImage: "clock", iconColor: .mint),
+            IOSToolDefinition(id: "markdown", title: "Markdown", subtitle: "编辑 / 预览", systemImage: "doc.richtext", iconColor: .orange),
+            IOSToolDefinition(id: "qr-code", title: "二维码", subtitle: "QR Code", systemImage: "qrcode", iconColor: .blue, tabTitle: "QR"),
+            IOSToolDefinition(id: "mac-relay", title: "Mac 中继", subtitle: "Relay", systemImage: "macbook.and.iphone", iconColor: .green, tabTitle: "Relay"),
+            IOSToolDefinition(id: "terminal", title: "终端", subtitle: "Terminal", systemImage: "terminal.fill", iconColor: .green, tabTitle: "Terminal"),
+        ]
+
+        if #available(iOS 18.0, *) {
+            tools.append(IOSToolDefinition(id: "webkit", title: "WebKit", subtitle: "Browser", systemImage: "globe", iconColor: .blue))
+            tools.append(IOSToolDefinition(id: "translation", title: "翻译", subtitle: "Translate", systemImage: "character.book.closed", iconColor: .teal))
+        }
+
+        tools.append(contentsOf: [
+            IOSToolDefinition(id: "ocr", title: "文字识别", subtitle: "OCR", systemImage: "doc.text.viewfinder", iconColor: .purple, tabTitle: "OCR"),
+            IOSToolDefinition(id: "speech-to-text", title: "语音转文字", subtitle: "Speech to Text", systemImage: "mic.fill", iconColor: .pink, tabTitle: "Speech"),
+            IOSToolDefinition(id: "memo", title: "备忘录", subtitle: "Memo", systemImage: "note.text", iconColor: .brown, tabTitle: "Memo"),
+            IOSToolDefinition(id: "chatbot-hermes", title: "Hermes", subtitle: "ChatBot", systemImage: "bubble.left.and.bubble.right.fill", iconColor: .green, tabTitle: "Hermes"),
+        ])
+
+        return tools
+    }
+}
+
+struct IOSToolDestinationView: View {
+    let toolID: String
+    var entryContext: IOSToolEntryContext = .pushed
+
+    var body: some View {
+        Group {
+            switch toolID {
+            case "api-client":
+                IOSAPIClientView()
+            case "formatter":
+                IOSFormatterView()
+            case "base64":
+                IOSBase64View()
+            case "timestamp":
+                IOSTimestampView()
+            case "markdown":
+                IOSMarkdownView()
+            case "qr-code":
+                IOSQRCodeView()
+            case "mac-relay":
+                IOSMacRelayView()
+            case "terminal":
+                IOSTerminalServerListView()
+            case "webkit":
+                if #available(iOS 18.0, *) {
+                    IOSWebKitView()
+                } else {
+                    ContentUnavailableView("Requires iOS 18+", systemImage: "globe")
+                }
+            case "translation":
+                if #available(iOS 18.0, *) {
+                    IOSTranslationView()
+                } else {
+                    EmptyView()
+                }
+            case "ocr":
+                IOSOCRView()
+            case "speech-to-text":
+                IOSSpeechToTextView()
+            case "memo":
+                IOSMemoListView()
+            case "chatbot-hermes":
+                IOSHermesConversationListView(provider: .hermes)
+            default:
+                EmptyView()
+            }
+        }
+        .environment(\.iosToolEntryContext, entryContext)
+        .toolbarTitleDisplayMode(entryContext.toolbarTitleDisplayMode)
+    }
+}
+
+enum IOSToolEntryContext {
+    case pushed
+    case tabRoot
+
+    var showsBackButton: Bool {
+        self == .pushed
+    }
+
+    var tabBarVisibility: Visibility {
+        self == .tabRoot ? .visible : .hidden
+    }
+
+    var toolbarTitleDisplayMode: ToolbarTitleDisplayMode {
+        self == .tabRoot ? .inlineLarge : .inline
+    }
+}
+
+private struct IOSToolTitleDisplayModeModifier: ViewModifier {
+    let context: IOSToolEntryContext
+
+    func body(content: Content) -> some View {
+        if context == .tabRoot {
+            content.toolbarTitleDisplayMode(.inlineLarge)
+        } else {
+            content.navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+extension View {
+    func iosToolTitleDisplayMode(_ context: IOSToolEntryContext) -> some View {
+        modifier(IOSToolTitleDisplayModeModifier(context: context))
+    }
+}
+
+private struct IOSToolEntryContextKey: EnvironmentKey {
+    static let defaultValue: IOSToolEntryContext = .pushed
+}
+
+extension EnvironmentValues {
+    var iosToolEntryContext: IOSToolEntryContext {
+        get { self[IOSToolEntryContextKey.self] }
+        set { self[IOSToolEntryContextKey.self] = newValue }
+    }
 }
 
 private struct IOSToolDropDelegate: DropDelegate {

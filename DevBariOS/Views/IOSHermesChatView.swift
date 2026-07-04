@@ -1,4 +1,5 @@
 import DevBarCore
+import Foundation
 import PhotosUI
 import SwiftData
 import SwiftUI
@@ -19,24 +20,46 @@ struct IOSHermesChatView: View {
     @State private var isVoiceInputCancelled = false
     @State private var draftBeforeVoiceInput = ""
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var pendingImageAttachments: [IOSHermesImageAttachment] = []
+    @State private var hasRegisteredChatInteraction = false
     @StateObject private var speechManager = IOSSpeechManager()
-    @StateObject private var viewModel = IOSHermesChatViewModel()
+    @StateObject private var viewModel: IOSHermesChatViewModel
 
     private let provider: ChatBotProviderKind
     private let initialConversation: IOSHermesConversation?
+    private let initialMessages: [IOSHermesChatViewModel.Message]?
     private let initialDraft: String
     private let onBack: (() -> Void)?
+    private let viewCreatedAt: CFAbsoluteTime
 
     init(
         provider: ChatBotProviderKind = .hermes,
         conversation: IOSHermesConversation? = nil,
+        initialMessages: [IOSHermesChatViewModel.Message]? = nil,
+        initialSettings: HermesSettings? = nil,
+        initialAPIKey: String? = nil,
         initialDraft: String = "",
         onBack: (() -> Void)? = nil
     ) {
         self.provider = conversation?.chatProvider ?? provider
         self.initialConversation = conversation
+        self.initialMessages = initialMessages
         self.initialDraft = initialDraft
         self.onBack = onBack
+        self.viewCreatedAt = CFAbsoluteTimeGetCurrent()
+        _viewModel = StateObject(
+            wrappedValue: IOSHermesChatViewModel(
+                conversation: conversation,
+                prefetchedMessages: initialMessages,
+                settings: initialSettings,
+                apiKey: initialAPIKey,
+                provider: conversation?.chatProvider ?? provider
+            )
+        )
+        IOSDebugLogger.log(
+            "HermesChat",
+            "view init conversation=\(conversation?.id.uuidString ?? "-") prefetched=\(initialMessages?.count ?? -1)"
+        )
     }
 
     var body: some View {
@@ -108,9 +131,11 @@ struct IOSHermesChatView: View {
             }
         }
         .onChange(of: selectedPhotoItem) { _, item in
-            guard item != nil else { return }
-            appendAttachmentReference(name: String(localized: "ios_hermes_attachment_photo_label"), type: String(localized: "ios_hermes_attachment_photo_label"))
-            selectedPhotoItem = nil
+            guard let item else { return }
+            Task {
+                await appendPhotoAttachment(from: item)
+                selectedPhotoItem = nil
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .iosToolNavigationChrome(theme, showsBackButton: true, backAction: onBack)
@@ -121,8 +146,11 @@ struct IOSHermesChatView: View {
             }
         }
         .onAppear {
+            let start = CFAbsoluteTimeGetCurrent()
+            debugLog("view onAppear begin conversation=\(initialConversation?.id.uuidString ?? "-") messages=\(viewModel.messages.count) viewAge=\(elapsedMilliseconds(since: viewCreatedAt))ms")
+            registerChatInteractionIfNeeded()
             if viewModel.conversation == nil {
-                viewModel.load(conversation: initialConversation)
+                viewModel.load(conversation: initialConversation, prefetchedMessages: initialMessages)
             }
             if viewModel.messages.isEmpty,
                viewModel.draft.isEmpty,
@@ -131,6 +159,11 @@ struct IOSHermesChatView: View {
                 isComposerFocused = true
             }
             configureViewModel()
+            debugLog("view onAppear end messages=\(viewModel.messages.count) configured=\(viewModel.isConfigured) dt=\(elapsedMilliseconds(since: start))ms")
+            Task { @MainActor in
+                await Task.yield()
+                debugLog("view post-yield checkpoint messages=\(viewModel.messages.count) dt=\(elapsedMilliseconds(since: start))ms")
+            }
         }
         .onChange(of: appViewModel.hermesSettings) { _, _ in
             configureViewModel()
@@ -140,6 +173,7 @@ struct IOSHermesChatView: View {
         }
         .onDisappear {
             resetVoiceInput()
+            unregisterChatInteractionIfNeeded()
         }
         .accessibilityIdentifier("ios.hermes.chat.screen")
     }
@@ -240,7 +274,12 @@ struct IOSHermesChatView: View {
                 if viewModel.canSend {
                     isComposerFocused = false
                     isAttachmentPanelPresented = false
-                    _ = viewModel.sendDraft(modelContext: modelContext, title: providerDisplayTitle)
+                    _ = viewModel.sendDraft(
+                        modelContext: modelContext,
+                        title: providerDisplayTitle,
+                        imageAttachments: pendingImageAttachments
+                    )
+                    pendingImageAttachments = []
                 } else {
                     isComposerFocused = false
                     withAnimation(.easeOut(duration: 0.2)) {
@@ -248,15 +287,7 @@ struct IOSHermesChatView: View {
                     }
                 }
             } label: {
-                Image(systemName: trailingButtonImage)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(trailingButtonForeground)
-                    .frame(width: 34, height: 34)
-                    .background(sendButtonColor, in: Circle())
-                    .overlay {
-                        Circle()
-                            .stroke(composerRoundButtonBorder, lineWidth: 1)
-                    }
+                trailingButtonLabel
             }
             .disabled(viewModel.isBusy == false && viewModel.isConfigured == false)
             .accessibilityIdentifier("ios.hermes.chat.send")
@@ -396,13 +427,13 @@ struct IOSHermesChatView: View {
 
     private var sendButtonColor: Color {
         if viewModel.canSend {
-            return theme.brandPrimary
+            return theme.brandPrimary.opacity(theme.isGeek ? 0.16 : 0.11)
         }
         return composerRoundButtonBackground
     }
 
     private var trailingButtonForeground: Color {
-        viewModel.canSend ? .white : composerRoundButtonForeground
+        viewModel.canSend ? theme.brandPrimary : composerRoundButtonForeground
     }
 
     private var composerRoundButtonForeground: Color {
@@ -415,6 +446,34 @@ struct IOSHermesChatView: View {
 
     private var composerRoundButtonBorder: Color {
         theme.borderSubtle.opacity(theme.isGeek ? 0.24 : 0.42)
+    }
+
+    @ViewBuilder
+    private var trailingButtonLabel: some View {
+        if viewModel.canSend {
+            Text("ios_hermes_send")
+                .font(theme.footnoteFont.weight(.semibold))
+                .foregroundStyle(trailingButtonForeground)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .padding(.horizontal, 12)
+                .frame(minWidth: 54, minHeight: 34)
+                .background(sendButtonColor, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(theme.brandPrimary.opacity(theme.isGeek ? 0.38 : 0.24), lineWidth: 1)
+                }
+        } else {
+            Image(systemName: trailingButtonImage)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(trailingButtonForeground)
+                .frame(width: 34, height: 34)
+                .background(sendButtonColor, in: Circle())
+                .overlay {
+                    Circle()
+                        .stroke(composerRoundButtonBorder, lineWidth: 1)
+                }
+        }
     }
 
     private var trailingButtonImage: String {
@@ -573,11 +632,31 @@ struct IOSHermesChatView: View {
     }
 
     private func configureViewModel() {
+        let start = CFAbsoluteTimeGetCurrent()
         viewModel.configure(
             settings: appViewModel.hermesSettings,
             apiKey: appViewModel.hermesAPIKey,
             provider: provider
         )
+        debugLog("configure provider=\(provider.rawValue) configured=\(viewModel.isConfigured) dt=\(elapsedMilliseconds(since: start))ms")
+    }
+
+    private func registerChatInteractionIfNeeded() {
+        guard !hasRegisteredChatInteraction else { return }
+        hasRegisteredChatInteraction = true
+        if !appViewModel.claimHermesChatInteractionReservation(reason: "chat appear") {
+            appViewModel.beginHermesChatInteraction(reason: "chat appear")
+        }
+    }
+
+    private func unregisterChatInteractionIfNeeded() {
+        guard hasRegisteredChatInteraction else { return }
+        hasRegisteredChatInteraction = false
+        if appViewModel.isHermesToolSelectionActive {
+            appViewModel.endHermesChatInteraction()
+        } else {
+            appViewModel.forceEndHermesChatInteraction(reason: "chat disappear outside hermes tab")
+        }
     }
 
     private func dismissChatInput() {
@@ -708,6 +787,31 @@ struct IOSHermesChatView: View {
         isComposerFocused = true
     }
 
+    private func appendPhotoAttachment(from item: PhotosPickerItem) async {
+        isAttachmentPanelPresented = false
+        let photoLabel = String(localized: "ios_hermes_attachment_photo_label")
+        guard let data = try? await item.loadTransferable(type: Data.self),
+              let attachment = Self.imageAttachment(from: data, displayName: photoLabel) else {
+            appendAttachmentReference(name: photoLabel, type: photoLabel)
+            return
+        }
+
+        pendingImageAttachments.append(attachment)
+        appendAttachmentReference(name: attachment.displayName, type: photoLabel)
+    }
+
+    private static func imageAttachment(from data: Data, displayName: String) -> IOSHermesImageAttachment? {
+        guard let image = UIImage(data: data),
+              let jpegData = image.hermesJPEGData(maxDimension: 1_600, quality: 0.86) else {
+            return nil
+        }
+
+        return IOSHermesImageAttachment(
+            displayName: displayName,
+            dataURL: "data:image/jpeg;base64,\(jpegData.base64EncodedString())"
+        )
+    }
+
     private func scrollToLatestMessage(_ proxy: ScrollViewProxy) {
         guard let lastID = viewModel.messages.last?.id else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
@@ -717,12 +821,20 @@ struct IOSHermesChatView: View {
         }
     }
 
+    private func debugLog(_ message: String) {
+        IOSDebugLogger.log("HermesChat", message)
+    }
+
+    private func elapsedMilliseconds(since start: CFAbsoluteTime) -> Int {
+        Int((CFAbsoluteTimeGetCurrent() - start) * 1_000)
+    }
 }
 
 private struct HermesChatRow: View {
     let message: IOSHermesChatViewModel.Message
     let theme: IOSThemeTokens
     @State private var isHTMLPreviewPresented = false
+    @State private var hasLoggedAppear = false
 
     var body: some View {
         VStack(spacing: 8) {
@@ -799,6 +911,14 @@ private struct HermesChatRow: View {
                     Spacer(minLength: 32)
                 }
             }
+        }
+        .onAppear {
+            guard !hasLoggedAppear else { return }
+            hasLoggedAppear = true
+            IOSDebugLogger.log(
+                "HermesChat",
+                "row appear id=\(message.id.uuidString) role=\(message.role.rawValue) chars=\(message.content.count) html=\(htmlContent != nil) code=\(containsCodeBlock)"
+            )
         }
     }
 
@@ -1056,6 +1176,23 @@ private struct IOSHermesCameraPicker: UIViewControllerRepresentable {
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.dismiss()
         }
+    }
+}
+
+private extension UIImage {
+    func hermesJPEGData(maxDimension: CGFloat, quality: CGFloat) -> Data? {
+        let longestSide = max(size.width, size.height)
+        guard longestSide > maxDimension else {
+            return jpegData(compressionQuality: quality)
+        }
+
+        let scale = maxDimension / longestSide
+        let targetSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let scaledImage = renderer.image { _ in
+            draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+        return scaledImage.jpegData(compressionQuality: quality)
     }
 }
 

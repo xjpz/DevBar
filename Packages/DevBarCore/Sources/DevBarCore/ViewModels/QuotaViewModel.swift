@@ -56,7 +56,7 @@ public final class QuotaViewModel: ObservableObject {
         }
 
         do {
-            let subscriptions = try await apiClient.fetchSubscriptionList(credentials: credentials)
+            let subscriptions = try await fetchSubscriptionListInBackground(credentials: credentials)
             subscription = subscriptions.first(where: { $0.isValid })
             persistCache()
         } catch {
@@ -106,7 +106,7 @@ public final class QuotaViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            quotaData = try await apiClient.fetchQuotaLimit(credentials: credentials)
+            quotaData = try await fetchQuotaLimitInBackground(credentials: credentials)
             lastUpdated = Date()
             persistCache()
             let widgetData = quotaData?.toWidgetData(
@@ -125,6 +125,34 @@ public final class QuotaViewModel: ObservableObject {
 
         isLoading = false
         isRefreshing = false
+    }
+
+    private func fetchSubscriptionListInBackground(credentials: AuthCredentials) async throws -> [Subscription] {
+        let apiClient = self.apiClient
+        let task = Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            return try await apiClient.fetchSubscriptionList(credentials: credentials)
+        }
+
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
+    }
+
+    private func fetchQuotaLimitInBackground(credentials: AuthCredentials) async throws -> QuotaData {
+        let apiClient = self.apiClient
+        let task = Task.detached(priority: .utility) {
+            try Task.checkCancellation()
+            return try await apiClient.fetchQuotaLimit(credentials: credentials)
+        }
+
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     public func startAutoRefresh(

@@ -6,6 +6,7 @@ struct IOSAPIClientView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.locale) private var locale
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @State private var selectedMethod = "GET"
     @State private var urlString = ""
     @State private var selectedTab: APIClientSection = .request
@@ -135,9 +136,9 @@ struct IOSAPIClientView: View {
         .background(Color.clear)
             .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle(apiClientNavigationTitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

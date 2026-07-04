@@ -84,13 +84,6 @@ struct IOSSettingsView: View {
                 }
             }
 
-            Section("ios_settings_navigation_section") {
-                Toggle(isOn: $appViewModel.isWebKitTabEnabled) {
-                    Label("ios_settings_show_webkit_tab", systemImage: "globe")
-                }
-                .accessibilityIdentifier("ios.settings.webkitTabEnabled")
-            }
-
             Section("ios_settings_device_system_section") {
                 settingsLink(
                     title: localized("ios_settings_device_widget_section"),

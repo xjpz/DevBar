@@ -7,6 +7,7 @@ import Translation
 @available(iOS 18.0, *)
 struct IOSTranslationView: View {
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @State private var inputText = ""
     @State private var translatedText = ""
     @State private var sourceLanguage: AppLanguage = .zhHans
@@ -29,9 +30,9 @@ struct IOSTranslationView: View {
         .background(Color.clear)
             .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_translate")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

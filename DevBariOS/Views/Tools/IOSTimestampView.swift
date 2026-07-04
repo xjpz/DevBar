@@ -2,6 +2,7 @@ import SwiftUI
 
 struct IOSTimestampView: View {
     @Environment(\.themeTokens) private var theme
+    @Environment(\.iosToolEntryContext) private var toolEntryContext
     @State private var unixInput = ""
     @State private var unixOutput = ""
     @State private var selectedDate = Date()
@@ -39,9 +40,9 @@ struct IOSTimestampView: View {
         .background(Color.clear)
             .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_timestamp")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .iosToolNavigationChrome(theme, showsBackButton: true)
+        .iosToolTitleDisplayMode(toolEntryContext)
+        .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
+        .iosToolNavigationChrome(theme, showsBackButton: toolEntryContext.showsBackButton)
     }
 
     private func toolPanel<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
