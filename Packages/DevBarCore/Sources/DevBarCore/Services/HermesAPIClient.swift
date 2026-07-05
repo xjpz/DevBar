@@ -5,10 +5,15 @@ public final class HermesAPIClient: Sendable {
     public static let defaultResourceTimeout: TimeInterval = 300
 
     private let session: URLSession
+    private let diagnostics: DiagnosticReporting?
     private let decoder = JSONDecoder()
 
-    public init(session: URLSession = HermesAPIClient.defaultSession()) {
+    public init(
+        session: URLSession = HermesAPIClient.defaultSession(),
+        diagnostics: DiagnosticReporting? = nil
+    ) {
         self.session = session
+        self.diagnostics = diagnostics
     }
 
     public static func defaultSession() -> URLSession {
@@ -26,22 +31,41 @@ public final class HermesAPIClient: Sendable {
         model: String? = nil,
         stream: Bool = false
     ) async throws -> String {
+        let requestId = UUID().uuidString
+        let start = Date()
         var request = try makeRequest(
             baseURL: baseURL,
             apiKey: apiKey,
             messages: messages,
             model: model,
-            stream: stream
+            stream: stream,
+            requestId: requestId
         )
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        let (data, response) = try await session.data(for: request)
-        try Self.validate(response: response, data: data)
-        let decoded = try decoder.decode(HermesChatResponse.self, from: data)
-        guard !decoded.assistantContent.isEmpty else {
-            throw APIError.invalidResponse
+        do {
+            let (data, response) = try await session.data(for: request)
+            try Self.validate(response: response, data: data)
+            let decoded = try decoder.decode(HermesChatResponse.self, from: data)
+            guard !decoded.assistantContent.isEmpty else {
+                throw APIError.invalidResponse
+            }
+            return decoded.assistantContent
+        } catch {
+            recordHermesFailure(
+                error: error,
+                requestId: requestId,
+                endpoint: "chat/completions",
+                model: model,
+                stream: stream,
+                durationMs: Self.elapsedMilliseconds(since: start),
+                responseData: (error as? HermesHTTPStatusError)?.data
+            )
+            if let statusError = error as? HermesHTTPStatusError {
+                throw APIError.httpError(statusError.statusCode)
+            }
+            throw error
         }
-        return decoded.assistantContent
     }
 
     public func streamMessage(
@@ -213,7 +237,8 @@ public final class HermesAPIClient: Sendable {
         apiKey: String,
         messages: [HermesChatRequestMessage],
         model: String?,
-        stream: Bool
+        stream: Bool,
+        requestId: String = UUID().uuidString
     ) throws -> URLRequest {
         guard let url = Self.chatURL(from: baseURL) else {
             throw APIError.invalidResponse
@@ -229,6 +254,7 @@ public final class HermesAPIClient: Sendable {
         request.timeoutInterval = Self.defaultRequestTimeout
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(authorization, forHTTPHeaderField: "Authorization")
+        request.setValue(requestId, forHTTPHeaderField: "X-Request-ID")
         request.httpBody = try JSONEncoder().encode(HermesChatRequest(
             messages: messages,
             model: model,
@@ -269,7 +295,52 @@ public final class HermesAPIClient: Sendable {
             if let data, let raw = String(data: data, encoding: .utf8), !raw.isEmpty {
                 print("[DevBar] Hermes HTTP \(httpResponse.statusCode): \(raw.prefix(300))")
             }
-            throw APIError.httpError(httpResponse.statusCode)
+            throw HermesHTTPStatusError(statusCode: httpResponse.statusCode, data: data)
         }
     }
+
+    private func recordHermesFailure(
+        error: Error,
+        requestId: String,
+        endpoint: String,
+        model: String?,
+        stream: Bool,
+        durationMs: Int64,
+        responseData: Data?
+    ) {
+        var details: [String: String] = [
+            "errorType": String(describing: type(of: error)),
+            "stream": stream ? "true" : "false",
+        ]
+        if let model = model?.trimmingCharacters(in: .whitespacesAndNewlines), !model.isEmpty {
+            details["model"] = model
+        }
+        if let responseData,
+           let response = String(data: responseData, encoding: .utf8),
+           !response.isEmpty {
+            details["responsePreview"] = DiagnosticLogRedactor.redactedPreview(response)
+        }
+        diagnostics?.record(DiagnosticLogEvent(
+            level: .error,
+            category: "hermes.api",
+            name: "hermes_http_failed",
+            message: error.localizedDescription,
+            platform: "unknown",
+            requestId: requestId,
+            endpoint: endpoint,
+            httpStatus: (error as? HermesHTTPStatusError)?.statusCode,
+            durationMs: durationMs,
+            tags: ["hermes"],
+            details: details
+        ))
+    }
+
+    private static func elapsedMilliseconds(since start: Date) -> Int64 {
+        Int64(Date().timeIntervalSince(start) * 1_000)
+    }
+}
+
+private struct HermesHTTPStatusError: Error {
+    let statusCode: Int
+    let data: Data?
 }

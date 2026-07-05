@@ -250,6 +250,12 @@ final class IOSAppViewModel: ObservableObject {
         self.pushNotificationPreferences = pushPreferences
         let relayDeviceName = Self.loadRelayDeviceName()
         self.relayDeviceName = relayDeviceName
+        DiagnosticLogger.shared.configure(
+            platform: "ios",
+            deviceName: relayDeviceName,
+            osName: UIDevice.current.systemName,
+            osVersion: UIDevice.current.systemVersion
+        )
         self.macThemeWidgetUserName = Self.loadMacThemeWidgetUserName()
         self.macThemeWidgetAvatarFileName = Self.loadMacThemeWidgetAvatarFileName()
         let storedShortcutActions = IOSHomeScreenShortcutPreferences.loadSelectedActions()
@@ -536,6 +542,7 @@ final class IOSAppViewModel: ObservableObject {
         try? await Task.sleep(for: .milliseconds(800))
 
         await startRelayIfNeeded()
+        flushDiagnosticsInBackground()
         debugLog("deferred launch work relay ready route=\(selectedTab.debugLabel)")
         syncPushStateInBackground(force: true)
         refreshDevBarLiveMessageReadiness()
@@ -735,6 +742,7 @@ final class IOSAppViewModel: ObservableObject {
         }
 
         await startRelayIfNeeded(resume: true)
+        flushDiagnosticsInBackground()
         syncPushStateInBackground(force: true)
         refreshDevBarLiveMessageReadiness()
         await refreshHomeScreenShortcuts()
@@ -776,6 +784,21 @@ final class IOSAppViewModel: ObservableObject {
         relayStartupTask = task
         await task.value
         relayStartupTask = nil
+        flushDiagnosticsInBackground()
+    }
+
+    func flushDiagnosticsInBackground() {
+        guard let token = deviceRelayManager.deviceToken else { return }
+        DiagnosticLogger.shared.configure(
+            platform: "ios",
+            deviceId: deviceRelayManager.localDeviceID,
+            deviceName: relayDeviceName,
+            osName: UIDevice.current.systemName,
+            osVersion: UIDevice.current.systemVersion
+        )
+        Task.detached(priority: .utility) {
+            try? await DiagnosticsUploadService.shared.flush(deviceToken: token)
+        }
     }
 
     private func syncPushStateInBackground(force: Bool) {

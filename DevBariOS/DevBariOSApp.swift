@@ -36,10 +36,17 @@ struct DevBariOSApp: App {
                     case .active:
                         IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: false)
                         Task {
+                            appViewModel.flushDiagnosticsInBackground()
                             await appViewModel.refreshOnForeground()
                         }
                     case .background:
                         IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: true)
+                        DiagnosticLogger.shared.record(
+                            level: .info,
+                            category: "app.lifecycle",
+                            name: "ios_scene_background",
+                            message: "iOS scene entered background"
+                        )
                     default:
                         break
                     }

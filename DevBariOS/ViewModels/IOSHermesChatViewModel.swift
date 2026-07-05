@@ -16,6 +16,56 @@ struct IOSHermesImageAttachment: Equatable {
         self.displayName = displayName
         self.dataURL = dataURL
     }
+
+    var persistenceMarker: String {
+        "[DevBarHermesImageAttachment: \(Self.encode(displayName)) \(Self.encode(dataURL))]"
+    }
+
+    static func content(_ prompt: String, appending attachments: [IOSHermesImageAttachment]) -> String {
+        guard !attachments.isEmpty else { return prompt }
+        let markers = attachments.map(\.persistenceMarker).joined(separator: "\n")
+        return [prompt, markers]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+    }
+
+    static func displayContent(from content: String) -> String {
+        content
+            .components(separatedBy: .newlines)
+            .filter { imageAttachmentMarker(from: $0) == nil }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func persistedAttachments(in content: String) -> [IOSHermesImageAttachment] {
+        content
+            .components(separatedBy: .newlines)
+            .compactMap(imageAttachmentMarker)
+    }
+
+    private static func imageAttachmentMarker(from line: String) -> IOSHermesImageAttachment? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        let prefix = "[DevBarHermesImageAttachment: "
+        guard trimmed.hasPrefix(prefix), trimmed.hasSuffix("]") else { return nil }
+        let body = String(trimmed.dropFirst(prefix.count).dropLast())
+        let parts = body.split(separator: " ", maxSplits: 1).map(String.init)
+        guard parts.count == 2,
+              let name = decode(parts[0]),
+              let dataURL = decode(parts[1]) else {
+            return nil
+        }
+        return IOSHermesImageAttachment(displayName: name, dataURL: dataURL)
+    }
+
+    private static func encode(_ value: String) -> String {
+        Data(value.utf8).base64EncodedString()
+    }
+
+    private static func decode(_ value: String) -> String? {
+        guard let data = Data(base64Encoded: value) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
 }
 
 extension ChatBotProviderKind {
@@ -80,7 +130,7 @@ final class IOSHermesChatViewModel: ObservableObject {
     private var lastImageAttachments: [IOSHermesImageAttachment] = []
 
     init(
-        client: HermesAPIClient = HermesAPIClient(),
+        client: HermesAPIClient = HermesAPIClient(diagnostics: DiagnosticLogger.shared),
         conversation: IOSHermesConversation? = nil,
         prefetchedMessages: [Message]? = nil,
         settings: HermesSettings? = nil,
@@ -189,17 +239,20 @@ final class IOSHermesChatViewModel: ObservableObject {
         status = isStreamingEnabled ? .streaming : .sending
 
         let conversation = ensureConversation(modelContext: modelContext)
+        let persistedPrompt = IOSHermesImageAttachment.content(prompt, appending: imageAttachments)
         let userMessage = persistMessage(
             role: .user,
-            content: prompt,
+            content: persistedPrompt,
             contentFormat: .plain,
             conversation: conversation,
             modelContext: modelContext
         )
         messages.append(userMessage)
-        var requestMessages = messages
-            .filter { !$0.content.isEmpty }
-            .map { HermesChatRequestMessage(role: $0.role, content: $0.content) }
+        var requestMessages = messages.compactMap { message -> HermesChatRequestMessage? in
+            let visibleContent = IOSHermesImageAttachment.displayContent(from: message.content)
+            guard !visibleContent.isEmpty else { return nil }
+            return HermesChatRequestMessage(role: message.role, content: visibleContent)
+        }
         if !imageAttachments.isEmpty,
            let userMessageIndex = requestMessages.indices.last(where: { requestMessages[$0].role == .user }) {
             requestMessages[userMessageIndex].content = .parts(
@@ -341,7 +394,7 @@ final class IOSHermesChatViewModel: ObservableObject {
         )
         modelContext.insert(persisted)
         conversation.messages.append(persisted)
-        conversation.recordMessage(content: content, at: now)
+        conversation.recordMessage(role: role, content: content, at: now)
         try? modelContext.save()
 
         return Message(

@@ -47,7 +47,7 @@ struct IOSRootView: View {
                 }
                 .tag(IOSAppViewModel.TabSelection.tools)
             }
-            .toolbarBackground(theme.backgroundPrimary, for: .tabBar)
+            .toolbarBackground(rootChromeBackground, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
         }
         .id("tabs.\(languageManager.selectedLanguage.rawValue)")
@@ -128,12 +128,19 @@ struct IOSRootView: View {
     }
 
     private var currentTabBackground: Color {
+        if theme.isGeek {
+            return .black
+        }
         switch appViewModel.selectedTab {
         case .dashboard:
-            theme.backgroundPrimary
+            return theme.backgroundPrimary
         case .tool, .tools:
-            theme.backgroundSecondary
+            return theme.backgroundSecondary
         }
+    }
+
+    private var rootChromeBackground: Color {
+        theme.isGeek ? .black : theme.backgroundPrimary
     }
 
     private var pinnedTools: [IOSToolDefinition] {

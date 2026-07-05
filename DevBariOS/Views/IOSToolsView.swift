@@ -29,7 +29,7 @@ struct IOSToolsView: View {
                 }
                 .padding(16)
             }
-            .iosGeekScreenBackground(theme)
+            .background(toolsPageBackground.ignoresSafeArea())
 
             if let toastMessage {
                 IOSStatusToast(toastMessage, kind: .failure, theme: theme)
@@ -39,7 +39,9 @@ struct IOSToolsView: View {
         }
         .navigationTitle("ios_tab_tools")
         .toolbarTitleDisplayMode(.inlineLarge)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(toolsPageBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(theme.isGeek ? .dark : nil, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if editMode != nil {
@@ -68,6 +70,10 @@ struct IOSToolsView: View {
             }
         }
         .accessibilityIdentifier("ios.tools.screen")
+    }
+
+    private var toolsPageBackground: Color {
+        theme.isGeek ? .black : theme.backgroundSecondary
     }
 
     private var orderedTools: [IOSToolDefinition] {
@@ -542,7 +548,7 @@ private struct IOSToolNavigationChromeModifier: ViewModifier {
     }
 }
 
-private struct IOSNavigationPopGestureEnabler: UIViewControllerRepresentable {
+struct IOSNavigationPopGestureEnabler: UIViewControllerRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }

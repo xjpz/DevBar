@@ -85,6 +85,10 @@ public enum DevBarCoreConstants {
         public static let smsAlertPath = "/api/devbar/push/sms-alert"
     }
 
+    public enum Diagnostics {
+        public static let logsPath = "/api/devbar/diagnostics/logs"
+    }
+
     public enum AppGroup {
         public static let groupID = "group.cc.xjpz.DevBar"
         public static let sharedDataKey = "widget_shared_data"

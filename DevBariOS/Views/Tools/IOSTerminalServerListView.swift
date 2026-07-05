@@ -5,6 +5,7 @@ import SwiftUI
 struct IOSTerminalServerListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.themeTokens) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.iosToolEntryContext) private var toolEntryContext
     @Query(sort: \IOSTerminalServer.updatedAt, order: .reverse) private var servers: [IOSTerminalServer]
     @State private var editorMode: IOSTerminalServerEditorMode?
@@ -21,7 +22,7 @@ struct IOSTerminalServerListView: View {
                 serverList
             }
         }
-        .iosGeekScreenBackground(theme)
+        .background(terminalPageBackground.ignoresSafeArea())
         .navigationTitle("Terminal")
         .iosToolTitleDisplayMode(toolEntryContext)
         .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
@@ -130,6 +131,10 @@ struct IOSTerminalServerListView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var terminalPageBackground: Color {
+        theme.isGeek || colorScheme == .dark ? .black : theme.backgroundSecondary
     }
 
     private func delete(_ server: IOSTerminalServer) {

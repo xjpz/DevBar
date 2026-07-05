@@ -4,11 +4,9 @@ import UIKit
 
 struct IOSTerminalSessionView: View {
     @Environment(\.themeTokens) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @StateObject private var viewModel: IOSTerminalSessionViewModel
     @State private var isKeyboardFocused = false
-
-    private let terminalBackground = Color(red: 0.08, green: 0.09, blue: 0.09)
-    private let terminalControlsBackground = Color(red: 0.07, green: 0.08, blue: 0.09)
 
     init(server: IOSTerminalServer) {
         _viewModel = StateObject(wrappedValue: IOSTerminalSessionRegistry.shared.session(for: server))
@@ -18,7 +16,7 @@ struct IOSTerminalSessionView: View {
         VStack(spacing: 0) {
             terminalOutput
         }
-        .iosGeekScreenBackground(theme)
+        .background(terminalScreenBackground.ignoresSafeArea())
         .safeAreaInset(edge: .bottom, spacing: 0) {
             controlsDock
         }
@@ -83,6 +81,22 @@ struct IOSTerminalSessionView: View {
         .padding(.top, 8)
         .padding(.bottom, 10)
         .background(terminalControlsBackground)
+    }
+
+    private var terminalScreenBackground: Color {
+        usesDarkTerminalCanvas ? .black : theme.backgroundSecondary
+    }
+
+    private var terminalBackground: Color {
+        usesDarkTerminalCanvas ? .black : theme.backgroundSecondary
+    }
+
+    private var terminalControlsBackground: Color {
+        usesDarkTerminalCanvas ? .black : theme.backgroundSecondary
+    }
+
+    private var usesDarkTerminalCanvas: Bool {
+        theme.isGeek || colorScheme == .dark
     }
 
     private var terminalOutput: some View {

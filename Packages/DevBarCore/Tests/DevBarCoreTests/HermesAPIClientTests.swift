@@ -244,10 +244,74 @@ func hermesAPIClientSendsNamedResponsesConversation() async throws {
     #expect(json?["provider"] == nil)
 }
 
+@Test
+func hermesAPIClientRecordsDiagnosticEventForHTTPFailure() async throws {
+    let store = HermesAPIRequestStore()
+    let diagnostics = HermesDiagnosticCapture()
+    let session = URLSession(configuration: .hermesAPIMock(id: store.id))
+    HermesAPIMockURLProtocol.register(
+        id: store.id,
+        statusCode: 503,
+        responseBody: Data("{\"error\":{\"message\":\"Authorization: Bearer secret\"}}".utf8)
+    ) { [store] request, body in
+        store.request = request
+        store.body = body
+    }
+
+    let client = HermesAPIClient(session: session, diagnostics: diagnostics)
+
+    do {
+        _ = try await client.sendMessage(
+            baseURL: "https://hermes.example.test/v1",
+            apiKey: "test-key",
+            messages: [HermesChatRequestMessage(role: .user, content: "你好")],
+            model: "hermes-agent",
+            stream: false
+        )
+        Issue.record("Expected HTTP 503 to throw")
+    } catch APIError.httpError(let code) {
+        #expect(code == 503)
+    } catch {
+        Issue.record("Expected APIError.httpError, got \(error)")
+    }
+
+    let request = try #require(store.request)
+    let requestId = try #require(request.value(forHTTPHeaderField: "X-Request-ID"))
+    let event = try #require(diagnostics.events.first)
+
+    #expect(requestId.isEmpty == false)
+    #expect(event.level == .error)
+    #expect(event.category == "hermes.api")
+    #expect(event.name == "hermes_http_failed")
+    #expect(event.requestId == requestId)
+    #expect(event.endpoint == "chat/completions")
+    #expect(event.httpStatus == 503)
+    #expect(event.details["model"] == "hermes-agent")
+    #expect(event.details["stream"] == "false")
+    #expect(event.details["responsePreview"] == "<redacted:length=52>")
+}
+
 private final class HermesAPIRequestStore: @unchecked Sendable {
     let id = UUID().uuidString
     var request: URLRequest?
     var body: Data?
+}
+
+private final class HermesDiagnosticCapture: DiagnosticReporting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var capturedEvents: [DiagnosticLogEvent] = []
+
+    var events: [DiagnosticLogEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+        return capturedEvents
+    }
+
+    func record(_ event: DiagnosticLogEvent) {
+        lock.lock()
+        capturedEvents.append(event)
+        lock.unlock()
+    }
 }
 
 private extension URLSessionConfiguration {

@@ -377,6 +377,12 @@ final class AppViewModel: ObservableObject {
         )
         providerAccounts = loadedAccounts
         accountConfigs = configs
+        DiagnosticLogger.shared.configure(
+            platform: "macos",
+            deviceName: Self.currentDeviceName,
+            osName: "macOS",
+            osVersion: ProcessInfo.processInfo.operatingSystemVersionString
+        )
         providerPingConfigs = providerPingSettingsStore.loadProviderPingConfigs()
         WidgetDataManager.shared.saveEnabledProviders(
             configs
@@ -496,6 +502,7 @@ final class AppViewModel: ObservableObject {
                 UserDefaults.standard.bool(forKey: DevBarCoreConstants.Defaults.relayMacEnabledKey)
             if relayEnabled {
                 await self.deviceRelayManager.setup(deviceType: .mac, deviceName: Self.currentDeviceName)
+                self.flushDiagnosticsInBackground()
                 await MacPushNotificationCoordinator.shared.syncRegistration(
                     relayDeviceToken: self.deviceRelayManager.deviceToken
                 )
@@ -509,6 +516,7 @@ final class AppViewModel: ObservableObject {
                     await MacPushNotificationCoordinator.shared.syncRegistration(
                         relayDeviceToken: self.deviceRelayManager.deviceToken
                     )
+                    self.flushDiagnosticsInBackground()
                 }
             }
             .store(in: &childObservers)
@@ -623,6 +631,20 @@ final class AppViewModel: ObservableObject {
 
     private static var currentDeviceName: String {
         Host.current().localizedName ?? ProcessInfo.processInfo.hostName
+    }
+
+    private func flushDiagnosticsInBackground() {
+        guard let token = deviceRelayManager.deviceToken else { return }
+        DiagnosticLogger.shared.configure(
+            platform: "macos",
+            deviceId: deviceRelayManager.localDeviceID,
+            deviceName: Self.currentDeviceName,
+            osName: "macOS",
+            osVersion: ProcessInfo.processInfo.operatingSystemVersionString
+        )
+        Task.detached(priority: .utility) {
+            try? await DiagnosticsUploadService.shared.flush(deviceToken: token)
+        }
     }
 
     private func handleRelayMessage(_ message: DeviceRelayMessage) async {

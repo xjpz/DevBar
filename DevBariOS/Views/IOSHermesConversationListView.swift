@@ -8,6 +8,7 @@ struct IOSHermesConversationListView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @Environment(\.modelContext) private var modelContext
     @Environment(\.themeTokens) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @Query
     private var conversations: [IOSHermesConversation]
 
@@ -17,6 +18,7 @@ struct IOSHermesConversationListView: View {
     @State private var quickStartItems: [HermesQuickStartItem] = []
     @State private var quickStartDraft: IOSHermesQuickStartDraft?
     @State private var hasRegisteredHermesInteraction = false
+    @State private var isChatsCollapsed = false
 
     private let hermesSettingsStore = UserDefaultsHermesSettingsStore()
 
@@ -33,12 +35,14 @@ struct IOSHermesConversationListView: View {
 
     var body: some View {
         List {
-            pageIntro
+            chatsSectionHeader
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 10, trailing: 16))
 
-            if displayedItems.isEmpty {
+            if isChatsCollapsed {
+                EmptyView()
+            } else if displayedItems.isEmpty {
                 emptyState
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -62,7 +66,9 @@ struct IOSHermesConversationListView: View {
                     .listRowSeparator(.hidden)
                     .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
                 }
+            }
 
+            if isChatsCollapsed || !displayedItems.isEmpty {
                 quickStartSection
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
@@ -71,10 +77,13 @@ struct IOSHermesConversationListView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
-        .iosGeekScreenBackground(theme)
+        .background(hermesPageBackground.ignoresSafeArea())
         .navigationTitle(provider.toolTitle)
         .toolbarTitleDisplayMode(.inlineLarge)
         .iosToolNavigationChrome(theme)
+        .toolbarBackground(hermesPageBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarColorScheme(theme.isGeek || colorScheme == .dark ? .dark : .light, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
@@ -134,13 +143,35 @@ struct IOSHermesConversationListView: View {
         .accessibilityIdentifier("ios.hermes.conversation.list")
     }
 
-    private var pageIntro: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("ios_hermes_workspace_subtitle")
-                .font(theme.subheadlineFont)
-                .foregroundStyle(theme.textSecondary)
+    private var chatsSectionHeader: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isChatsCollapsed.toggle()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "message")
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(theme.textPrimary)
+                    .frame(width: 22, height: 22)
+
+                Text("Chats")
+                    .font(theme.appFont.font(.title3, weight: .semibold, monospaced: theme.isGeek))
+                    .foregroundStyle(theme.textPrimary)
+                    .lineLimit(1)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(theme.textTertiary)
+                    .rotationEffect(.degrees(isChatsCollapsed ? -90 : 0))
+
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
         }
-        .padding(.top, 2)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Chats")
+        .accessibilityValue(isChatsCollapsed ? "Collapsed" : "Expanded")
     }
 
     private var emptyState: some View {
@@ -167,6 +198,11 @@ struct IOSHermesConversationListView: View {
     private var quickStartSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
+                Image(systemName: "wand.and.sparkles.inverse")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.textTertiary)
+                    .frame(width: 18, height: 18)
+
                 Text("ios_hermes_quick_start_title")
                     .font(theme.captionWeightFont)
                     .foregroundStyle(theme.textTertiary)
@@ -191,13 +227,7 @@ struct IOSHermesConversationListView: View {
                 Button {
                     isQuickStartManagerPresented = true
                 } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 15, weight: .bold))
-                            .foregroundStyle(theme.brandPrimary)
-                            .frame(width: 38, height: 38)
-                            .background(theme.brandPrimary.opacity(theme.isGeek ? 0.18 : 0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
+                    HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text("ios_hermes_quick_empty_title")
                                 .font(theme.footnoteFont.weight(.semibold))
@@ -233,6 +263,10 @@ struct IOSHermesConversationListView: View {
             .map(HermesConversationListItem.local)
     }
 
+    private var hermesPageBackground: Color {
+        theme.isGeek || colorScheme == .dark ? .black : theme.backgroundSecondary
+    }
+
     private func conversationRow(_ item: HermesConversationListItem) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 5) {
@@ -247,20 +281,11 @@ struct IOSHermesConversationListView: View {
                         .foregroundStyle(theme.textTertiary)
                 }
 
-                Text(conversationMeta(messageCount: item.messageCount))
-                    .font(theme.captionFont)
-                    .foregroundStyle(theme.textTertiary)
-                    .lineLimit(1)
-
                 Text(item.preview.isEmpty ? String(localized: "ios_hermes_conversation_new") : item.preview)
                     .font(theme.footnoteFont)
                     .foregroundStyle(theme.textSecondary)
                     .lineLimit(2)
             }
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(theme.textTertiary.opacity(0.72))
         }
         .padding(14)
         .background(theme.surfacePrimary.opacity(theme.isGeek ? 0.72 : 0.94), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -369,16 +394,7 @@ struct IOSHermesConversationListView: View {
                 apiKey: appViewModel.hermesAPIKey
             )
         } label: {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(theme.brandPrimary.opacity(theme.isGeek ? 0.18 : 0.12))
-                    Image(systemName: item.systemImage)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(theme.brandPrimary)
-                }
-                .frame(width: 38, height: 38)
-
+            HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(item.title)
                         .font(theme.footnoteFont.weight(.semibold))
@@ -422,21 +438,6 @@ struct IOSHermesConversationListView: View {
                 Label("ios_common_delete", systemImage: "trash")
             }
         }
-    }
-
-    private func conversationMeta(messageCount count: Int) -> String {
-        let tag = providerDisplayTag
-        guard count > 0 else {
-            return "\(tag) · \(String(localized: "ios_hermes_conversation_new"))"
-        }
-        let format = String(localized: "ios_hermes_conversation_message_count")
-        return "\(tag) · \(String(format: format, count))"
-    }
-
-    private var providerDisplayTag: String {
-        let tag = appViewModel.hermesSettings.chatTag(for: provider)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return tag.isEmpty ? provider.title : tag
     }
 
     private var providerRemark: String {
@@ -664,6 +665,9 @@ private enum HermesConversationListItem: Identifiable {
         let rawTitle: String
         switch self {
         case .local(let conversation):
+            if let firstUserMessageTitle = conversation.firstUserMessageTitle {
+                return firstUserMessageTitle
+            }
             rawTitle = conversation.title
         }
         let title = rawTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -718,6 +722,7 @@ private struct IOSHermesQuickStartDraft: Identifiable, Equatable {
 private struct IOSHermesQuickStartManagerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.themeTokens) private var theme
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var items: [HermesQuickStartItem]
     @State private var draft: IOSHermesQuickStartDraft?
@@ -748,6 +753,7 @@ private struct IOSHermesQuickStartManagerView: View {
                 } else {
                     ForEach(items) { item in
                         quickStartManagementRow(item)
+                            .listRowBackground(Color.clear)
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
                                     delete(item)
@@ -761,9 +767,12 @@ private struct IOSHermesQuickStartManagerView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
-            .iosGeekScreenBackground(theme)
+            .background(quickStartBackground.ignoresSafeArea())
             .navigationTitle("ios_hermes_quick_manage")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(quickStartBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(theme.isGeek || colorScheme == .dark ? .dark : .light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("ios_common_cancel") {
@@ -802,6 +811,10 @@ private struct IOSHermesQuickStartManagerView: View {
                 }
             }
         }
+    }
+
+    private var quickStartBackground: Color {
+        theme.isGeek || colorScheme == .dark ? .black : theme.backgroundSecondary
     }
 
     private func quickStartManagementRow(_ item: HermesQuickStartItem) -> some View {
@@ -859,6 +872,7 @@ private struct IOSHermesQuickStartManagerView: View {
 private struct IOSHermesQuickStartEditView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.themeTokens) private var theme
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var draft: IOSHermesQuickStartDraft
 
@@ -890,9 +904,12 @@ private struct IOSHermesQuickStartEditView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .iosGeekScreenBackground(theme)
+            .background(quickStartBackground.ignoresSafeArea())
             .navigationTitle(draft.originalID == nil ? "ios_hermes_quick_add" : "ios_hermes_quick_edit")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(quickStartBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(theme.isGeek || colorScheme == .dark ? .dark : .light, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("ios_common_cancel") {
@@ -910,6 +927,10 @@ private struct IOSHermesQuickStartEditView: View {
                 }
             }
         }
+    }
+
+    private var quickStartBackground: Color {
+        theme.isGeek || colorScheme == .dark ? .black : theme.backgroundSecondary
     }
 }
 

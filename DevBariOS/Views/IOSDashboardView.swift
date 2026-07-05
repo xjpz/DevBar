@@ -16,8 +16,8 @@ struct IOSDashboardView: View {
 
     var body: some View {
         ZStack {
-            Color.clear
-                .iosGeekScreenBackground(theme)
+            dashboardPageBackground
+                .ignoresSafeArea()
 
             List {
                 Section {
@@ -43,7 +43,9 @@ struct IOSDashboardView: View {
         .id("dashboard.list.\(languageManager.selectedLanguage.rawValue)")
         .navigationTitle(Text("ios_dashboard_title"))
         .toolbarTitleDisplayMode(.inlineLarge)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(dashboardNavigationBackground, for: .navigationBar)
+        .toolbarBackground(theme.isGeek ? .visible : .hidden, for: .navigationBar)
+        .toolbarColorScheme(theme.isGeek ? .dark : nil, for: .navigationBar)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
@@ -71,7 +73,7 @@ struct IOSDashboardView: View {
                 .accessibilityIdentifier("ios.dashboard.settings")
             }
         }
-        .toolbarBackground(theme.backgroundPrimary, for: .tabBar)
+        .toolbarBackground(theme.isGeek ? .black : theme.backgroundPrimary, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
         .accessibilityIdentifier("ios.dashboard.screen")
         .navigationDestination(isPresented: $isShowingAccounts) {
@@ -124,6 +126,14 @@ struct IOSDashboardView: View {
         .onChange(of: appViewModel.dashboardScanRequestID) { _, _ in
             openScannerIfRequested()
         }
+    }
+
+    private var dashboardPageBackground: Color {
+        theme.isGeek ? .black : theme.backgroundSecondary
+    }
+
+    private var dashboardNavigationBackground: Color {
+        theme.isGeek ? .black : .clear
     }
 
     private var overviewCard: some View {

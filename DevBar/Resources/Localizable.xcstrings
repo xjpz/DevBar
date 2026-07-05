@@ -1441,7 +1441,7 @@
         }
       }
     },
-    "ChatBot" : {
+    "Chats" : {
 
     },
     "Check" : {
@@ -1737,6 +1737,9 @@
           }
         }
       }
+    },
+    "Collapsed" : {
+
     },
     "Connected" : {
 
@@ -2298,6 +2301,9 @@
           }
         }
       }
+    },
+    "Expanded" : {
+
     },
     "Favorite" : {
       "localizations" : {
@@ -3268,6 +3274,9 @@
         }
       }
     },
+    "ios_common_close" : {
+
+    },
     "ios_common_copy" : {
       "localizations" : {
         "en" : {
@@ -4009,6 +4018,7 @@
       }
     },
     "ios_hermes_chat_remark_footer" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4057,6 +4067,7 @@
       }
     },
     "ios_hermes_chat_settings_subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4105,6 +4116,7 @@
       }
     },
     "ios_hermes_conversation_message_count" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4215,22 +4227,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入问题、日志或任务..."
-          }
-        }
-      }
-    },
-    "ios_hermes_send" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Send"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "发送"
           }
         }
       }
@@ -4771,6 +4767,23 @@
         }
       }
     },
+    "ios_hermes_send" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Send"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送"
+          }
+        }
+      }
+    },
     "ios_hermes_time_hours_ago" : {
       "localizations" : {
         "en" : {
@@ -4917,6 +4930,7 @@
       }
     },
     "ios_hermes_workspace_subtitle" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
