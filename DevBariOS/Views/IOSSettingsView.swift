@@ -11,6 +11,7 @@ struct IOSSettingsView: View {
     @State private var versionTapCount = 0
     @State private var isShowingDebugInfo = false
     @State private var copiedDebugItemID: String?
+    @State private var currentAppIconOption: IOSAppIconOption = .default
 
     private let intervals: [(LocalizedStringKey, TimeInterval)] = [
         ("ios_settings_interval_3m", 180),
@@ -61,6 +62,14 @@ struct IOSSettingsView: View {
                     Label(String(localized: "ios_settings_time_format", defaultValue: "Time Format"), systemImage: "clock")
                 }
                 .accessibilityIdentifier("ios.settings.timeFormat")
+
+                settingsLink(
+                    title: localized("ios_settings_app_icon_title"),
+                    systemImage: "app.dashed",
+                    summary: currentAppIconOption.displayName
+                ) {
+                    IOSAppIconSettingsView(currentOption: $currentAppIconOption)
+                }
             }
 
             Section("ios_settings_ai_quota_section") {
@@ -175,6 +184,9 @@ struct IOSSettingsView: View {
                 copiedItemID: copiedDebugItemID,
                 onCopy: copyDebugValue
             )
+        }
+        .onAppear {
+            currentAppIconOption = IOSAppIconController.shared.preferredOption
         }
     }
 
@@ -356,6 +368,108 @@ private struct IOSSettingsLinkLabel: View {
                     .lineLimit(1)
             }
         }
+    }
+}
+
+@MainActor
+private struct IOSAppIconSettingsView: View {
+    @Binding var currentOption: IOSAppIconOption
+
+    @EnvironmentObject private var languageManager: IOSLanguageManager
+    @EnvironmentObject private var themeManager: IOSThemeManager
+    @Environment(\.themeTokens) private var theme
+    @State private var selectedOption: IOSAppIconOption = .default
+    @State private var isChanging = false
+    @State private var errorMessage: String?
+
+    private var supportsAlternateIcons: Bool {
+        UIApplication.shared.supportsAlternateIcons
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                ForEach(IOSAppIconOption.allCases) { option in
+                    Button {
+                        setAppIcon(option)
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(option.previewAssetName)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 58, height: 58)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                .shadow(color: .black.opacity(theme.isGeek ? 0.28 : 0.12), radius: 8, y: 4)
+
+                            Text(option.displayName)
+                                .foregroundStyle(theme.textPrimary)
+
+                            Spacer()
+
+                            if selectedOption == option {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(theme.brandPrimary)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!supportsAlternateIcons || isChanging || selectedOption == option)
+                    .accessibilityIdentifier("ios.settings.appIcon.\(option.id)")
+                }
+            } footer: {
+                if supportsAlternateIcons {
+                    Text("ios_settings_app_icon_footer")
+                } else {
+                    Text("ios_settings_app_icon_unsupported")
+                }
+            }
+
+            if let errorMessage {
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                        .font(.subheadline)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .iosGeekScreenBackground(theme)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationTitle("ios_settings_app_icon_title")
+        .navigationBarTitleDisplayMode(.inline)
+        .accessibilityIdentifier("ios.settings.appIcon.screen")
+        .overlay {
+            if isChanging {
+                ProgressView()
+                    .controlSize(.large)
+                    .padding(18)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+        }
+        .onAppear(perform: refreshCurrentIcon)
+    }
+
+    private func refreshCurrentIcon() {
+        let option = IOSAppIconController.shared.preferredOption
+        selectedOption = option
+        currentOption = option
+    }
+
+    private func setAppIcon(_ option: IOSAppIconOption) {
+        guard supportsAlternateIcons, selectedOption != option else { return }
+        isChanging = true
+        errorMessage = nil
+
+        IOSAppIconController.shared.apply(option)
+        selectedOption = option
+        currentOption = option
+        isChanging = false
+    }
+
+    private func localized(_ key: String.LocalizationValue) -> String {
+        String(localized: key, locale: languageManager.currentLocale)
     }
 }
 

@@ -5625,6 +5625,71 @@
         }
       }
     },
+    "ios_settings_app_icon_footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Home Screen uses the selected light icon. In Dark Mode, iOS applies its system rendering."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "桌面使用所选浅色图标。开启夜间模式后，由 iOS 系统渲染深色效果。"
+          }
+        }
+      }
+    },
+    "ios_settings_app_icon_switch_failed_format" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not switch app icon: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法切换 App 图标：%@"
+          }
+        }
+      }
+    },
+    "ios_settings_app_icon_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 图标"
+          }
+        }
+      }
+    },
+    "ios_settings_app_icon_unsupported" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This device does not support alternate app icons."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前设备不支持切换 App 图标。"
+          }
+        }
+      }
+    },
     "ios_settings_app_label" : {
       "localizations" : {
         "en" : {

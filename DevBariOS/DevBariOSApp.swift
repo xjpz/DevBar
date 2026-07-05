@@ -35,6 +35,7 @@ struct DevBariOSApp: App {
                     switch newPhase {
                     case .active:
                         IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: false)
+                        IOSAppIconController.shared.migrateLegacyDarkIconIfNeeded()
                         Task {
                             appViewModel.flushDiagnosticsInBackground()
                             await appViewModel.refreshOnForeground()
@@ -96,15 +97,18 @@ private struct ThemeRootView: View {
     @EnvironmentObject private var themeManager: IOSThemeManager
 
     var body: some View {
-        IOSRootView()
-            .onAppear { themeManager.updateBarAppearance() }
-            .onChange(of: systemColorScheme) { _, newScheme in
-                themeManager.systemColorScheme = newScheme
-                themeManager.updateBarAppearance()
-            }
-            .onChange(of: themeManager.selectedMode) { _, _ in
-                themeManager.updateBarAppearance()
-            }
+            IOSRootView()
+                .onAppear {
+                    themeManager.updateBarAppearance()
+                    IOSAppIconController.shared.migrateLegacyDarkIconIfNeeded()
+                }
+                .onChange(of: systemColorScheme) { _, newScheme in
+                    themeManager.systemColorScheme = newScheme
+                    themeManager.updateBarAppearance()
+                }
+                .onChange(of: themeManager.selectedMode) { _, _ in
+                    themeManager.updateBarAppearance()
+                }
             .onChange(of: themeManager.selectedFont) { _, _ in
                 themeManager.updateBarAppearance()
             }
