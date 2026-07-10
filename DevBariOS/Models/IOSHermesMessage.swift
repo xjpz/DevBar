@@ -16,6 +16,9 @@ final class IOSHermesMessage {
     var contentFormatRawValue: String
     var isComplete: Bool
     var remoteMessageId: String?
+    /// The Hermes Runs API `run_id` that produced this assistant message, if any. Lets the view
+    /// model re-attach to and reconcile a still-streaming bubble after a stream drop / relaunch.
+    var runId: String?
     var sortIndex: Int?
     var createdAt: Date
     var completedAt: Date?
@@ -29,6 +32,7 @@ final class IOSHermesMessage {
         contentFormat: IOSHermesMessageContentFormat,
         isComplete: Bool = true,
         remoteMessageId: String? = nil,
+        runId: String? = nil,
         sortIndex: Int? = nil,
         createdAt: Date = Date(),
         completedAt: Date? = nil,
@@ -41,6 +45,7 @@ final class IOSHermesMessage {
         self.contentFormatRawValue = contentFormat.rawValue
         self.isComplete = isComplete
         self.remoteMessageId = remoteMessageId
+        self.runId = runId
         self.sortIndex = sortIndex
         self.createdAt = createdAt
         self.completedAt = completedAt

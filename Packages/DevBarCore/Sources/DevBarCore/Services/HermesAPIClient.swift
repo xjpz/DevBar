@@ -2,7 +2,10 @@ import Foundation
 
 public final class HermesAPIClient: Sendable {
     public static let defaultRequestTimeout: TimeInterval = 180
-    public static let defaultResourceTimeout: TimeInterval = 300
+    // Long streams (and long agent runs) must not be cut at 5 minutes. With the Runs API a
+    // dropped stream is harmless (we re-attach), so a generous resource cap only avoids
+    // needless mid-answer aborts on the non-runs paths; short poll requests are unaffected.
+    public static let defaultResourceTimeout: TimeInterval = 3600
 
     private let session: URLSession
     private let diagnostics: DiagnosticReporting?
@@ -161,6 +164,119 @@ public final class HermesAPIClient: Sendable {
         return decoded.assistantContent
     }
 
+    // MARK: - Runs API
+
+    /// `POST /v1/runs` — start a server-side agent run, decoupled from this connection.
+    public func submitRun(
+        baseURL: String,
+        apiKey: String,
+        request runRequest: HermesRunRequest
+    ) async throws -> HermesRunSubmitResponse {
+        guard let url = Self.runsURL(from: baseURL) else {
+            throw APIError.invalidResponse
+        }
+        let authorization = BigModelAPIClient.normalizedBearerToken(apiKey)
+        guard !authorization.isEmpty else {
+            throw APIError.unauthorized
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = Self.defaultRequestTimeout
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(authorization, forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONEncoder().encode(runRequest)
+
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+        return try decoder.decode(HermesRunSubmitResponse.self, from: data)
+    }
+
+    /// `GET /v1/runs/{run_id}` — authoritative run state, used to reconcile the final answer.
+    public func fetchRunStatus(
+        baseURL: String,
+        apiKey: String,
+        runId: String
+    ) async throws -> HermesRunStatusResponse {
+        let request = try makeGETRequest(url: Self.runURL(from: baseURL, runId: runId), apiKey: apiKey)
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+        return try decoder.decode(HermesRunStatusResponse.self, from: data)
+    }
+
+    /// `POST /v1/runs/{run_id}/stop` — interrupt a running turn.
+    public func stopRun(
+        baseURL: String,
+        apiKey: String,
+        runId: String
+    ) async throws {
+        guard let url = Self.runStopURL(from: baseURL, runId: runId) else {
+            throw APIError.invalidResponse
+        }
+        let authorization = BigModelAPIClient.normalizedBearerToken(apiKey)
+        guard !authorization.isEmpty else {
+            throw APIError.unauthorized
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = Self.defaultRequestTimeout
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(authorization, forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await session.data(for: request)
+        try Self.validate(response: response, data: data)
+    }
+
+    /// `GET /v1/runs/{run_id}/events` — SSE stream of token deltas + lifecycle events.
+    /// A dropped stream is non-fatal: the run keeps executing server-side and the caller
+    /// re-attaches via `fetchRunStatus`.
+    public func streamRunEvents(
+        baseURL: String,
+        apiKey: String,
+        runId: String
+    ) -> AsyncThrowingStream<HermesRunEvent, Error> {
+        AsyncThrowingStream { continuation in
+            let task = Task {
+                do {
+                    guard let url = Self.runEventsURL(from: baseURL, runId: runId) else {
+                        throw APIError.invalidResponse
+                    }
+                    let authorization = BigModelAPIClient.normalizedBearerToken(apiKey)
+                    guard !authorization.isEmpty else {
+                        throw APIError.unauthorized
+                    }
+
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "GET"
+                    request.timeoutInterval = Self.defaultRequestTimeout
+                    request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                    request.setValue(authorization, forHTTPHeaderField: "Authorization")
+
+                    let (bytes, response) = try await session.bytes(for: request)
+                    try Self.validate(response: response, data: nil)
+
+                    for try await line in bytes.lines {
+                        guard !Task.isCancelled else { break }
+                        if let event = HermesRunEvent.parse(fromLine: line) {
+                            continuation.yield(event)
+                        }
+                    }
+                    continuation.finish()
+                } catch is CancellationError {
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+
     public static func chatURL(from baseURL: String) -> URL? {
         endpointURL(from: baseURL, appending: "chat/completions")
     }
@@ -177,6 +293,38 @@ public final class HermesAPIClient: Sendable {
         endpointURL(from: baseURL, appending: "responses")
     }
 
+    public static func runsURL(from baseURL: String) -> URL? {
+        endpointURL(from: baseURL, appending: "runs")
+    }
+
+    public static func runURL(from baseURL: String, runId: String) -> URL? {
+        runsSubpathURL(from: baseURL, runId: runId, suffix: nil)
+    }
+
+    public static func runEventsURL(from baseURL: String, runId: String) -> URL? {
+        runsSubpathURL(from: baseURL, runId: runId, suffix: "events")
+    }
+
+    public static func runStopURL(from baseURL: String, runId: String) -> URL? {
+        runsSubpathURL(from: baseURL, runId: runId, suffix: "stop")
+    }
+
+    private static func runsSubpathURL(from baseURL: String, runId: String, suffix: String?) -> URL? {
+        let trimmedRunId = runId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedRunId.isEmpty,
+              let base = runsURL(from: baseURL),
+              var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else {
+            return nil
+        }
+        let encodedRunId = trimmedRunId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? trimmedRunId
+        var path = components.path + "/" + encodedRunId
+        if let suffix, !suffix.isEmpty {
+            path += "/" + suffix
+        }
+        components.path = path
+        return components.url
+    }
+
     private static func endpointURL(from baseURL: String, appending endpoint: String) -> URL? {
         let trimmed = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty,
@@ -191,7 +339,7 @@ public final class HermesAPIClient: Sendable {
         while path.hasSuffix("/") {
             path.removeLast()
         }
-        for knownEndpoint in ["chat/completions", "responses", "models", "capabilities"] {
+        for knownEndpoint in ["chat/completions", "responses", "models", "capabilities", "runs"] {
             let suffix = "/\(knownEndpoint)"
             if path.hasSuffix(suffix) {
                 path.removeLast(suffix.count)

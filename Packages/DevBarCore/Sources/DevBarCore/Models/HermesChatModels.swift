@@ -252,6 +252,225 @@ public struct HermesResponsesResponse: Decodable, Equatable, Sendable {
     }
 }
 
+// MARK: - Runs API
+
+/// Body for `POST /v1/runs`. The Runs API runs the agent server-side, decoupled
+/// from the HTTP connection, so a dropped stream can be re-attached instead of losing
+/// the generation. See the Hermes API Server docs (Runs API section).
+public struct HermesRunRequest: Encodable, Sendable {
+    public var input: String
+    public var sessionId: String?
+    public var instructions: String?
+    public var conversationHistory: [HermesChatRequestMessage]?
+    public var previousResponseId: String?
+
+    public init(
+        input: String,
+        sessionId: String? = nil,
+        instructions: String? = nil,
+        conversationHistory: [HermesChatRequestMessage]? = nil,
+        previousResponseId: String? = nil
+    ) {
+        self.input = input
+        self.sessionId = sessionId?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.instructions = instructions?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.conversationHistory = (conversationHistory?.isEmpty ?? true) ? nil : conversationHistory
+        self.previousResponseId = previousResponseId?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case input
+        case sessionId = "session_id"
+        case instructions
+        case conversationHistory = "conversation_history"
+        case previousResponseId = "previous_response_id"
+    }
+}
+
+/// Response from `POST /v1/runs`.
+public struct HermesRunSubmitResponse: Decodable, Equatable, Sendable {
+    public let runId: String
+    public let status: String?
+
+    public init(runId: String, status: String? = nil) {
+        self.runId = runId
+        self.status = status
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case runId = "run_id"
+        case status
+    }
+}
+
+/// Response from `GET /v1/runs/{run_id}` — the authoritative run state used to reconcile
+/// the final answer after any stream drop.
+public struct HermesRunStatusResponse: Decodable, Equatable, Sendable {
+    public let runId: String?
+    public let status: String?
+    public let output: String?
+    public let sessionId: String?
+
+    public init(runId: String? = nil, status: String? = nil, output: String? = nil, sessionId: String? = nil) {
+        self.runId = runId
+        self.status = status
+        self.output = output
+        self.sessionId = sessionId
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case runId = "run_id"
+        case status
+        case output
+        case sessionId = "session_id"
+    }
+
+    public var normalizedStatus: String {
+        (status ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    public var isTerminal: Bool {
+        ["completed", "failed", "cancelled", "canceled", "error"].contains(normalizedStatus)
+    }
+
+    public var isFailed: Bool {
+        normalizedStatus == "failed" || normalizedStatus == "error"
+    }
+
+    public var trimmedOutput: String {
+        (output ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+/// A single parsed event from the `GET /v1/runs/{run_id}/events` SSE stream.
+///
+/// The exact event JSON is not fully specified by the docs, so parsing is best-effort
+/// (correctness is guaranteed by reconciling the final text via `GET /{run_id}`).
+public struct HermesRunEvent: Equatable, Sendable {
+    public let textDelta: String?
+    public let terminalStatus: String?
+
+    public init(textDelta: String?, terminalStatus: String?) {
+        self.textDelta = textDelta
+        self.terminalStatus = terminalStatus
+    }
+
+    public var isEmpty: Bool {
+        textDelta == nil && terminalStatus == nil
+    }
+
+    /// Parse one raw SSE line. Returns nil for lines carrying no usable delta or lifecycle
+    /// signal (e.g. `event:` type lines, comments, empty keep-alives).
+    public static func parse(fromLine line: String) -> HermesRunEvent? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        // SSE `event:` lines carry only the type; the payload arrives on the paired `data:` line.
+        guard !trimmed.hasPrefix("event:"), !trimmed.hasPrefix(":") else { return nil }
+
+        let payload: String
+        if trimmed.hasPrefix("data:") {
+            payload = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            payload = trimmed
+        }
+        guard !payload.isEmpty else { return nil }
+        if payload == "[DONE]" {
+            return HermesRunEvent(textDelta: nil, terminalStatus: "completed")
+        }
+
+        guard let data = payload.data(using: .utf8),
+              let raw = try? JSONDecoder().decode(RawRunEvent.self, from: data) else {
+            return nil
+        }
+        let delta = raw.extractedTextDelta
+        let terminal = raw.extractedTerminalStatus
+        guard delta != nil || terminal != nil else { return nil }
+        return HermesRunEvent(textDelta: delta, terminalStatus: terminal)
+    }
+
+    private struct RawRunEvent: Decodable {
+        let type: String?
+        let status: String?
+        let delta: FlexibleText?
+        let text: String?
+        let content: FlexibleText?
+        let output: FlexibleText?
+        let choices: [Choice]?
+
+        struct Choice: Decodable {
+            struct Delta: Decodable { let content: String? }
+            let delta: Delta?
+            let text: String?
+            let finishReason: String?
+
+            enum CodingKeys: String, CodingKey {
+                case delta
+                case text
+                case finishReason = "finish_reason"
+            }
+        }
+
+        var extractedTextDelta: String? {
+            if let value = delta?.value, !value.isEmpty { return value }
+            if let choiceDelta = choices?
+                .compactMap({ $0.delta?.content ?? $0.text })
+                .first(where: { !$0.isEmpty }) {
+                return choiceDelta
+            }
+            // Only treat top-level text/content as an incremental delta when the event type
+            // looks like a delta, so a terminal aggregate isn't double-counted as a delta.
+            if let type = type?.lowercased(), type.contains("delta") {
+                if let text, !text.isEmpty { return text }
+                if let value = content?.value, !value.isEmpty { return value }
+            }
+            return nil
+        }
+
+        var extractedTerminalStatus: String? {
+            if let status = status?.lowercased(),
+               ["completed", "failed", "cancelled", "canceled", "error"].contains(status) {
+                return status == "canceled" ? "cancelled" : status
+            }
+            if let type = type?.lowercased() {
+                if type.contains("completed") { return "completed" }
+                if type.contains("failed") || type.contains("error") { return "failed" }
+                if type.contains("cancel") { return "cancelled" }
+            }
+            if choices?.contains(where: { ($0.finishReason?.isEmpty == false) }) == true {
+                return "completed"
+            }
+            return nil
+        }
+    }
+
+    /// Decodes a value that the server may express either as a plain string or as an object
+    /// wrapping the text under `content`/`text`.
+    private struct FlexibleText: Decodable {
+        let value: String?
+
+        init(from decoder: Decoder) throws {
+            if let single = try? decoder.singleValueContainer(), let string = try? single.decode(String.self) {
+                value = string
+            } else if let container = try? decoder.container(keyedBy: CodingKeys.self) {
+                if let content = try? container.decodeIfPresent(String.self, forKey: .content) {
+                    value = content
+                } else if let text = try? container.decodeIfPresent(String.self, forKey: .text) {
+                    value = text
+                } else {
+                    value = nil
+                }
+            } else {
+                value = nil
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case content
+            case text
+        }
+    }
+}
+
 public struct HermesChatResponse: Decodable, Equatable, Sendable {
     public struct Choice: Decodable, Equatable, Sendable {
         public struct Message: Decodable, Equatable, Sendable {

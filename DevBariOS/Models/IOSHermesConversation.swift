@@ -19,6 +19,10 @@ final class IOSHermesConversation {
     var createdAt: Date
     var updatedAt: Date
     var archivedAt: Date?
+    /// The in-flight Hermes Runs API `run_id` for this conversation, or nil when idle.
+    /// Set when a run is submitted and cleared when the run reaches a terminal state; used to
+    /// re-attach to a still-running (or already-completed) server-side run after a stream drop.
+    var activeRunId: String?
 
     @Relationship(deleteRule: .cascade, inverse: \IOSHermesMessage.conversation)
     var messages: [IOSHermesMessage]
@@ -39,6 +43,7 @@ final class IOSHermesConversation {
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
         archivedAt: Date? = nil,
+        activeRunId: String? = nil,
         messages: [IOSHermesMessage] = []
     ) {
         self.id = id
@@ -56,6 +61,7 @@ final class IOSHermesConversation {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.archivedAt = archivedAt
+        self.activeRunId = activeRunId
         self.messages = messages
     }
 }

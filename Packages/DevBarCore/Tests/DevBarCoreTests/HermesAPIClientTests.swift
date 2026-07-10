@@ -31,7 +31,120 @@ func hermesAPIClientRejectsInvalidBaseURL() {
 @Test
 func hermesAPIClientUsesLongRunningRequestTimeouts() {
     #expect(HermesAPIClient.defaultRequestTimeout == 180)
-    #expect(HermesAPIClient.defaultResourceTimeout == 300)
+    // Raised so long streams / runs aren't cut at 5 minutes.
+    #expect(HermesAPIClient.defaultResourceTimeout == 3600)
+}
+
+@Test
+func hermesAPIClientBuildsRunsURLsFromAPIBase() throws {
+    #expect(HermesAPIClient.runsURL(from: "https://hermes.example.com/v1")?.absoluteString == "https://hermes.example.com/v1/runs")
+    #expect(HermesAPIClient.runsURL(from: "https://hermes.example.com/v1/chat/completions")?.absoluteString == "https://hermes.example.com/v1/runs")
+    #expect(HermesAPIClient.runURL(from: "https://hermes.example.com/v1", runId: "run_abc123")?.absoluteString == "https://hermes.example.com/v1/runs/run_abc123")
+    #expect(HermesAPIClient.runEventsURL(from: "https://hermes.example.com/v1/", runId: "run_abc123")?.absoluteString == "https://hermes.example.com/v1/runs/run_abc123/events")
+    #expect(HermesAPIClient.runStopURL(from: "https://hermes.example.com/v1", runId: "run_abc123")?.absoluteString == "https://hermes.example.com/v1/runs/run_abc123/stop")
+}
+
+@Test
+func hermesAPIClientRejectsRunSubpathWithEmptyRunId() {
+    #expect(HermesAPIClient.runURL(from: "https://hermes.example.com/v1", runId: "  ") == nil)
+    #expect(HermesAPIClient.runEventsURL(from: "https://hermes.example.com/v1", runId: "") == nil)
+}
+
+@Test
+func hermesRunStatusReportsTerminalAndFailedStates() {
+    #expect(HermesRunStatusResponse(status: "completed").isTerminal)
+    #expect(HermesRunStatusResponse(status: "FAILED").isTerminal)
+    #expect(HermesRunStatusResponse(status: "cancelled").isTerminal)
+    #expect(HermesRunStatusResponse(status: "started").isTerminal == false)
+    #expect(HermesRunStatusResponse(status: "failed").isFailed)
+    #expect(HermesRunStatusResponse(status: "completed").isFailed == false)
+    #expect(HermesRunStatusResponse(output: "  hi  ").trimmedOutput == "hi")
+}
+
+@Test
+func hermesRunEventParsesDeltaShapes() {
+    // OpenAI Responses-style delta (top-level string delta with a delta-type).
+    #expect(HermesRunEvent.parse(fromLine: #"data: {"type":"response.output_text.delta","delta":"你好"}"#)?.textDelta == "你好")
+    // Chat-completion-chunk-style delta.
+    #expect(HermesRunEvent.parse(fromLine: #"data: {"choices":[{"delta":{"content":"，Hermes"}}]}"#)?.textDelta == "，Hermes")
+    // Delta expressed as an object wrapping the text.
+    #expect(HermesRunEvent.parse(fromLine: #"data: {"type":"assistant.delta","delta":{"text":"tok"}}"#)?.textDelta == "tok")
+}
+
+@Test
+func hermesRunEventParsesTerminalMarkers() {
+    #expect(HermesRunEvent.parse(fromLine: #"data: {"type":"response.completed"}"#)?.terminalStatus == "completed")
+    #expect(HermesRunEvent.parse(fromLine: #"data: {"type":"run.failed"}"#)?.terminalStatus == "failed")
+    #expect(HermesRunEvent.parse(fromLine: #"data: {"status":"cancelled"}"#)?.terminalStatus == "cancelled")
+    #expect(HermesRunEvent.parse(fromLine: "data: [DONE]")?.terminalStatus == "completed")
+}
+
+@Test
+func hermesRunEventIgnoresNonPayloadLines() {
+    #expect(HermesRunEvent.parse(fromLine: "event: response.output_text.delta") == nil)
+    #expect(HermesRunEvent.parse(fromLine: ": keep-alive") == nil)
+    #expect(HermesRunEvent.parse(fromLine: "   ") == nil)
+    // A tool-progress event with neither text nor a terminal signal is dropped.
+    #expect(HermesRunEvent.parse(fromLine: #"data: {"type":"response.output_item.added","item":{"type":"function_call"}}"#) == nil)
+}
+
+@Test
+func hermesAPIClientSubmitsRunWithHistoryAndSession() async throws {
+    let store = HermesAPIRequestStore()
+    let session = URLSession(configuration: .hermesAPIMock(id: store.id))
+    HermesAPIMockURLProtocol.register(id: store.id, responseBody: """
+    {"run_id": "run_abc123", "status": "started"}
+    """.data(using: .utf8)!) { [store] request, body in
+        store.request = request
+        store.body = body
+    }
+
+    let client = HermesAPIClient(session: session)
+    let submit = try await client.submitRun(
+        baseURL: "https://hermes.example.test/v1",
+        apiKey: "test-key",
+        request: HermesRunRequest(
+            input: "继续",
+            sessionId: "devbar-ios-abc",
+            conversationHistory: [HermesChatRequestMessage(role: .user, content: "你好")]
+        )
+    )
+
+    #expect(submit.runId == "run_abc123")
+    #expect(submit.status == "started")
+    #expect(store.request?.url?.absoluteString == "https://hermes.example.test/v1/runs")
+    #expect(store.request?.httpMethod == "POST")
+    #expect(store.request?.value(forHTTPHeaderField: "Authorization") == "Bearer test-key")
+    let body = try #require(store.body)
+    let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
+    #expect(json?["input"] as? String == "继续")
+    #expect(json?["session_id"] as? String == "devbar-ios-abc")
+    let history = try #require(json?["conversation_history"] as? [[String: Any]])
+    #expect(history.first?["role"] as? String == "user")
+    #expect(history.first?["content"] as? String == "你好")
+}
+
+@Test
+func hermesAPIClientFetchesRunStatus() async throws {
+    let store = HermesAPIRequestStore()
+    let session = URLSession(configuration: .hermesAPIMock(id: store.id))
+    HermesAPIMockURLProtocol.register(id: store.id, responseBody: """
+    {"object": "hermes.run", "run_id": "run_abc123", "status": "completed", "output": "Done."}
+    """.data(using: .utf8)!) { [store] request, _ in
+        store.request = request
+    }
+
+    let client = HermesAPIClient(session: session)
+    let state = try await client.fetchRunStatus(
+        baseURL: "https://hermes.example.test/v1",
+        apiKey: "test-key",
+        runId: "run_abc123"
+    )
+
+    #expect(state.isTerminal)
+    #expect(state.trimmedOutput == "Done.")
+    #expect(store.request?.url?.absoluteString == "https://hermes.example.test/v1/runs/run_abc123")
+    #expect(store.request?.httpMethod == "GET")
 }
 
 @Test
