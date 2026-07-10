@@ -11,6 +11,9 @@
         }
       }
     },
+    "." : {
+
+    },
     "·" : {
 
     },
@@ -333,6 +336,12 @@
           }
         }
       }
+    },
+    "↑ %@" : {
+
+    },
+    "↓ %@" : {
+
     },
     "about" : {
       "localizations" : {
@@ -2643,6 +2652,9 @@
         }
       }
     },
+    "iCloud 同步" : {
+
+    },
     "icon_bar_fill" : {
       "localizations" : {
         "en" : {
@@ -4756,13 +4768,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Replying..."
+            "value" : "Thinking"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在回复..."
+            "value" : "正在思考"
           }
         }
       }
@@ -9512,6 +9524,9 @@
         }
       }
     },
+    "Mac 控制" : {
+
+    },
     "Mac 正常提醒，iPhone 不提醒" : {
       "localizations" : {
         "en" : {
@@ -9527,6 +9542,9 @@
           }
         }
       }
+    },
+    "Mac 状态" : {
+
     },
     "Mac：%@" : {
       "localizations" : {
@@ -12978,6 +12996,9 @@
         }
       }
     },
+    "上次检查" : {
+
+    },
     "下一页" : {
       "localizations" : {
         "en" : {
@@ -13337,6 +13358,9 @@
         }
       }
     },
+    "动作" : {
+
+    },
     "包含 Provider：%@" : {
       "localizations" : {
         "en" : {
@@ -13445,7 +13469,16 @@
         }
       }
     },
+    "同步 API headers/body" : {
+
+    },
     "同步凭证到已配对 iPhone" : {
+
+    },
+    "同步数据" : {
+
+    },
+    "同步结果" : {
 
     },
     "启用 Agent Watcher" : {
@@ -13787,6 +13820,9 @@
         }
       }
     },
+    "开启后，DevBar 会使用用户自己的 iCloud 私有数据库同步支持的数据。同步失败不会影响本地数据继续使用。" : {
+
+    },
     "开启后，Mac 会通过 Relay 把此账号的 token/cookie 同步到 iPhone。请只用于自己的可信设备。" : {
 
     },
@@ -13799,6 +13835,9 @@
           }
         }
       }
+    },
+    "当前同步备忘录、Markdown 文档、SSH 服务器列表和聊天记录。API Record 和 Web 历史会在后续版本开放。" : {
+
     },
     "当前工作目录" : {
       "localizations" : {
@@ -13865,6 +13904,9 @@
           }
         }
       }
+    },
+    "执行 Mac 控制" : {
+
     },
     "扫一扫" : {
       "extractionState" : "stale",
@@ -13980,6 +14022,9 @@
           }
         }
       }
+    },
+    "敏感数据" : {
+
     },
     "文件权限" : {
       "localizations" : {
@@ -14184,6 +14229,9 @@
         }
       }
     },
+    "检查 iCloud 状态" : {
+
+    },
     "正在执行 %@" : {
       "localizations" : {
         "en" : {
@@ -14317,6 +14365,9 @@
         }
       }
     },
+    "点亮" : {
+
+    },
     "点亮电脑" : {
       "localizations" : {
         "en" : {
@@ -14337,6 +14388,12 @@
           }
         }
       }
+    },
+    "熄屏" : {
+
+    },
+    "状态" : {
+
     },
     "生成一个 5 分钟内有效的二维码，在 iPhone 上扫码导入当前配置。" : {
       "localizations" : {
@@ -14498,6 +14555,9 @@
         }
       }
     },
+    "立即同步" : {
+
+    },
     "等待 %@" : {
       "localizations" : {
         "en" : {
@@ -14537,6 +14597,9 @@
           }
         }
       }
+    },
+    "等待同步" : {
+
     },
     "等待处理" : {
       "localizations" : {
@@ -14619,6 +14682,9 @@
         }
       }
     },
+    "网速" : {
+
+    },
     "翻页时钟" : {
       "localizations" : {
         "en" : {
@@ -14628,6 +14694,9 @@
           }
         }
       }
+    },
+    "聊天记录" : {
+
     },
     "设备与小组件" : {
       "extractionState" : "stale",
@@ -14986,6 +15055,9 @@
         }
       }
     },
+    "通过 DevBar Relay 控制已配对的 Mac。" : {
+
+    },
     "通过 DevBar Relay 点亮已配对电脑的显示器。" : {
       "localizations" : {
         "en" : {
@@ -15005,6 +15077,12 @@
           }
         }
       }
+    },
+    "通过 iCloud Keychain 同步 Provider 凭证" : {
+
+    },
+    "通过 iCloud Keychain 同步 SSH 密码/私钥" : {
+
     },
     "鄂ICP备2021013794号-4A" : {
       "extractionState" : "stale",
@@ -15114,6 +15192,9 @@
           }
         }
       }
+    },
+    "锁定 Mac" : {
+
     },
     "锁定 Mac？" : {
       "localizations" : {
