@@ -259,7 +259,7 @@ struct IOSHermesConversationListView: View {
     }
 
     private var displayedItems: [HermesConversationListItem] {
-        Self.deduplicatedLocalConversations(conversations.filter(Self.matchesHermesProvider))
+        Self.deduplicatedLocalConversations(conversations)
             .map(HermesConversationListItem.local)
     }
 
@@ -559,13 +559,6 @@ struct IOSHermesConversationListView: View {
 
     private func elapsedMilliseconds(since start: CFAbsoluteTime) -> Int {
         Int((CFAbsoluteTimeGetCurrent() - start) * 1_000)
-    }
-
-    @MainActor
-    private static func matchesHermesProvider(_ conversation: IOSHermesConversation) -> Bool {
-        conversation.providerRawValue == ChatBotProviderKind.hermes.rawValue ||
-            conversation.providerRawValue == nil ||
-            conversation.providerRawValue == "customProvider"
     }
 
     @MainActor

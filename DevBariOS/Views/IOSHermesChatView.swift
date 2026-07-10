@@ -12,6 +12,7 @@ struct IOSHermesChatView: View {
     @Environment(\.themeTokens) private var theme
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isComposerFocused: Bool
     @State private var isAttachmentPanelPresented = false
@@ -24,6 +25,7 @@ struct IOSHermesChatView: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var pendingImageAttachments: [IOSHermesImageAttachment] = []
     @State private var hasRegisteredChatInteraction = false
+    @State private var hasPerformedInitialScroll = false
     @StateObject private var speechManager = IOSSpeechManager()
     @StateObject private var viewModel: IOSHermesChatViewModel
 
@@ -95,8 +97,18 @@ struct IOSHermesChatView: View {
                 .onTapGesture {
                     dismissChatInput()
                 }
+                .onAppear {
+                    performInitialScrollToBottom(proxy)
+                }
                 .onChange(of: viewModel.messages) { _, messages in
                     guard let lastID = messages.last?.id else { return }
+                    // Messages loaded after the view appeared (async fetch). Keep the
+                    // initial-scroll flag in sync so the jump-to-bottom still happens.
+                    if !hasPerformedInitialScroll {
+                        hasPerformedInitialScroll = true
+                        proxy.scrollTo(lastID, anchor: .bottom)
+                        return
+                    }
                     withAnimation(.easeOut(duration: 0.2)) {
                         proxy.scrollTo(lastID, anchor: .bottom)
                     }
@@ -178,10 +190,19 @@ struct IOSHermesChatView: View {
                 isComposerFocused = true
             }
             configureViewModel()
+            // Re-attach to a run that was still in flight when this conversation was last open.
+            viewModel.resumeActiveRunIfNeeded(modelContext: modelContext)
             debugLog("view onAppear end messages=\(viewModel.messages.count) configured=\(viewModel.isConfigured) dt=\(elapsedMilliseconds(since: start))ms")
             Task { @MainActor in
                 await Task.yield()
                 debugLog("view post-yield checkpoint messages=\(viewModel.messages.count) dt=\(elapsedMilliseconds(since: start))ms")
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            // Returning to the foreground: pick up a run that kept executing server-side while
+            // the app was backgrounded / off-network.
+            if phase == .active {
+                viewModel.resumeActiveRunIfNeeded(modelContext: modelContext)
             }
         }
         .onChange(of: appViewModel.hermesSettings) { _, _ in
@@ -486,12 +507,14 @@ struct IOSHermesChatView: View {
     }
 
     private var chatScrollBottomPadding: CGFloat {
-        isAttachmentPanelPresented ? 248 : 112
+        // The composer (and, when open, the attachment panel) lives in a bottom safeAreaInset,
+        // which already reserves its height below the scroll content. Only a small breathing gap
+        // is needed here — anything more leaves a large empty band above the input box.
+        12
     }
 
     private var headerTitle: String {
-        if viewModel.isBusy { return String(localized: "ios_hermes_replying") }
-        return providerDisplayTitle
+        providerDisplayTitle
     }
 
     private var providerRemark: String {
@@ -530,31 +553,38 @@ struct IOSHermesChatView: View {
     }
 
     private var navigationTitleView: some View {
-        HStack(alignment: .center, spacing: 7) {
-            Image("HermesBot")
-                .resizable()
-                .scaledToFill()
-                .frame(width: 26, height: 26)
-                .clipShape(Circle())
-                .overlay {
-                    Circle()
-                        .stroke(Color.white.opacity(theme.isGeek ? 0.24 : 0.16), lineWidth: 0.5)
-                }
+        VStack(spacing: 1) {
+            HStack(alignment: .center, spacing: 7) {
+                Image("HermesBot")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 26, height: 26)
+                    .clipShape(Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(Color.white.opacity(theme.isGeek ? 0.24 : 0.16), lineWidth: 0.5)
+                    }
 
-            Text(headerTitle)
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(theme.textPrimary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
+                Text(headerTitle)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
 
-            Text(currentTag)
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(chatHeaderTagForeground)
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 3)
-                .background(chatHeaderTagBackground, in: Capsule())
+                Text(currentTag)
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(chatHeaderTagForeground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(chatHeaderTagBackground, in: Capsule())
+            }
+
+            if viewModel.isBusy {
+                HermesThinkingStatusView(theme: theme)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
         }
         .frame(maxWidth: 260, alignment: .center)
     }
@@ -843,6 +873,22 @@ struct IOSHermesChatView: View {
         )
     }
 
+    private func performInitialScrollToBottom(_ proxy: ScrollViewProxy) {
+        guard !hasPerformedInitialScroll else { return }
+        guard let lastID = viewModel.messages.last?.id else { return }
+        hasPerformedInitialScroll = true
+        // Prefetched conversations arrive fully populated, so viewModel.messages
+        // never "changes" and the onChange scroll never fires — the list would sit
+        // pinned to the first message. Jump straight to the newest one, re-anchoring
+        // a few times because Markdown rows in the LazyVStack measure asynchronously.
+        proxy.scrollTo(lastID, anchor: .bottom)
+        for delay in [0.05, 0.2, 0.4] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                proxy.scrollTo(lastID, anchor: .bottom)
+            }
+        }
+    }
+
     private func scrollToLatestMessage(_ proxy: ScrollViewProxy) {
         guard let lastID = viewModel.messages.last?.id else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
@@ -869,11 +915,6 @@ private struct HermesChatRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(Self.timeFormatter.string(from: message.createdAt))
-                .font(theme.captionFont)
-                .foregroundStyle(theme.textTertiary)
-                .frame(maxWidth: .infinity, alignment: .center)
-
             if message.role == .user {
                 HStack(alignment: .top) {
                     Spacer(minLength: 72)
@@ -888,8 +929,11 @@ private struct HermesChatRow: View {
                         }
                 }
             } else {
-                VStack(alignment: .leading, spacing: 14) {
-                    if isHTMLPreviewPresented, let htmlContent {
+                VStack(alignment: .leading, spacing: 8) {
+                    if message.content.isEmpty, !message.isComplete {
+                        // Streaming bubble awaiting its first token (fresh run or re-attach).
+                        HermesThinkingStatusView(theme: theme)
+                    } else if isHTMLPreviewPresented, let htmlContent {
                         HermesHTMLPreview(html: htmlContent, theme: theme)
                     } else {
                         HermesMarkdownMessage(
@@ -904,7 +948,7 @@ private struct HermesChatRow: View {
                     }
 
                     HStack(spacing: 18) {
-                        assistantActionButton(title: "ios_common_copy", systemImage: "doc.on.doc") {
+                        assistantActionButton(title: "ios_common_copy", systemImage: "square.on.square") {
                             UIPasteboard.general.string = message.content
                         }
                         if htmlContent != nil {
@@ -916,7 +960,6 @@ private struct HermesChatRow: View {
                             }
                         }
                     }
-                    .padding(.top, 2)
                     .opacity(message.content.isEmpty ? 0 : 1)
                 }
                 .frame(maxWidth: assistantBubbleMaxWidth, alignment: .leading)
@@ -945,10 +988,10 @@ private struct HermesChatRow: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 18, weight: .medium))
+                .font(.system(size: 15, weight: .regular))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(theme.textTertiary)
-                .frame(width: 24, height: 24)
+                .frame(width: 22, height: 22)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(title))
@@ -968,12 +1011,6 @@ private struct HermesChatRow: View {
         }
     }
 
-    private static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter
-    }()
-
     private var userTextColor: Color {
         theme.isGeek ? Color.white.opacity(0.96) : theme.textPrimary
     }
@@ -984,6 +1021,33 @@ private struct HermesChatRow: View {
 
     private var htmlContent: String? {
         HermesHTMLExtractor.extract(from: message.content)
+    }
+}
+
+private struct HermesThinkingStatusView: View {
+    let theme: IOSThemeTokens
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.36)) { context in
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text("ios_hermes_replying")
+
+                ForEach(0..<3, id: \.self) { index in
+                    Text(".")
+                        .opacity(dotOpacity(index: index, date: context.date))
+                }
+            }
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(theme.textTertiary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+    }
+
+    private func dotOpacity(index: Int, date: Date) -> Double {
+        let phase = Int(date.timeIntervalSinceReferenceDate / 0.36) % 4
+        return phase > index ? 1 : 0.28
     }
 }
 
