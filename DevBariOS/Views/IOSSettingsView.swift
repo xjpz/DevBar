@@ -1,5 +1,6 @@
 import DevBarCore
 import PhotosUI
+import SwiftData
 import SwiftUI
 import UIKit
 
@@ -12,6 +13,7 @@ struct IOSSettingsView: View {
     @State private var isShowingDebugInfo = false
     @State private var copiedDebugItemID: String?
     @State private var currentAppIconOption: IOSAppIconOption = .default
+    @StateObject private var iCloudSyncCoordinator = ICloudSyncCoordinator.shared
 
     private let intervals: [(LocalizedStringKey, TimeInterval)] = [
         ("ios_settings_interval_3m", 180),
@@ -94,6 +96,14 @@ struct IOSSettingsView: View {
             }
 
             Section("ios_settings_device_system_section") {
+                settingsLink(
+                    title: "iCloud 同步",
+                    systemImage: "icloud",
+                    summary: iCloudSyncSummary
+                ) {
+                    IOSICloudSyncSettingsView(coordinator: iCloudSyncCoordinator)
+                }
+
                 settingsLink(
                     title: localized("ios_settings_device_widget_section"),
                     systemImage: "iphone.and.arrow.forward",
@@ -257,6 +267,22 @@ struct IOSSettingsView: View {
         )
     }
 
+    private var iCloudSyncSummary: String {
+        guard iCloudSyncCoordinator.settings.isEnabled else {
+            return "未开启"
+        }
+        switch iCloudSyncCoordinator.availability {
+        case .available:
+            return "已开启 · iCloud 可用"
+        case .checking:
+            return "正在检查"
+        case .notChecked:
+            return "已开启"
+        case .unavailable(let message):
+            return message
+        }
+    }
+
     private var greetingPreviewText: String {
         let firstLine = themeManager.developerGreeting
             .split(whereSeparator: \.isNewline)
@@ -344,6 +370,191 @@ struct IOSSettingsView: View {
     }
 }
 
+@MainActor
+private struct IOSICloudSyncSettingsView: View {
+    @ObservedObject var coordinator: ICloudSyncCoordinator
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.themeTokens) private var theme
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(isOn: enabledBinding) {
+                    Label("iCloud 同步", systemImage: "icloud")
+                }
+                .accessibilityIdentifier("ios.settings.icloud.enabled")
+
+                HStack {
+                    Label("状态", systemImage: "checkmark.icloud")
+                    Spacer()
+                    Text(coordinator.availability.title)
+                        .foregroundStyle(statusColor)
+                        .multilineTextAlignment(.trailing)
+                }
+
+                if let lastCheckedAt = coordinator.lastCheckedAt {
+                    LabeledContent("上次检查") {
+                        Text(lastCheckedAt.formatted(date: .abbreviated, time: .shortened))
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                }
+
+                Button {
+                    Task { await coordinator.refreshAvailability() }
+                } label: {
+                    Label("检查 iCloud 状态", systemImage: "arrow.clockwise")
+                }
+                .disabled(coordinator.availability == .checking)
+
+                Button {
+                    Task { await coordinator.syncNow(modelContext: modelContext) }
+                } label: {
+                    Label("立即同步", systemImage: "arrow.triangle.2.circlepath.icloud")
+                }
+                .disabled(!canRunSync)
+
+                HStack {
+                    Label("同步结果", systemImage: "waveform.path.ecg")
+                    Spacer()
+                    Text(coordinator.runState.title)
+                        .foregroundStyle(runStateColor)
+                        .multilineTextAlignment(.trailing)
+                }
+            } footer: {
+                Text("开启后，DevBar 会使用用户自己的 iCloud 私有数据库同步支持的数据。同步失败不会影响本地数据继续使用。")
+            }
+
+            Section {
+                entityToggle("备忘录", systemImage: "note.text", entity: .memo)
+                entityToggle("Markdown 文档", systemImage: "doc.plaintext", entity: .markdownDocument)
+                entityToggle("SSH 服务器列表", systemImage: "terminal", entity: .terminalServer)
+                chatRecordsToggle()
+                entityToggle("API Record 元数据（即将支持）", systemImage: "network", entity: .apiRecord, isAvailable: false)
+                entityToggle("Web 历史（即将支持）", systemImage: "clock.arrow.circlepath", entity: .webHistoryRecord, isAvailable: false)
+            } header: {
+                Text("同步数据")
+            } footer: {
+                Text("当前同步备忘录、Markdown 文档、SSH 服务器列表和聊天记录。API Record 和 Web 历史会在后续版本开放。")
+            }
+
+            Section {
+                Toggle(isOn: apiSensitiveBinding) {
+                    Label("同步 API headers/body", systemImage: "lock.doc")
+                }
+                .disabled(true)
+                Toggle(isOn: terminalSecretsBinding) {
+                    Label("通过 iCloud Keychain 同步 SSH 密码/私钥", systemImage: "key")
+                }
+                .disabled(true)
+                Toggle(isOn: providerCredentialsBinding) {
+                    Label("通过 iCloud Keychain 同步 Provider 凭证", systemImage: "person.badge.key")
+                }
+                .disabled(true)
+            } header: {
+                Text("敏感数据")
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .iosGeekScreenBackground(theme)
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationTitle("iCloud 同步")
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            guard coordinator.settings.isEnabled,
+                  coordinator.availability == .notChecked else { return }
+            await coordinator.refreshAvailability()
+        }
+    }
+
+    private var enabledBinding: Binding<Bool> {
+        Binding(
+            get: { coordinator.settings.isEnabled },
+            set: { coordinator.setEnabled($0) }
+        )
+    }
+
+    private var apiSensitiveBinding: Binding<Bool> {
+        Binding(
+            get: { coordinator.settings.syncAPISensitiveFields },
+            set: { coordinator.setSyncAPISensitiveFields($0) }
+        )
+    }
+
+    private var terminalSecretsBinding: Binding<Bool> {
+        Binding(
+            get: { coordinator.settings.syncTerminalSecrets },
+            set: { coordinator.setSyncTerminalSecrets($0) }
+        )
+    }
+
+    private var providerCredentialsBinding: Binding<Bool> {
+        Binding(
+            get: { coordinator.settings.syncProviderCredentials },
+            set: { coordinator.setSyncProviderCredentials($0) }
+        )
+    }
+
+    private var statusColor: Color {
+        switch coordinator.availability {
+        case .available:
+            return .green
+        case .checking, .notChecked:
+            return theme.textSecondary
+        case .unavailable:
+            return .orange
+        }
+    }
+
+    private var runStateColor: Color {
+        switch coordinator.runState {
+        case .completed:
+            return .green
+        case .failed:
+            return .orange
+        case .idle, .syncing:
+            return theme.textSecondary
+        }
+    }
+
+    private var canRunSync: Bool {
+        guard coordinator.settings.isEnabled else { return false }
+        if coordinator.runState == .syncing { return false }
+        if coordinator.availability == .checking { return false }
+        return true
+    }
+
+    private func entityToggle(
+        _ title: String,
+        systemImage: String,
+        entity: ICloudSyncEntity,
+        isAvailable: Bool = true
+    ) -> some View {
+        Toggle(isOn: Binding(
+            get: { isAvailable && coordinator.settings.isSyncEnabled(for: entity) },
+            set: { if isAvailable { coordinator.setEntity(entity, enabled: $0) } }
+        )) {
+            Label(title, systemImage: systemImage)
+        }
+        .disabled(!coordinator.settings.isEnabled || !isAvailable)
+    }
+
+    private func chatRecordsToggle() -> some View {
+        Toggle(isOn: Binding(
+            get: {
+                coordinator.settings.isSyncEnabled(for: .chatConversation) &&
+                    coordinator.settings.isSyncEnabled(for: .chatMessage)
+            },
+            set: { isEnabled in
+                coordinator.setEntity(.chatConversation, enabled: isEnabled)
+                coordinator.setEntity(.chatMessage, enabled: isEnabled)
+            }
+        )) {
+            Label("聊天记录", systemImage: "bubble.left.and.bubble.right")
+        }
+        .disabled(!coordinator.settings.isEnabled)
+    }
+}
+
 private struct IOSSettingsLinkLabel: View {
     let title: String
     let systemImage: String
@@ -379,7 +590,7 @@ private struct IOSAppIconSettingsView: View {
     @EnvironmentObject private var themeManager: IOSThemeManager
     @Environment(\.themeTokens) private var theme
     @State private var selectedOption: IOSAppIconOption = .default
-    @State private var isChanging = false
+    @State private var applyingOption: IOSAppIconOption?
     @State private var errorMessage: String?
 
     private var supportsAlternateIcons: Bool {
@@ -406,7 +617,10 @@ private struct IOSAppIconSettingsView: View {
 
                             Spacer()
 
-                            if selectedOption == option {
+                            if applyingOption == option {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else if selectedOption == option {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.title3.weight(.semibold))
                                     .foregroundStyle(theme.brandPrimary)
@@ -415,7 +629,7 @@ private struct IOSAppIconSettingsView: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .disabled(!supportsAlternateIcons || isChanging || selectedOption == option)
+                    .disabled(!supportsAlternateIcons || selectedOption == option || applyingOption != nil)
                     .accessibilityIdentifier("ios.settings.appIcon.\(option.id)")
                 }
             } footer: {
@@ -440,14 +654,6 @@ private struct IOSAppIconSettingsView: View {
         .navigationTitle("ios_settings_app_icon_title")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("ios.settings.appIcon.screen")
-        .overlay {
-            if isChanging {
-                ProgressView()
-                    .controlSize(.large)
-                    .padding(18)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-        }
         .onAppear(perform: refreshCurrentIcon)
     }
 
@@ -458,14 +664,89 @@ private struct IOSAppIconSettingsView: View {
     }
 
     private func setAppIcon(_ option: IOSAppIconOption) {
-        guard supportsAlternateIcons, selectedOption != option else { return }
-        isChanging = true
-        errorMessage = nil
+        let traceId = UUID().uuidString
+        DiagnosticLogger.shared.record(
+            level: .info,
+            category: "ios.appIcon",
+            name: "ios_app_icon_selection_tapped",
+            message: "iOS app icon option tapped",
+            traceId: traceId,
+            tags: ["app-icon"],
+            details: [
+                "optionId": option.id,
+                "optionDisplayName": option.displayName,
+                "selectedOptionId": selectedOption.id,
+                "currentOptionId": currentOption.id,
+                "requestedAlternateIconName": option.alternateIconName ?? "<default>",
+                "systemCurrentAlternateIconName": UIApplication.shared.alternateIconName ?? "<default>",
+                "supportsAlternateIcons": String(supportsAlternateIcons),
+            ]
+        )
 
-        IOSAppIconController.shared.apply(option)
-        selectedOption = option
-        currentOption = option
-        isChanging = false
+        guard supportsAlternateIcons else {
+            DiagnosticLogger.shared.record(
+                level: .warning,
+                category: "ios.appIcon",
+                name: "ios_app_icon_selection_ignored",
+                message: "iOS app icon option ignored because alternate icons are unsupported",
+                traceId: traceId,
+                tags: ["app-icon"],
+                details: [
+                    "optionId": option.id,
+                    "reason": "unsupported",
+                ]
+            )
+            return
+        }
+
+        guard applyingOption == nil else {
+            DiagnosticLogger.shared.record(
+                level: .info,
+                category: "ios.appIcon",
+                name: "ios_app_icon_selection_ignored",
+                message: "iOS app icon option ignored because another icon change is in progress",
+                traceId: traceId,
+                tags: ["app-icon"],
+                details: [
+                    "optionId": option.id,
+                    "reason": "already_applying",
+                    "applyingOptionId": applyingOption?.id ?? "<none>",
+                    "systemCurrentAlternateIconName": UIApplication.shared.alternateIconName ?? "<default>",
+                ]
+            )
+            return
+        }
+
+        guard selectedOption != option else {
+            DiagnosticLogger.shared.record(
+                level: .info,
+                category: "ios.appIcon",
+                name: "ios_app_icon_selection_ignored",
+                message: "iOS app icon option ignored because it is already selected",
+                traceId: traceId,
+                tags: ["app-icon"],
+                details: [
+                    "optionId": option.id,
+                    "reason": "already_selected",
+                    "systemCurrentAlternateIconName": UIApplication.shared.alternateIconName ?? "<default>",
+                ]
+            )
+            return
+        }
+
+        applyingOption = option
+        IOSAppIconController.shared.apply(option, traceId: traceId) { error in
+            applyingOption = nil
+            if let error {
+                errorMessage = error.localizedDescription
+                refreshCurrentIcon()
+                return
+            }
+
+            errorMessage = nil
+            selectedOption = option
+            currentOption = option
+        }
     }
 
     private func localized(_ key: String.LocalizationValue) -> String {

@@ -110,6 +110,10 @@ public enum DevBarCoreConstants {
         }
     }
 
+    public enum ICloud {
+        public static let containerIdentifier = "iCloud.cc.xjpz.DevBar"
+    }
+
     public enum Defaults {
         public static let refreshIntervalKey = "refresh_interval"
         public static let defaultRefreshInterval: TimeInterval = 300
@@ -139,5 +143,6 @@ public enum DevBarCoreConstants {
         public static let relayIPhoneDeviceNameKey = "relay_iphone_device_name"
         public static let macThemeWidgetUserNameKey = "mac_theme_widget_user_name"
         public static let relayMacEnabledKey = "relay_mac_enabled"
+        public static let iCloudSyncSettingsKey = "icloud_sync_settings_v1"
     }
 }
