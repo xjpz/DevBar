@@ -6,6 +6,8 @@ public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
     case lightBluePurple
     case frostedLilacGray
     case graphiteMono
+    case smileBlue
+    case smileBlueBorder
 
     public var id: String {
         switch self {
@@ -19,6 +21,10 @@ public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
             "frosted-lilac-gray"
         case .graphiteMono:
             "graphite-mono"
+        case .smileBlue:
+            "smile-blue"
+        case .smileBlueBorder:
+            "smile-blue-border"
         }
     }
 
@@ -34,6 +40,10 @@ public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
             "Frosted lilac gray"
         case .graphiteMono:
             "Graphite mono"
+        case .smileBlue:
+            "Smile blue"
+        case .smileBlueBorder:
+            "Smile blue border"
         }
     }
 
@@ -49,7 +59,15 @@ public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
             "AppIconFrostedLilacGray"
         case .graphiteMono:
             "AppIconGraphiteMono"
+        case .smileBlue:
+            "AppIconSmileBlueV2"
+        case .smileBlueBorder:
+            "AppIconSmileBlueBorder"
         }
+    }
+
+    public var expectedBundleIconName: String {
+        alternateIconName ?? "AppIcon"
     }
 
     public var previewAssetName: String {
@@ -64,12 +82,17 @@ public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
             "AppIconPreviewFrostedLilacGray"
         case .graphiteMono:
             "AppIconPreviewGraphiteMono"
+        case .smileBlue:
+            "AppIconPreviewSmileBlue"
+        case .smileBlueBorder:
+            "AppIconPreviewSmileBlueBorder"
         }
     }
 
     public static func option(forAlternateIconName alternateIconName: String?) -> IOSAppIconOption {
-        allCases.first {
-            $0.alternateIconName == alternateIconName
-        } ?? .default
+        if alternateIconName == "AppIconSmileBlue" || alternateIconName == "AppIconSmileBlueDark" {
+            return .smileBlue
+        }
+        return allCases.first { $0.alternateIconName == alternateIconName } ?? .default
     }
 }

@@ -8,37 +8,31 @@
 		<dict>
 			<key>AppIconDockBlue</key>
 			<dict>
-				<key>CFBundleIconFiles</key>
-				<array>
-					<string>AppIconDockBlue</string>
-				</array>
 				<key>CFBundleIconName</key>
 				<string>AppIconDockBlue</string>
 			</dict>
 			<key>AppIconFrostedLilacGray</key>
 			<dict>
-				<key>CFBundleIconFiles</key>
-				<array>
-					<string>AppIconFrostedLilacGray</string>
-				</array>
 				<key>CFBundleIconName</key>
 				<string>AppIconFrostedLilacGray</string>
 			</dict>
 			<key>AppIconGraphiteMono</key>
 			<dict>
-				<key>CFBundleIconFiles</key>
-				<array>
-					<string>AppIconGraphiteMono</string>
-				</array>
 				<key>CFBundleIconName</key>
 				<string>AppIconGraphiteMono</string>
 			</dict>
+			<key>AppIconSmileBlueV2</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconSmileBlueV2</string>
+			</dict>
+			<key>AppIconSmileBlueBorder</key>
+			<dict>
+				<key>CFBundleIconName</key>
+				<string>AppIconSmileBlueBorder</string>
+			</dict>
 			<key>AppIconLightBluePurple</key>
 			<dict>
-				<key>CFBundleIconFiles</key>
-				<array>
-					<string>AppIconLightBluePurple</string>
-				</array>
 				<key>CFBundleIconName</key>
 				<string>AppIconLightBluePurple</string>
 			</dict>

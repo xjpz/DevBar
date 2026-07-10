@@ -7,6 +7,7 @@ import SwiftData
 struct DevBariOSApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @Environment(\.scenePhase) private var scenePhase
+    private let modelContainer: ModelContainer
     @StateObject private var appViewModel = IOSAppViewModel()
     @StateObject private var languageManager = IOSLanguageManager()
     @StateObject private var themeManager = IOSThemeManager()
@@ -14,6 +15,7 @@ struct DevBariOSApp: App {
 
     init() {
         Self.ensureSharedModelStoreDirectoryExists()
+        self.modelContainer = Self.makeModelContainer()
     }
 
     var body: some Scene {
@@ -35,7 +37,7 @@ struct DevBariOSApp: App {
                     switch newPhase {
                     case .active:
                         IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: false)
-                        IOSAppIconController.shared.migrateLegacyDarkIconIfNeeded()
+                        IOSAppIconController.shared.synchronizePreferredIcon()
                         Task {
                             appViewModel.flushDiagnosticsInBackground()
                             await appViewModel.refreshOnForeground()
@@ -62,19 +64,7 @@ struct DevBariOSApp: App {
                     shortcutStore.handle(action)
                 }
         }
-        .modelContainer(
-            for: [
-                IOSAPIRecord.self,
-                IOSWebHistoryRecord.self,
-                IOSMemoItem.self,
-                IOSMarkdownDocument.self,
-                IOSHermesConversation.self,
-                IOSHermesMessage.self,
-                IOSTerminalServer.self,
-            ],
-            isAutosaveEnabled: true,
-            isUndoEnabled: false
-        )
+        .modelContainer(modelContainer)
     }
 
     /// SwiftData's default `ModelConfiguration` uses `groupContainer: .automatic`. Because this app
@@ -90,6 +80,32 @@ struct DevBariOSApp: App {
         let appSupport = groupURL.appending(path: "Library/Application Support", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: appSupport, withIntermediateDirectories: true)
     }
+
+    private static func makeModelContainer() -> ModelContainer {
+        let schema = Schema(modelTypes)
+        let configuration = ModelConfiguration(
+            schema: schema,
+            groupContainer: .identifier(DevBarCoreConstants.AppGroup.groupID),
+            cloudKitDatabase: .none
+        )
+        do {
+            return try ModelContainer(for: schema, configurations: [configuration])
+        } catch {
+            fatalError("Unable to create SwiftData model container: \(error)")
+        }
+    }
+
+    private static var modelTypes: [any PersistentModel.Type] {
+        [
+            IOSAPIRecord.self,
+            IOSWebHistoryRecord.self,
+            IOSMemoItem.self,
+            IOSMarkdownDocument.self,
+            IOSHermesConversation.self,
+            IOSHermesMessage.self,
+            IOSTerminalServer.self,
+        ]
+    }
 }
 
 private struct ThemeRootView: View {
@@ -97,18 +113,17 @@ private struct ThemeRootView: View {
     @EnvironmentObject private var themeManager: IOSThemeManager
 
     var body: some View {
-            IOSRootView()
-                .onAppear {
-                    themeManager.updateBarAppearance()
-                    IOSAppIconController.shared.migrateLegacyDarkIconIfNeeded()
-                }
-                .onChange(of: systemColorScheme) { _, newScheme in
-                    themeManager.systemColorScheme = newScheme
-                    themeManager.updateBarAppearance()
-                }
-                .onChange(of: themeManager.selectedMode) { _, _ in
-                    themeManager.updateBarAppearance()
-                }
+        IOSRootView()
+            .onAppear {
+                themeManager.updateBarAppearance()
+            }
+            .onChange(of: systemColorScheme) { _, newScheme in
+                themeManager.systemColorScheme = newScheme
+                themeManager.updateBarAppearance()
+            }
+            .onChange(of: themeManager.selectedMode) { _, _ in
+                themeManager.updateBarAppearance()
+            }
             .onChange(of: themeManager.selectedFont) { _, _ in
                 themeManager.updateBarAppearance()
             }
