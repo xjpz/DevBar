@@ -382,7 +382,11 @@ func deviceRelaySystemStatusTracksPeerNameLockStateAndDisplayState() throws {
         requestId: "status-unit",
         screenLocked: true,
         displayAwake: false,
-        deviceName: "Unit MacBook"
+        deviceName: "Unit MacBook",
+        cpuPercent: 37,
+        memoryPercent: 68,
+        networkDownBytesPerSecond: 2_621_440,
+        networkUpBytesPerSecond: 184_320
     )
 
     let encoded = try DeviceRelayMessageCodec.encode(message)
@@ -392,15 +396,34 @@ func deviceRelaySystemStatusTracksPeerNameLockStateAndDisplayState() throws {
     #expect(decoded.type == .systemStatus)
     #expect(decoded.payload["screenLocked"] == "true")
     #expect(decoded.payload["displayAwake"] == "false")
+    #expect(decoded.payload["cpuPercent"] == "37")
+    #expect(decoded.payload["memoryPercent"] == "68")
+    #expect(decoded.payload["networkDownBytesPerSecond"] == "2621440")
+    #expect(decoded.payload["networkUpBytesPerSecond"] == "184320")
     #expect(manager.displayName(for: peer) == "Unit MacBook")
     #expect(manager.screenLocked(for: peer) == true)
     #expect(manager.displayAwake(for: peer) == false)
+    #expect(manager.cpuPercent(for: peer) == 37)
+    #expect(manager.memoryPercent(for: peer) == 68)
+    #expect(manager.networkDownBytesPerSecond(for: peer) == 2_621_440)
+    #expect(manager.networkUpBytesPerSecond(for: peer) == 184_320)
 }
 
 @Test
 func deviceRelaySocketDisconnectedErrorIsNotReportedAsUnregistered() {
     #expect(DeviceRelayError.webSocketNotConnected.errorDescription == "中继 WebSocket 未连接")
     #expect(DeviceRelayError.missingDeviceToken.errorDescription == "设备尚未注册")
+}
+
+@Test
+@MainActor
+func deviceRelayReconnectBackoffIsCapped() {
+    #expect(DeviceRelayManager.reconnectDelay(forAttempt: 0) == 2)
+    #expect(DeviceRelayManager.reconnectDelay(forAttempt: 1) == 5)
+    #expect(DeviceRelayManager.reconnectDelay(forAttempt: 2) == 15)
+    #expect(DeviceRelayManager.reconnectDelay(forAttempt: 3) == 30)
+    #expect(DeviceRelayManager.reconnectDelay(forAttempt: 4) == 60)
+    #expect(DeviceRelayManager.reconnectDelay(forAttempt: 99) == 60)
 }
 
 @MainActor

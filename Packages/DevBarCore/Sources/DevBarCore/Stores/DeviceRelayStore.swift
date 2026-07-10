@@ -3,13 +3,16 @@ import Security
 
 public struct DeviceRelayStore: @unchecked Sendable {
     private let defaults: UserDefaults
+    private let sharedDefaults: UserDefaults?
     private let keychain: KeychainService
 
     public init(
         defaults: UserDefaults = .standard,
+        sharedDefaults: UserDefaults? = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID),
         keychain: KeychainService = .shared
     ) {
         self.defaults = defaults
+        self.sharedDefaults = sharedDefaults
         self.keychain = keychain
     }
 
@@ -39,16 +42,24 @@ public struct DeviceRelayStore: @unchecked Sendable {
     public func saveDeviceToken(_ token: String) {
         keychain.save(key: DevBarCoreConstants.Keychain.relayDeviceTokenKey, value: token)
         defaults.set(token, forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
+        sharedDefaults?.set(token, forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
     }
 
     public func loadDeviceToken() -> String? {
-        keychain.load(key: DevBarCoreConstants.Keychain.relayDeviceTokenKey) ??
-            defaults.string(forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
+        let token = keychain.load(key: DevBarCoreConstants.Keychain.relayDeviceTokenKey) ??
+            defaults.string(forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey) ??
+            sharedDefaults?.string(forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
+
+        if let token, !token.isEmpty {
+            sharedDefaults?.set(token, forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
+        }
+        return token
     }
 
     public func clearDeviceToken() {
         keychain.delete(key: DevBarCoreConstants.Keychain.relayDeviceTokenKey)
         defaults.removeObject(forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
+        sharedDefaults?.removeObject(forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
     }
 
     public func saveLocalPairSecret(_ secret: String, peerDeviceID: String) {

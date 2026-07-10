@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import Network
 import Security
 
 @MainActor
@@ -23,6 +24,14 @@ public final class DeviceRelayManager: ObservableObject {
     private var socketTask: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
+    private var reconnectAttempts = 0
+    private var shouldMaintainRemoteConnection = false
+    private var currentSocketService: DeviceRelayService
+    private var pathMonitor: NWPathMonitor?
+    private let pathMonitorQueue = DispatchQueue(label: "com.devbar.devicerelay.pathmonitor")
+    private var hasNetworkPath = true
+    private var lastInboundMessageAt: Date?
     private var deviceType: DeviceRelayDeviceType?
     private var deviceName: String?
     public var messageHandler: ((DeviceRelayMessage) -> Void)?
@@ -33,6 +42,7 @@ public final class DeviceRelayManager: ObservableObject {
     ) {
         self.service = service
         self.store = store
+        self.currentSocketService = service
         self.deviceToken = store.loadDeviceToken()
         bindLocalTransport()
     }
@@ -71,6 +81,26 @@ public final class DeviceRelayManager: ObservableObject {
 
     public func displayAwake(for peer: DeviceRelayDevice) -> Bool? {
         peerRuntimeStates[peer.deviceId]?.displayAwake
+    }
+
+    public func cpuPercent(for peer: DeviceRelayDevice) -> Int? {
+        peerRuntimeStates[peer.deviceId]?.cpuPercent
+    }
+
+    public func memoryPercent(for peer: DeviceRelayDevice) -> Int? {
+        peerRuntimeStates[peer.deviceId]?.memoryPercent
+    }
+
+    public func networkDownBytesPerSecond(for peer: DeviceRelayDevice) -> Int? {
+        peerRuntimeStates[peer.deviceId]?.networkDownBytesPerSecond
+    }
+
+    public func networkUpBytesPerSecond(for peer: DeviceRelayDevice) -> Int? {
+        peerRuntimeStates[peer.deviceId]?.networkUpBytesPerSecond
+    }
+
+    public func systemMetricsUpdatedAt(for peer: DeviceRelayDevice) -> Date? {
+        peerRuntimeStates[peer.deviceId]?.systemMetricsUpdatedAt
     }
 
 #if DEBUG
@@ -254,6 +284,9 @@ public final class DeviceRelayManager: ObservableObject {
         }
 
         do {
+            shouldMaintainRemoteConnection = true
+            currentSocketService = service
+            startPathMonitor()
             connectionState = .connecting
             let task = try service.makeWebSocketTask(deviceId: deviceID, deviceToken: token)
             socketTask = task
@@ -264,17 +297,24 @@ public final class DeviceRelayManager: ObservableObject {
             startHeartbeat()
         } catch {
             fail(error)
+            scheduleReconnect(reason: error.localizedDescription)
         }
     }
 
     public func disconnect() {
+        shouldMaintainRemoteConnection = false
+        stopPathMonitor()
+        reconnectTask?.cancel()
         heartbeatTask?.cancel()
         receiveTask?.cancel()
         socketTask?.cancel(with: .goingAway, reason: nil)
+        reconnectTask = nil
         heartbeatTask = nil
         receiveTask = nil
         socketTask = nil
+        lastInboundMessageAt = nil
         connectionState = .disconnected
+        reconnectAttempts = 0
         activeTransport = localConnectedPeerIDs.isEmpty ? .none : .local
         appendLog(.info, "WebSocket 已断开")
     }
@@ -346,9 +386,11 @@ public final class DeviceRelayManager: ObservableObject {
             activeTransport = .relay
             appendLog(.info, "发送 \(message.type.rawValue) requestId=\(message.requestId ?? "-")")
         } catch {
+            socketTask.cancel(with: .goingAway, reason: nil)
             self.socketTask = nil
             connectionState = .failed(error.localizedDescription)
             appendLog(.error, "WebSocket 发送失败：\(error.localizedDescription)")
+            scheduleReconnect(reason: error.localizedDescription)
             throw error
         }
     }
@@ -451,7 +493,11 @@ public final class DeviceRelayManager: ObservableObject {
         requestId: String?,
         screenLocked: Bool?,
         displayAwake: Bool?,
-        deviceName: String?
+        deviceName: String?,
+        cpuPercent: Int? = nil,
+        memoryPercent: Int? = nil,
+        networkDownBytesPerSecond: Int? = nil,
+        networkUpBytesPerSecond: Int? = nil
     ) async throws {
         guard let localDeviceID else {
             throw DeviceRelayError.missingDeviceID
@@ -463,7 +509,11 @@ public final class DeviceRelayManager: ObservableObject {
                 requestId: requestId,
                 screenLocked: screenLocked,
                 displayAwake: displayAwake,
-                deviceName: deviceName
+                deviceName: deviceName,
+                cpuPercent: cpuPercent,
+                memoryPercent: memoryPercent,
+                networkDownBytesPerSecond: networkDownBytesPerSecond,
+                networkUpBytesPerSecond: networkUpBytesPerSecond
             )
         )
     }
@@ -484,6 +534,7 @@ public final class DeviceRelayManager: ObservableObject {
                     @unknown default:
                         continue
                     }
+                    self.lastInboundMessageAt = Date()
                     print("[DevBar:DeviceRelay] WebSocket received type=\(message.type.rawValue) requestId=\(message.requestId ?? "-")")
                     self.appendLog(.info, "收到 \(message.type.rawValue) requestId=\(message.requestId ?? "-")")
                     self.markPeerRemoteSeen(from: message)
@@ -498,6 +549,7 @@ public final class DeviceRelayManager: ObservableObject {
                     self.appendLog(.error, "WebSocket 接收失败：\(error.localizedDescription)")
                     self.socketTask = nil
                     self.fail(error)
+                    self.scheduleReconnect(reason: error.localizedDescription)
                     return
                 }
             }
@@ -573,15 +625,34 @@ public final class DeviceRelayManager: ObservableObject {
 
     private func startHeartbeat() {
         heartbeatTask?.cancel()
+        lastInboundMessageAt = Date()
         heartbeatTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(DevBarCoreConstants.DeviceRelay.heartbeatInterval))
-                guard let self, let localDeviceID = self.localDeviceID else { continue }
+                guard let self, !Task.isCancelled else { return }
+                // Liveness watchdog: on a half-open socket (abrupt network loss,
+                // sleep, router reboot) receive() never errors and the heartbeat
+                // send() just buffers, so the connection looks alive forever.
+                // Detect the silently-dead socket by inbound staleness and force
+                // a clean reconnect instead of waiting for a TCP timeout.
+                if self.connectionState == .connected, let last = self.lastInboundMessageAt {
+                    let staleFor = Date().timeIntervalSince(last)
+                    if staleFor > Self.connectionStaleThreshold {
+                        self.appendLog(.warning, "\(Int(staleFor)) 秒未收到中继消息，判定连接失效")
+                        self.forceReconnect(reason: "心跳超时")
+                        return
+                    }
+                }
+                guard let localDeviceID = self.localDeviceID else { continue }
                 try? await self.send(
                     Self.makeHeartbeatMessage(localDeviceID: localDeviceID, deviceName: self.deviceName)
                 )
             }
         }
+    }
+
+    private static var connectionStaleThreshold: TimeInterval {
+        max(DevBarCoreConstants.DeviceRelay.heartbeatInterval * 3, 75)
     }
 
     static func makeHeartbeatMessage(localDeviceID: String, deviceName: String? = nil) -> DeviceRelayMessage {
@@ -632,7 +703,11 @@ public final class DeviceRelayManager: ObservableObject {
         requestId: String?,
         screenLocked: Bool?,
         displayAwake: Bool?,
-        deviceName: String?
+        deviceName: String?,
+        cpuPercent: Int? = nil,
+        memoryPercent: Int? = nil,
+        networkDownBytesPerSecond: Int? = nil,
+        networkUpBytesPerSecond: Int? = nil
     ) -> DeviceRelayMessage {
         var payload: [String: String] = [:]
         if let screenLocked {
@@ -643,6 +718,18 @@ public final class DeviceRelayManager: ObservableObject {
         }
         if let deviceName = normalizedDeviceName(deviceName) {
             payload["deviceName"] = deviceName
+        }
+        if let cpuPercent {
+            payload["cpuPercent"] = "\(clampedPercent(cpuPercent))"
+        }
+        if let memoryPercent {
+            payload["memoryPercent"] = "\(clampedPercent(memoryPercent))"
+        }
+        if let networkDownBytesPerSecond {
+            payload["networkDownBytesPerSecond"] = "\(max(0, networkDownBytesPerSecond))"
+        }
+        if let networkUpBytesPerSecond {
+            payload["networkUpBytesPerSecond"] = "\(max(0, networkUpBytesPerSecond))"
         }
         payload["timestamp"] = "\(Int64(Date().timeIntervalSince1970 * 1000))"
         return DeviceRelayMessage(
@@ -810,11 +897,13 @@ public final class DeviceRelayManager: ObservableObject {
         switch message.type {
         case .relayConnected:
             connectionState = .connected
+            markRemoteConnectionHealthy()
             activeTransport = localConnectedPeerIDs.isEmpty ? .relay : .local
             lastErrorMessage = nil
             appendLog(.success, "WebSocket 已连接")
         case .relayHeartbeat, .relayPong:
             connectionState = .connected
+            markRemoteConnectionHealthy()
             activeTransport = localConnectedPeerIDs.isEmpty ? .relay : .local
             lastErrorMessage = nil
         case .systemStatus:
@@ -939,7 +1028,12 @@ public final class DeviceRelayManager: ObservableObject {
             lastRemoteSeenAt: Date(timeIntervalSince1970: TimeInterval(message.timestamp) / 1000),
             displayName: message.payload["deviceName"],
             screenLocked: screenLockedPayload(from: message),
-            displayAwake: displayAwakePayload(from: message)
+            displayAwake: displayAwakePayload(from: message),
+            cpuPercent: percentPayload("cpuPercent", from: message),
+            memoryPercent: percentPayload("memoryPercent", from: message),
+            networkDownBytesPerSecond: nonNegativeIntPayload("networkDownBytesPerSecond", from: message),
+            networkUpBytesPerSecond: nonNegativeIntPayload("networkUpBytesPerSecond", from: message),
+            systemMetricsUpdatedAt: systemMetricsUpdatedAtPayload(from: message)
         )
     }
 
@@ -950,7 +1044,12 @@ public final class DeviceRelayManager: ObservableObject {
             lastLocalSeenAt: Date(),
             displayName: message.payload["deviceName"],
             screenLocked: screenLockedPayload(from: message),
-            displayAwake: displayAwakePayload(from: message)
+            displayAwake: displayAwakePayload(from: message),
+            cpuPercent: percentPayload("cpuPercent", from: message),
+            memoryPercent: percentPayload("memoryPercent", from: message),
+            networkDownBytesPerSecond: nonNegativeIntPayload("networkDownBytesPerSecond", from: message),
+            networkUpBytesPerSecond: nonNegativeIntPayload("networkUpBytesPerSecond", from: message),
+            systemMetricsUpdatedAt: systemMetricsUpdatedAtPayload(from: message)
         )
     }
 
@@ -967,7 +1066,12 @@ public final class DeviceRelayManager: ObservableObject {
             peerDeviceID: peerDeviceID,
             displayName: message.payload["deviceName"],
             screenLocked: screenLockedPayload(from: message),
-            displayAwake: displayAwakePayload(from: message)
+            displayAwake: displayAwakePayload(from: message),
+            cpuPercent: percentPayload("cpuPercent", from: message),
+            memoryPercent: percentPayload("memoryPercent", from: message),
+            networkDownBytesPerSecond: nonNegativeIntPayload("networkDownBytesPerSecond", from: message),
+            networkUpBytesPerSecond: nonNegativeIntPayload("networkUpBytesPerSecond", from: message),
+            systemMetricsUpdatedAt: systemMetricsUpdatedAtPayload(from: message)
         )
     }
 
@@ -977,7 +1081,12 @@ public final class DeviceRelayManager: ObservableObject {
         lastLocalSeenAt: Date? = nil,
         displayName: String? = nil,
         screenLocked: Bool? = nil,
-        displayAwake: Bool? = nil
+        displayAwake: Bool? = nil,
+        cpuPercent: Int? = nil,
+        memoryPercent: Int? = nil,
+        networkDownBytesPerSecond: Int? = nil,
+        networkUpBytesPerSecond: Int? = nil,
+        systemMetricsUpdatedAt: Date? = nil
     ) {
         let existing = peerRuntimeStates[peerDeviceID] ?? DeviceRelayPeerRuntimeState()
         peerRuntimeStates[peerDeviceID] = existing.updating(
@@ -985,7 +1094,12 @@ public final class DeviceRelayManager: ObservableObject {
             lastLocalSeenAt: lastLocalSeenAt,
             displayName: Self.normalizedDeviceName(displayName),
             screenLocked: screenLocked,
-            displayAwake: displayAwake
+            displayAwake: displayAwake,
+            cpuPercent: cpuPercent,
+            memoryPercent: memoryPercent,
+            networkDownBytesPerSecond: networkDownBytesPerSecond,
+            networkUpBytesPerSecond: networkUpBytesPerSecond,
+            systemMetricsUpdatedAt: systemMetricsUpdatedAt
         )
     }
 
@@ -1016,6 +1130,139 @@ public final class DeviceRelayManager: ObservableObject {
         if ["true", "1", "yes"].contains(value) { return true }
         if ["false", "0", "no"].contains(value) { return false }
         return nil
+    }
+
+    private func percentPayload(_ key: String, from message: DeviceRelayMessage) -> Int? {
+        guard let value = nonNegativeIntPayload(key, from: message) else { return nil }
+        return Self.clampedPercent(value)
+    }
+
+    private func nonNegativeIntPayload(_ key: String, from message: DeviceRelayMessage) -> Int? {
+        guard let rawValue = message.payload[key],
+              let value = Int(rawValue) else {
+            return nil
+        }
+        return max(0, value)
+    }
+
+    private func systemMetricsUpdatedAtPayload(from message: DeviceRelayMessage) -> Date? {
+        guard percentPayload("cpuPercent", from: message) != nil ||
+            percentPayload("memoryPercent", from: message) != nil ||
+            nonNegativeIntPayload("networkDownBytesPerSecond", from: message) != nil ||
+            nonNegativeIntPayload("networkUpBytesPerSecond", from: message) != nil else {
+            return nil
+        }
+        if let timestamp = Int64(message.payload["timestamp"] ?? "") {
+            return Date(timeIntervalSince1970: TimeInterval(timestamp) / 1000)
+        }
+        return Date(timeIntervalSince1970: TimeInterval(message.timestamp) / 1000)
+    }
+
+    private static func clampedPercent(_ percent: Int) -> Int {
+        min(max(percent, 0), 100)
+    }
+
+    static func reconnectDelay(forAttempt attempt: Int) -> TimeInterval {
+        let delays: [TimeInterval] = [2, 5, 15, 30, 60]
+        return delays[min(max(attempt, 0), delays.count - 1)]
+    }
+
+    private func scheduleReconnect(reason: String) {
+        guard shouldMaintainRemoteConnection else { return }
+        guard reconnectTask == nil else { return }
+        guard localDeviceID != nil, deviceToken != nil else { return }
+        let attempt = reconnectAttempts
+        reconnectAttempts += 1
+        let delay = Self.reconnectDelay(forAttempt: attempt)
+        appendLog(.warning, "WebSocket 将在 \(Int(delay)) 秒后重连：\(reason)")
+
+        reconnectTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard let self, !Task.isCancelled else { return }
+            self.reconnectTask = nil
+            guard self.shouldMaintainRemoteConnection, self.socketTask == nil else { return }
+            self.connect(using: self.currentSocketService)
+        }
+    }
+
+    private func markRemoteConnectionHealthy() {
+        reconnectAttempts = 0
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        lastInboundMessageAt = Date()
+    }
+
+    /// Tear down the current (possibly half-open) socket and immediately
+    /// reconnect, bypassing the exponential backoff. Used when we have a
+    /// positive signal that the network is usable again (path restoration or a
+    /// heartbeat-timeout watchdog trip), where waiting out the backoff would add
+    /// needless latency.
+    private func forceReconnect(reason: String) {
+        guard shouldMaintainRemoteConnection else { return }
+        guard localDeviceID != nil, deviceToken != nil else { return }
+        reconnectTask?.cancel()
+        reconnectTask = nil
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+        receiveTask?.cancel()
+        receiveTask = nil
+        socketTask?.cancel(with: .goingAway, reason: nil)
+        socketTask = nil
+        reconnectAttempts = 0
+        appendLog(.warning, "强制重连：\(reason)")
+        connect(using: currentSocketService)
+    }
+
+    private func startPathMonitor() {
+        guard pathMonitor == nil else { return }
+        let monitor = NWPathMonitor()
+        monitor.pathUpdateHandler = { [weak self] path in
+            let isSatisfied = path.status == .satisfied
+            Task { @MainActor [weak self] in
+                self?.handlePathUpdate(isSatisfied: isSatisfied)
+            }
+        }
+        monitor.start(queue: pathMonitorQueue)
+        pathMonitor = monitor
+    }
+
+    private func stopPathMonitor() {
+        pathMonitor?.cancel()
+        pathMonitor = nil
+    }
+
+    private func handlePathUpdate(isSatisfied: Bool) {
+        let wasSatisfied = hasNetworkPath
+        hasNetworkPath = isSatisfied
+        guard shouldMaintainRemoteConnection else { return }
+
+        if isSatisfied {
+            if !wasSatisfied {
+                // Network came back after an outage. Any existing socket is a
+                // stale half-open carryover from before the drop — replace it.
+                appendLog(.info, "网络已恢复，重新建立中继连接")
+                forceReconnect(reason: "网络恢复")
+            } else if socketTask == nil, reconnectTask == nil {
+                // Network is up but we have no live socket and nothing pending
+                // (e.g. a prior teardown left us idle) — reconnect now.
+                forceReconnect(reason: "网络可用")
+            }
+        } else {
+            // Network went away. Drop the half-open socket eagerly and cancel any
+            // pending backoff retry; a satisfied path will trigger a fresh connect.
+            appendLog(.warning, "网络断开，暂停中继连接")
+            reconnectTask?.cancel()
+            reconnectTask = nil
+            heartbeatTask?.cancel()
+            heartbeatTask = nil
+            receiveTask?.cancel()
+            receiveTask = nil
+            socketTask?.cancel(with: .goingAway, reason: nil)
+            socketTask = nil
+            if connectionState == .connected {
+                connectionState = .connecting
+            }
+        }
     }
 
     private static func randomLocalSecret() -> String {

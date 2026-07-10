@@ -379,19 +379,34 @@ public struct DeviceRelayPeerRuntimeState: Sendable, Equatable {
     public let displayName: String?
     public let screenLocked: Bool?
     public let displayAwake: Bool?
+    public let cpuPercent: Int?
+    public let memoryPercent: Int?
+    public let networkDownBytesPerSecond: Int?
+    public let networkUpBytesPerSecond: Int?
+    public let systemMetricsUpdatedAt: Date?
 
     public init(
         lastRemoteSeenAt: Date? = nil,
         lastLocalSeenAt: Date? = nil,
         displayName: String? = nil,
         screenLocked: Bool? = nil,
-        displayAwake: Bool? = nil
+        displayAwake: Bool? = nil,
+        cpuPercent: Int? = nil,
+        memoryPercent: Int? = nil,
+        networkDownBytesPerSecond: Int? = nil,
+        networkUpBytesPerSecond: Int? = nil,
+        systemMetricsUpdatedAt: Date? = nil
     ) {
         self.lastRemoteSeenAt = lastRemoteSeenAt
         self.lastLocalSeenAt = lastLocalSeenAt
         self.displayName = displayName
         self.screenLocked = screenLocked
         self.displayAwake = displayAwake
+        self.cpuPercent = cpuPercent
+        self.memoryPercent = memoryPercent
+        self.networkDownBytesPerSecond = networkDownBytesPerSecond
+        self.networkUpBytesPerSecond = networkUpBytesPerSecond
+        self.systemMetricsUpdatedAt = systemMetricsUpdatedAt
     }
 
     public func updating(
@@ -399,14 +414,24 @@ public struct DeviceRelayPeerRuntimeState: Sendable, Equatable {
         lastLocalSeenAt: Date? = nil,
         displayName: String? = nil,
         screenLocked: Bool? = nil,
-        displayAwake: Bool? = nil
+        displayAwake: Bool? = nil,
+        cpuPercent: Int? = nil,
+        memoryPercent: Int? = nil,
+        networkDownBytesPerSecond: Int? = nil,
+        networkUpBytesPerSecond: Int? = nil,
+        systemMetricsUpdatedAt: Date? = nil
     ) -> DeviceRelayPeerRuntimeState {
         DeviceRelayPeerRuntimeState(
             lastRemoteSeenAt: lastRemoteSeenAt ?? self.lastRemoteSeenAt,
             lastLocalSeenAt: lastLocalSeenAt ?? self.lastLocalSeenAt,
             displayName: displayName ?? self.displayName,
             screenLocked: screenLocked ?? self.screenLocked,
-            displayAwake: displayAwake ?? self.displayAwake
+            displayAwake: displayAwake ?? self.displayAwake,
+            cpuPercent: cpuPercent ?? self.cpuPercent,
+            memoryPercent: memoryPercent ?? self.memoryPercent,
+            networkDownBytesPerSecond: networkDownBytesPerSecond ?? self.networkDownBytesPerSecond,
+            networkUpBytesPerSecond: networkUpBytesPerSecond ?? self.networkUpBytesPerSecond,
+            systemMetricsUpdatedAt: systemMetricsUpdatedAt ?? self.systemMetricsUpdatedAt
         )
     }
 }
