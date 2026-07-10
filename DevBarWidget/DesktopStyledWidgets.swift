@@ -452,12 +452,15 @@ private struct DesktopStyledQuotaLargeView: View {
     private func providerCard(_ provider: WidgetProviderSelection, density: QuotaCardDensity) -> some View {
         let data = dataByProvider[provider]
         let limits = visibleQuotaLimits(in: data, maxCount: density.maxVisibleLimits)
-        let headerDetail = quotaHeaderDetail(
-            in: limits,
-            provider: provider,
-            fallbackLevel: data?.level,
-            canShowResetInBody: density.showsDetail
-        )
+        let showsOpenAIResetBadge = provider == .openai && (data?.availableResetCount ?? 0) > 0
+        let headerDetail = showsOpenAIResetBadge
+            ? (data?.level?.capitalized ?? "--")
+            : quotaHeaderDetail(
+                in: limits,
+                provider: provider,
+                fallbackLevel: data?.level,
+                canShowResetInBody: density.showsDetail
+            )
 
         return VStack(alignment: .leading, spacing: density.contentSpacing) {
             HStack(spacing: 5) {
@@ -469,6 +472,14 @@ private struct DesktopStyledQuotaLargeView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Spacer()
+                if showsOpenAIResetBadge,
+                   let resetCount = data?.availableResetCount {
+                    ResetCreditsBadge(
+                        count: resetCount,
+                        size: min(max(density.titleFontSize + 6, 15), 19),
+                        visualStyle: visualStyle
+                    )
+                }
                 Text(headerDetail)
                     .font(.system(size: density.levelFontSize, weight: .bold))
                     .foregroundStyle(secondaryTextColor)
@@ -547,14 +558,21 @@ private struct DesktopStyledQuotaLargeView: View {
     }
 
     private var lastUpdated: Date? {
-        dataByProvider.values
-            .map(\.lastUpdated)
+        visibleSyncedProviders
+            .compactMap { dataByProvider[$0]?.lastUpdated }
             .filter { $0 != .distantPast }
             .max()
     }
 
     private var syncedProviderCount: Int {
-        dataByProvider.values.filter { $0.lastUpdated != .distantPast }.count
+        visibleSyncedProviders.count
+    }
+
+    private var visibleSyncedProviders: [WidgetProviderSelection] {
+        visibleProviders.filter { provider in
+            guard let data = dataByProvider[provider] else { return false }
+            return data.lastUpdated != .distantPast
+        }
     }
 
     private var primaryTextColor: Color {

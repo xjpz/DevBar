@@ -5,6 +5,7 @@
 
 import AppIntents
 import DevBarCore
+import Foundation
 import WidgetKit
 
 enum WidgetProviderSelection: String, AppEnum, CaseIterable {
@@ -206,6 +207,88 @@ struct SetMacThemeQuotaProviderPageIntent: AppIntent {
         WidgetCenter.shared.reloadTimelines(ofKind: "DevBarLiquidGlassWidget")
         WidgetCenter.shared.reloadTimelines(ofKind: "DevBarDarkWidget")
         return .result()
+    }
+}
+
+enum MacThemeControlAction: String, AppEnum {
+    case lockScreen
+    case wakeDisplay
+    case displaySleep
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation {
+        TypeDisplayRepresentation(name: "Mac 控制")
+    }
+
+    static var caseDisplayRepresentations: [MacThemeControlAction: DisplayRepresentation] {
+        [
+            .lockScreen: DisplayRepresentation(title: "锁定 Mac"),
+            .wakeDisplay: DisplayRepresentation(title: "点亮"),
+            .displaySleep: DisplayRepresentation(title: "熄屏")
+        ]
+    }
+
+    var command: DeviceRelayCommandType {
+        switch self {
+        case .lockScreen:
+            return .lockScreen
+        case .wakeDisplay:
+            return .wakeDisplay
+        case .displaySleep:
+            return .displaySleep
+        }
+    }
+}
+
+struct RunMacThemeControlIntent: AppIntent {
+    static var title: LocalizedStringResource { "执行 Mac 控制" }
+    static var description = IntentDescription("通过 DevBar Relay 控制已配对的 Mac。")
+    static var openAppWhenRun = false
+
+    @Parameter(title: "动作")
+    var action: MacThemeControlAction
+
+    init() {}
+
+    init(action: MacThemeControlAction) {
+        self.action = action
+    }
+
+    func perform() async throws -> some IntentResult {
+        let store = DeviceRelayStore()
+        guard let token = store.loadDeviceToken(), !token.isEmpty else {
+            print("[DevBar:WidgetMacControl] Missing relay device token.")
+            return .result()
+        }
+
+        guard let targetDeviceID = Self.loadOnlineTargetMacDeviceID() else {
+            print("[DevBar:WidgetMacControl] Missing online target Mac device ID.")
+            return .result()
+        }
+
+        do {
+            _ = try await DeviceRelayService.shared.sendDeviceCommand(
+                type: action.command,
+                targetDeviceId: targetDeviceID,
+                deviceToken: token
+            )
+            WidgetCenter.shared.reloadTimelines(ofKind: "DevBarMacThemeWidget")
+        } catch {
+            print("[DevBar:WidgetMacControl] Failed to send \(action.rawValue): \(error.localizedDescription)")
+        }
+        return .result()
+    }
+
+    private static func loadOnlineTargetMacDeviceID() -> String? {
+        guard let defaults = UserDefaults(suiteName: DevBarCoreConstants.AppGroup.groupID),
+              let raw = defaults.data(forKey: DevBarCoreConstants.AppGroup.macThemeWidgetSnapshotKey),
+              let snapshot = try? JSONDecoder().decode(MacThemeWidgetSnapshot.self, from: raw),
+              snapshot.schemaVersion == MacThemeWidgetSnapshot.currentSchemaVersion,
+              snapshot.macStatus?.isOnline == true,
+              let deviceID = snapshot.macStatus?.deviceID,
+              !deviceID.isEmpty else {
+            return nil
+        }
+        return deviceID
     }
 }
 

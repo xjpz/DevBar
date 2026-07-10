@@ -208,7 +208,8 @@ final class IOSAppViewModel: ObservableObject {
     private var hasPairedMacForShortcuts = false
     private var relayStartupTask: Task<Void, Never>?
     private var lastMacThemeStatusRequestAt: Date?
-    private let macThemeStatusRequestCooldown: TimeInterval = 15
+    private let macThemeStatusRequestCooldown: TimeInterval = 60
+    private let macThemeSystemMetricsTTL: TimeInterval = 120
 
     init() {
         let accounts = settingsStore.loadProviderAccounts(
@@ -1291,11 +1292,19 @@ final class IOSAppViewModel: ObservableObject {
             let connectionStatus = deviceRelayManager.connectionStatus(for: mac, now: now)
             let screenLocked = deviceRelayManager.screenLocked(for: mac)
             let displayAwake = deviceRelayManager.displayAwake(for: mac)
+            let cpuPercent = deviceRelayManager.cpuPercent(for: mac)
+            let memoryPercent = deviceRelayManager.memoryPercent(for: mac)
+            let networkDownBytesPerSecond = deviceRelayManager.networkDownBytesPerSecond(for: mac)
+            let networkUpBytesPerSecond = deviceRelayManager.networkUpBytesPerSecond(for: mac)
             requestMacThemeStatusIfNeeded(
                 for: mac,
                 connectionStatus: connectionStatus,
                 screenLocked: screenLocked,
                 displayAwake: displayAwake,
+                hasSystemMetrics: cpuPercent != nil ||
+                    memoryPercent != nil ||
+                    networkDownBytesPerSecond != nil ||
+                    networkUpBytesPerSecond != nil,
                 now: now
             )
             return MacStatusWidgetSnapshot(
@@ -1308,8 +1317,10 @@ final class IOSAppViewModel: ObservableObject {
                 keepAwakeState: .unknown,
                 connectionMode: macThemeConnectionMode(for: connectionStatus),
                 batteryPercent: nil,
-                cpuPercent: nil,
-                memoryPercent: nil,
+                cpuPercent: cpuPercent,
+                memoryPercent: memoryPercent,
+                networkDownBytesPerSecond: networkDownBytesPerSecond,
+                networkUpBytesPerSecond: networkUpBytesPerSecond,
                 lastUpdated: now
             )
         }
@@ -1333,10 +1344,13 @@ final class IOSAppViewModel: ObservableObject {
         connectionStatus: DeviceRelayPeerConnectionStatus,
         screenLocked: Bool?,
         displayAwake: Bool?,
+        hasSystemMetrics: Bool,
         now: Date
     ) {
         guard connectionStatus != .offline else { return }
-        guard screenLocked == nil || displayAwake == nil else { return }
+        let metricsUpdatedAt = deviceRelayManager.systemMetricsUpdatedAt(for: mac)
+        let metricsAreStale = metricsUpdatedAt.map { now.timeIntervalSince($0) > macThemeSystemMetricsTTL } ?? true
+        guard screenLocked == nil || displayAwake == nil || !hasSystemMetrics || metricsAreStale else { return }
         if let lastMacThemeStatusRequestAt,
            now.timeIntervalSince(lastMacThemeStatusRequestAt) < macThemeStatusRequestCooldown {
             return

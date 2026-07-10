@@ -41,6 +41,8 @@ public struct MacStatusWidgetSnapshot: Codable, Sendable, Equatable {
     public let batteryPercent: Int?
     public let cpuPercent: Int?
     public let memoryPercent: Int?
+    public let networkDownBytesPerSecond: Int?
+    public let networkUpBytesPerSecond: Int?
     public let lastUpdated: Date
 
     public init(
@@ -55,6 +57,8 @@ public struct MacStatusWidgetSnapshot: Codable, Sendable, Equatable {
         batteryPercent: Int?,
         cpuPercent: Int?,
         memoryPercent: Int?,
+        networkDownBytesPerSecond: Int? = nil,
+        networkUpBytesPerSecond: Int? = nil,
         lastUpdated: Date
     ) {
         self.deviceID = deviceID
@@ -68,6 +72,8 @@ public struct MacStatusWidgetSnapshot: Codable, Sendable, Equatable {
         self.batteryPercent = batteryPercent
         self.cpuPercent = cpuPercent
         self.memoryPercent = memoryPercent
+        self.networkDownBytesPerSecond = networkDownBytesPerSecond
+        self.networkUpBytesPerSecond = networkUpBytesPerSecond
         self.lastUpdated = lastUpdated
     }
 }
@@ -90,7 +96,7 @@ public struct MacThemeWidgetUserSnapshot: Codable, Sendable, Equatable {
 }
 
 public struct MacThemeWidgetSnapshot: Codable, Sendable, Equatable {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public let schemaVersion: Int
     public let user: MacThemeWidgetUserSnapshot
@@ -123,5 +129,27 @@ public enum MacThemeWidgetPolicy {
     public static func percentText(_ percent: Int?) -> String {
         guard let percent else { return "--" }
         return "\(max(0, min(percent, 100)))%"
+    }
+
+    public static func networkSpeedText(_ bytesPerSecond: Int?) -> String {
+        guard let bytesPerSecond else { return "--" }
+        let clamped = max(0, bytesPerSecond)
+        if clamped < 1_024 {
+            return "\(clamped) B/s"
+        }
+        let kilobytes = Double(clamped) / 1_024
+        if kilobytes < 1_024 {
+            return "\(oneDecimal(kilobytes)) KB/s"
+        }
+        let megabytes = kilobytes / 1_024
+        return "\(oneDecimal(megabytes)) MB/s"
+    }
+
+    private static func oneDecimal(_ value: Double) -> String {
+        let rounded = (value * 10).rounded() / 10
+        if rounded.rounded() == rounded {
+            return "\(Int(rounded))"
+        }
+        return String(format: "%.1f", rounded)
     }
 }

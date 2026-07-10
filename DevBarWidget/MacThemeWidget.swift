@@ -1,6 +1,7 @@
 import WidgetKit
 import SwiftUI
 import DevBarCore
+import AppIntents
 
 struct MacThemeWidgetProvider: AppIntentTimelineProvider {
     func placeholder(in context: Context) -> MacThemeWidgetEntry {
@@ -133,9 +134,12 @@ private struct MacThemeSmallWidgetView: View {
         VStack(alignment: .leading, spacing: 8) {
             macStatusHeader
             Spacer(minLength: 0)
-            Link(destination: URL(string: "devbar://mac-control?action=lock")!) {
+            Button(intent: RunMacThemeControlIntent(action: .lockScreen)) {
                 compactAction(icon: "lock.fill", title: "锁定 Mac")
             }
+            .buttonStyle(.plain)
+            .disabled(!isMacOnline)
+            .opacity(isMacOnline ? 1 : 0.48)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
@@ -179,6 +183,10 @@ private struct MacThemeSmallWidgetView: View {
         }
     }
 
+    private var isMacOnline: Bool {
+        entry.macTheme.macStatus?.isOnline == true
+    }
+
     private var primaryTextColor: Color {
         visualStyle == .transparent ? .primary : .white
     }
@@ -212,10 +220,10 @@ private struct MacThemeMediumWidgetView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(spacing: 7) {
-                action(icon: "lock.fill", title: "锁定", action: "lock")
+                action(icon: "lock.fill", title: "锁定", action: .lockScreen)
                 HStack(spacing: 7) {
-                    action(icon: "sun.max.fill", title: "点亮", action: "wakeDisplay")
-                    action(icon: "display.trianglebadge.exclamationmark", title: "熄屏", action: "sleepDisplay")
+                    action(icon: "sun.max.fill", title: "点亮", action: .wakeDisplay)
+                    action(icon: "display.trianglebadge.exclamationmark", title: "熄屏", action: .displaySleep)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -223,8 +231,8 @@ private struct MacThemeMediumWidgetView: View {
         .foregroundStyle(primaryTextColor)
     }
 
-    private func action(icon: String, title: String, action: String) -> some View {
-        Link(destination: URL(string: "devbar://mac-control?action=\(action)")!) {
+    private func action(icon: String, title: String, action: MacThemeControlAction) -> some View {
+        Button(intent: RunMacThemeControlIntent(action: action)) {
             Label(title, systemImage: icon)
                 .font(.caption.weight(.bold))
                 .lineLimit(1)
@@ -234,6 +242,9 @@ private struct MacThemeMediumWidgetView: View {
                 .frame(maxWidth: .infinity)
                 .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
+        .buttonStyle(.plain)
+        .disabled(!isMacOnline)
+        .opacity(isMacOnline ? 1 : 0.48)
     }
 
     private var connectionSummary: String {
@@ -242,6 +253,10 @@ private struct MacThemeMediumWidgetView: View {
         case .relay: return "Relay 中继"
         case .unknown: return "等待连接"
         }
+    }
+
+    private var isMacOnline: Bool {
+        entry.macTheme.macStatus?.isOnline == true
     }
 
     private var displayStateText: String {

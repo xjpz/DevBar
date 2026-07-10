@@ -947,12 +947,17 @@ final class AppViewModel: ObservableObject {
 
     private func sendRelaySystemStatus(requestId: String?, targetDeviceId: String) async {
         do {
+            let metrics = MacSystemMetricsProvider.shared.snapshot()
             try await deviceRelayManager.sendSystemStatus(
                 targetDeviceId: targetDeviceId,
                 requestId: requestId,
                 screenLocked: MacScreenLockStateProvider.isScreenLocked(),
                 displayAwake: MacDisplayStateProvider.isDisplayAwake(),
-                deviceName: Self.currentDeviceName
+                deviceName: Self.currentDeviceName,
+                cpuPercent: metrics.cpuPercent,
+                memoryPercent: metrics.memoryPercent,
+                networkDownBytesPerSecond: metrics.networkDownBytesPerSecond,
+                networkUpBytesPerSecond: metrics.networkUpBytesPerSecond
             )
         } catch {
             print("[DevBar:DeviceRelay] system.status send failed: \(error)")

@@ -33,6 +33,9 @@ struct QuotaLargeView: View {
                     .font(.headline)
                     .foregroundStyle(primaryTextColor)
                 Spacer()
+                if let availableResetCount, availableResetCount > 0 {
+                    ResetCreditsBadge(count: availableResetCount, size: 26, visualStyle: visualStyle)
+                }
                 if let lvl = level {
                     Text(lvl.capitalized)
                         .font(.caption2)
@@ -40,9 +43,6 @@ struct QuotaLargeView: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(levelBadgeBackground, in: Capsule())
-                }
-                if let availableResetCount, availableResetCount > 0 {
-                    ResetCreditsBadge(count: availableResetCount, size: 26, visualStyle: visualStyle)
                 }
             }
 

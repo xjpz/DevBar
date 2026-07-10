@@ -225,12 +225,15 @@ struct MacThemeLargeWidgetView: View {
     private func providerQuotaCard(_ provider: WidgetProviderSelection, density: QuotaCardDensity) -> some View {
         let data = entry.quotaDataByProvider[provider]
         let limits = visibleQuotaLimits(in: data, maxCount: density.maxVisibleLimits)
-        let headerDetail = quotaHeaderDetail(
-            in: limits,
-            provider: provider,
-            fallbackLevel: data?.level,
-            canShowResetInBody: density.showsDetail
-        )
+        let showsOpenAIResetBadge = provider == .openai && (data?.availableResetCount ?? 0) > 0
+        let headerDetail = showsOpenAIResetBadge
+            ? (data?.level?.capitalized ?? "--")
+            : quotaHeaderDetail(
+                in: limits,
+                provider: provider,
+                fallbackLevel: data?.level,
+                canShowResetInBody: density.showsDetail
+            )
 
         return VStack(alignment: .leading, spacing: density.contentSpacing) {
             HStack(spacing: 4) {
@@ -242,6 +245,14 @@ struct MacThemeLargeWidgetView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.65)
                 Spacer(minLength: 2)
+                if showsOpenAIResetBadge,
+                   let resetCount = data?.availableResetCount {
+                    ResetCreditsBadge(
+                        count: resetCount,
+                        size: min(max(density.titleFontSize + 6, 15), 19),
+                        visualStyle: visualStyle
+                    )
+                }
                 Text(headerDetail)
                     .font(.system(size: density.levelFontSize, weight: .bold))
                     .foregroundStyle(.white.opacity(0.62))
@@ -381,16 +392,24 @@ struct MacThemeLargeWidgetView: View {
     private var macConsoleContent: some View {
         VStack(spacing: 7) {
             controlRow(
-                left: statusItem(icon: connectionIcon, title: "Mac 状态", value: macConnectionStatusText),
-                right: actionItem(icon: "lock.fill", title: "锁定 Mac", action: "lock")
+                left: macSummaryItem,
+                right: actionItem(icon: "lock.fill", title: "锁定 Mac", action: .lockScreen)
             )
             controlRow(
-                left: statusItem(icon: "lock.display", title: "锁屏状态", value: screenStateText),
-                right: actionItem(icon: "sun.max.fill", title: "点亮", action: "wakeDisplay")
+                left: displayToggleActionItem,
+                right: metricItem(
+                    icon: "cpu",
+                    title: "CPU",
+                    value: MacThemeWidgetPolicy.percentText(entry.macTheme.macStatus?.cpuPercent)
+                )
             )
             controlRow(
-                left: statusItem(icon: "display", title: "屏幕状态", value: displayStateText),
-                right: actionItem(icon: "display.trianglebadge.exclamationmark", title: "熄屏", action: "sleepDisplay")
+                left: metricItem(
+                    icon: "memorychip.fill",
+                    title: "内存",
+                    value: MacThemeWidgetPolicy.percentText(entry.macTheme.macStatus?.memoryPercent)
+                ),
+                right: networkMetricItem
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -419,13 +438,97 @@ struct MacThemeLargeWidgetView: View {
         .cardStyle()
     }
 
-    private func actionItem(icon: String, title: String, action: String) -> some View {
-        Link(destination: URL(string: "devbar://mac-control?action=\(action)")!) {
+    private var macSummaryItem: some View {
+        VStack(spacing: 3) {
+            Label("Mac 状态", systemImage: connectionIcon)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white.opacity(0.74))
+
+            Text(macConnectionStatusText)
+                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+
+            if let statusDetailText {
+                Text(statusDetailText)
+                    .font(.system(size: 7.5, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.50))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .cardStyle()
+    }
+
+    private var displayToggleActionItem: some View {
+        let action = displayToggleAction
+        return actionItem(icon: action.icon, title: action.title, action: action.action)
+    }
+
+    private func actionItem(icon: String, title: String, action: MacThemeControlAction) -> some View {
+        Button(intent: RunMacThemeControlIntent(action: action)) {
             Label(title, systemImage: icon)
                 .font(.system(size: 11, weight: .bold))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .cardStyle(emphasized: true)
         }
+        .buttonStyle(.plain)
+        .disabled(!isOnline)
+        .opacity(isOnline ? 1 : 0.48)
+    }
+
+    private func metricItem(icon: String, title: String, value: String) -> some View {
+        VStack(spacing: 4) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white.opacity(0.74))
+
+            Text(value == "--" ? "等待同步" : value)
+                .font(.system(size: value == "--" ? 10 : 16, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+                .foregroundStyle(value == "--" ? .white.opacity(0.56) : .white)
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .cardStyle()
+    }
+
+    private var networkMetricItem: some View {
+        VStack(spacing: 3) {
+            Label("网速", systemImage: "arrow.up.arrow.down")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.white.opacity(0.74))
+
+            if hasNetworkMetrics {
+                VStack(spacing: 2) {
+                    Text("↓ \(MacThemeWidgetPolicy.networkSpeedText(entry.macTheme.macStatus?.networkDownBytesPerSecond))")
+                    Text("↑ \(MacThemeWidgetPolicy.networkSpeedText(entry.macTheme.macStatus?.networkUpBytesPerSecond))")
+                }
+                .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+            } else {
+                Text("等待同步")
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.56))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .cardStyle()
+    }
+
+    private var hasNetworkMetrics: Bool {
+        entry.macTheme.macStatus?.networkDownBytesPerSecond != nil ||
+            entry.macTheme.macStatus?.networkUpBytesPerSecond != nil
     }
 
     private func visibleQuotaLimits(in data: WidgetSharedData?, maxCount: Int = 2) -> [WidgetQuotaLimit] {
@@ -468,14 +571,21 @@ struct MacThemeLargeWidgetView: View {
     }
 
     private var latestQuotaUpdatedAt: Date? {
-        entry.quotaDataByProvider.values
-            .map(\.lastUpdated)
+        visibleSyncedProviders
+            .compactMap { entry.quotaDataByProvider[$0]?.lastUpdated }
             .filter { $0 != .distantPast }
             .max()
     }
 
     private var syncedProviderCount: Int {
-        entry.quotaDataByProvider.values.filter { $0.lastUpdated != .distantPast }.count
+        visibleSyncedProviders.count
+    }
+
+    private var visibleSyncedProviders: [WidgetProviderSelection] {
+        visibleProviders.filter { provider in
+            guard let data = entry.quotaDataByProvider[provider] else { return false }
+            return data.lastUpdated != .distantPast
+        }
     }
 
     private func providerColor(_ provider: WidgetProviderSelection) -> Color {
@@ -657,7 +767,7 @@ struct MacThemeLargeWidgetView: View {
     }
 
     private var macConnectionStatusText: String {
-        isOnline ? "在线 · \(connectionSummary)" : "离线 · \(connectionSummary)"
+        isOnline ? connectionSummary : "离线"
     }
 
     private var screenStateText: String {
@@ -668,11 +778,42 @@ struct MacThemeLargeWidgetView: View {
         }
     }
 
+    private var statusDetailText: String? {
+        var parts: [String] = []
+        switch entry.macTheme.macStatus?.screenState ?? .unknown {
+        case .locked:
+            parts.append("已锁定")
+        case .unlocked:
+            parts.append("未锁定")
+        case .unknown:
+            break
+        }
+
+        switch entry.macTheme.macStatus?.displayState ?? .unknown {
+        case .awake:
+            parts.append("屏幕点亮")
+        case .sleeping:
+            parts.append("屏幕熄灭")
+        case .unknown:
+            break
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     private var displayStateText: String {
         switch entry.macTheme.macStatus?.displayState ?? .unknown {
         case .awake: return "已点亮"
         case .sleeping: return "已关闭"
         case .unknown: return "--"
+        }
+    }
+
+    private var displayToggleAction: (icon: String, title: String, action: MacThemeControlAction) {
+        switch entry.macTheme.macStatus?.displayState ?? .unknown {
+        case .awake:
+            return ("display.trianglebadge.exclamationmark", "熄屏", .displaySleep)
+        case .sleeping, .unknown:
+            return ("sun.max.fill", "点亮", .wakeDisplay)
         }
     }
 

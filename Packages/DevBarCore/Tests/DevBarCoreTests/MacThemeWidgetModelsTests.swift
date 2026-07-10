@@ -19,12 +19,47 @@ import Testing
         batteryPercent: nil,
         cpuPercent: nil,
         memoryPercent: nil,
+        networkDownBytesPerSecond: nil,
+        networkUpBytesPerSecond: nil,
         lastUpdated: Date(timeIntervalSince1970: 1_714_000_000)
     )
 
     #expect(MacThemeWidgetPolicy.percentText(snapshot.batteryPercent) == "--")
     #expect(MacThemeWidgetPolicy.percentText(snapshot.cpuPercent) == "--")
     #expect(MacThemeWidgetPolicy.percentText(snapshot.memoryPercent) == "--")
+    #expect(MacThemeWidgetPolicy.networkSpeedText(snapshot.networkDownBytesPerSecond) == "--")
+    #expect(MacThemeWidgetPolicy.networkSpeedText(snapshot.networkUpBytesPerSecond) == "--")
+}
+
+@Test func macThemeWidgetFormatsNetworkSpeeds() {
+    #expect(MacThemeWidgetPolicy.networkSpeedText(nil) == "--")
+    #expect(MacThemeWidgetPolicy.networkSpeedText(512) == "512 B/s")
+    #expect(MacThemeWidgetPolicy.networkSpeedText(1_536) == "1.5 KB/s")
+    #expect(MacThemeWidgetPolicy.networkSpeedText(2_621_440) == "2.5 MB/s")
+}
+
+@Test func macStatusWidgetSnapshotRoundTripsSystemMetrics() throws {
+    let snapshot = MacStatusWidgetSnapshot(
+        deviceID: "mac-1",
+        deviceName: "Studio",
+        isOnline: true,
+        lastSeenAt: Date(timeIntervalSince1970: 1_714_000_001),
+        screenState: .locked,
+        displayState: .awake,
+        keepAwakeState: .unknown,
+        connectionMode: .local,
+        batteryPercent: nil,
+        cpuPercent: 37,
+        memoryPercent: 68,
+        networkDownBytesPerSecond: 2_621_440,
+        networkUpBytesPerSecond: 184_320,
+        lastUpdated: Date(timeIntervalSince1970: 1_714_000_002)
+    )
+
+    let data = try JSONEncoder().encode(snapshot)
+    let decoded = try JSONDecoder().decode(MacStatusWidgetSnapshot.self, from: data)
+
+    #expect(decoded == snapshot)
 }
 
 @Test func macThemeWidgetUserSnapshotDecodesLegacyPayloadWithoutAvatarFile() throws {
