@@ -112,11 +112,11 @@ struct QuotaSmallView: View {
     }
 
     private var primaryTextColor: Color {
-        visualStyle == .transparent ? .primary : .white
+        .white
     }
 
     private var secondaryTextColor: Color {
-        visualStyle == .transparent ? .secondary : .white.opacity(0.65)
+        .white.opacity(0.65)
     }
 
     private var circelTrackColor: Color {
@@ -216,7 +216,7 @@ private struct QuotaSmallLimitRow: View {
     }
 
     private var secondaryTextColor: Color {
-        visualStyle == .transparent ? .secondary : .white.opacity(0.65)
+        .white.opacity(0.65)
     }
 
     private var trackColor: Color {

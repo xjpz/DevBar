@@ -98,11 +98,11 @@ struct QuotaLargeView: View {
     }
 
     private var primaryTextColor: Color {
-        visualStyle == .transparent ? .primary : .white
+        .white
     }
 
     private var secondaryTextColor: Color {
-        visualStyle == .transparent ? .secondary : .white.opacity(0.58)
+        .white.opacity(0.58)
     }
 
     private var levelBadgeBackground: Color {

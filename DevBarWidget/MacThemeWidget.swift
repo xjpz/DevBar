@@ -188,11 +188,11 @@ private struct MacThemeSmallWidgetView: View {
     }
 
     private var primaryTextColor: Color {
-        visualStyle == .transparent ? .primary : .white
+        .white
     }
 
     private var secondaryTextColor: Color {
-        visualStyle == .transparent ? .secondary : .white.opacity(0.68)
+        .white.opacity(0.68)
     }
 
     private var accentColor: Color {
@@ -268,10 +268,10 @@ private struct MacThemeMediumWidgetView: View {
     }
 
     private var primaryTextColor: Color {
-        visualStyle == .transparent ? .primary : .white
+        .white
     }
 
     private var secondaryTextColor: Color {
-        visualStyle == .transparent ? .secondary : .white.opacity(0.68)
+        .white.opacity(0.68)
     }
 }

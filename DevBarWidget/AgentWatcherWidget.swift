@@ -266,11 +266,11 @@ struct AgentWatcherWidgetView: View {
     }
 
     private var primaryTextColor: Color {
-        visualStyle == .transparent ? .primary : .white
+        .white
     }
 
     private var secondaryTextColor: Color {
-        visualStyle == .transparent ? .secondary : .white.opacity(0.62)
+        .white.opacity(0.62)
     }
 
     private var cardFill: Color {
