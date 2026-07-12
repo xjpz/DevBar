@@ -43,6 +43,7 @@ struct IOSWebKitView: View {
                     openNewTab()
                 } label: {
                     Image(systemName: "plus")
+                        .iosToolToolbarIcon(theme)
                 }
             }
         }
