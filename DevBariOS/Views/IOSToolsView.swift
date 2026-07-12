@@ -39,8 +39,8 @@ struct IOSToolsView: View {
         }
         .navigationTitle("ios_tab_tools")
         .toolbarTitleDisplayMode(.inlineLarge)
-        .toolbarBackground(toolsPageBackground, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbarBackground(toolsNavigationBackground, for: .navigationBar)
+        .toolbarBackground(theme.isGeek ? .visible : .hidden, for: .navigationBar)
         .toolbarColorScheme(theme.isGeek ? .dark : nil, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -74,6 +74,10 @@ struct IOSToolsView: View {
 
     private var toolsPageBackground: Color {
         theme.isGeek ? .black : theme.backgroundSecondary
+    }
+
+    private var toolsNavigationBackground: Color {
+        theme.isGeek ? .black : .clear
     }
 
     private var orderedTools: [IOSToolDefinition] {
@@ -361,6 +365,8 @@ enum IOSToolCatalog {
 }
 
 struct IOSToolDestinationView: View {
+    @Environment(\.themeTokens) private var theme
+
     let toolID: String
     var entryContext: IOSToolEntryContext = .pushed
 
@@ -409,6 +415,13 @@ struct IOSToolDestinationView: View {
         }
         .environment(\.iosToolEntryContext, entryContext)
         .toolbarTitleDisplayMode(entryContext.toolbarTitleDisplayMode)
+        .toolbarBackground(toolNavigationBackground, for: .navigationBar)
+        .toolbarBackground(theme.isGeek ? .visible : .hidden, for: .navigationBar)
+        .toolbarColorScheme(theme.isGeek ? .dark : nil, for: .navigationBar)
+    }
+
+    private var toolNavigationBackground: Color {
+        theme.isGeek ? .black : .clear
     }
 }
 
