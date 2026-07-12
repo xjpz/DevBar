@@ -83,7 +83,7 @@ struct IOSHermesChatView: View {
                             emptyState
                         }
 
-                        ForEach(viewModel.messages) { message in
+                        ForEach(visibleMessages) { message in
                             HermesChatRow(message: message, theme: theme)
                                 .id(message.id)
                         }
@@ -511,6 +511,12 @@ struct IOSHermesChatView: View {
         // which already reserves its height below the scroll content. Only a small breathing gap
         // is needed here — anything more leaves a large empty band above the input box.
         12
+    }
+
+    private var visibleMessages: [IOSHermesChatViewModel.Message] {
+        viewModel.messages.filter { message in
+            !(message.role == .assistant && message.content.isEmpty && !message.isComplete)
+        }
     }
 
     private var headerTitle: String {
