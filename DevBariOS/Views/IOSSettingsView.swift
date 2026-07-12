@@ -40,8 +40,7 @@ struct IOSSettingsView: View {
                 Picker(selection: $themeManager.selectedMode) {
                     Text("ios_settings_theme_system").tag(IOSThemeMode.system)
                     Text("ios_settings_theme_light").tag(IOSThemeMode.light)
-                    Text("ios_settings_theme_dark").tag(IOSThemeMode.dark)
-                    Text("ios_settings_theme_geek").tag(IOSThemeMode.geek)
+                    Text("ios_settings_theme_dark").tag(IOSThemeMode.geek)
                 } label: {
                     Label("ios_settings_theme", systemImage: "paintpalette")
                 }

@@ -7031,6 +7031,7 @@
       }
     },
     "ios_settings_theme_geek" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

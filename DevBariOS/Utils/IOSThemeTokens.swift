@@ -4,7 +4,6 @@ import UIKit
 enum IOSThemeMode: String, CaseIterable, Identifiable {
     case system
     case light
-    case dark
     case geek
 
     var id: String { rawValue }
@@ -237,23 +236,23 @@ struct IOSThemeTokens: Equatable {
 
 extension IOSThemeTokens {
     static let light = IOSThemeTokens(
-        backgroundPrimary: Color(hex: "F6F7F9"),
-        backgroundSecondary: Color(hex: "EEF1F4"),
+        backgroundPrimary: Color(hex: "F8F9F7"),
+        backgroundSecondary: Color(hex: "F4F6F3"),
         surfacePrimary: Color(hex: "FFFFFF"),
-        surfaceSecondary: Color(hex: "F2F7F3"),
+        surfaceSecondary: Color(hex: "EEF5F0"),
         textPrimary: Color(hex: "111111"),
-        textSecondary: Color(hex: "6B7280"),
-        textTertiary: Color(hex: "9CA3AF"),
-        borderSubtle: Color(hex: "DCE3E8"),
-        borderStrong: Color(hex: "C0C8D0"),
-        brandPrimary: Color(hex: "53A567"),
-        brandSecondary: Color(hex: "7BC88C"),
-        success: Color(hex: "34C759"),
+        textSecondary: Color(hex: "65706B"),
+        textTertiary: Color(hex: "929B96"),
+        borderSubtle: Color(hex: "DDE3DF"),
+        borderStrong: Color(hex: "C6CEC9"),
+        brandPrimary: Color(hex: "34A864"),
+        brandSecondary: Color(hex: "71C58F"),
+        success: Color(hex: "2FA85E"),
         warning: Color(hex: "FF9F0A"),
         danger: Color(hex: "FF453A"),
         info: Color(hex: "007AFF"),
         heroGradientStart: Color(hex: "FFFFFF"),
-        heroGradientEnd: Color(hex: "F2F7F3"),
+        heroGradientEnd: Color(hex: "F1F6F2"),
         providerPlateOpacity: 0.14,
         isGeek: false,
         appFont: .system

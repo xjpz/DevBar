@@ -47,11 +47,10 @@ final class IOSThemeManager: ObservableObject {
         switch selectedMode {
         case .system:
             switch systemColorScheme {
-            case .dark: return .dark.applying(font: selectedFont)
+            case .dark: return .geek.applying(font: selectedFont)
             default: return .light.applying(font: selectedFont)
             }
         case .light: return .light.applying(font: selectedFont)
-        case .dark: return .dark.applying(font: selectedFont)
         case .geek: return .geek.applying(font: selectedFont)
         }
     }
@@ -60,7 +59,6 @@ final class IOSThemeManager: ObservableObject {
         switch selectedMode {
         case .system: return nil
         case .light: return .light
-        case .dark: return .dark
         case .geek: return .dark
         }
     }
@@ -77,7 +75,7 @@ final class IOSThemeManager: ObservableObject {
 
     init() {
         let saved = UserDefaults.standard.string(forKey: "app_theme_mode") ?? IOSThemeMode.system.rawValue
-        selectedMode = IOSThemeMode(rawValue: saved) ?? .system
+        selectedMode = saved == "dark" ? .geek : (IOSThemeMode(rawValue: saved) ?? .system)
         let savedFont = UserDefaults.standard.string(forKey: "app_font_choice") ?? IOSAppFont.system.rawValue
         selectedFont = IOSAppFont(rawValue: savedFont) ?? .system
         developerGreeting = UserDefaults.standard.string(forKey: "app_developer_greeting") ?? Self.defaultGreeting
