@@ -37,6 +37,53 @@ import Testing
     #expect(await recorder.lastRequest?.httpMethod == "GET")
 }
 
+@Test func pushOpenKeyCreateReturnsOneTimeSecret() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"id":7,"name":"CI","keyPrefix":"dpk_v1_abcd...","lastUsedAt":null,"createdAt":"2026-07-14T10:00:00","key":"dpk_v1_full-secret"}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+
+    let created = try await service.createOpenKey(name: "CI", deviceToken: "relay-token")
+
+    #expect(created.id == 7)
+    #expect(created.key == "dpk_v1_full-secret")
+    #expect(created.summary.keyPrefix == "dpk_v1_abcd...")
+    #expect(await recorder.lastRequest?.url?.path == "/api/devbar/push/open-keys")
+    #expect(await recorder.lastRequest?.httpMethod == "POST")
+    #expect(await recorder.lastRequest?.value(forHTTPHeaderField: "Authorization") == "Bearer relay-token")
+    let body = try #require(await recorder.lastRequestBody)
+    let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
+    #expect(json["name"] == "CI")
+}
+
+@Test func pushOpenKeyListOnlyDecodesRedactedMetadata() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"keys":[{"id":7,"name":"CI","keyPrefix":"dpk_v1_abcd...","lastUsedAt":null,"createdAt":"2026-07-14T10:00:00"}]}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+
+    let keys = try await service.listOpenKeys(deviceToken: "relay-token")
+
+    #expect(keys.count == 1)
+    #expect(keys.first?.keyPrefix == "dpk_v1_abcd...")
+    #expect(await recorder.lastRequest?.httpMethod == "GET")
+    #expect(await recorder.lastRequestBody == nil)
+}
+
+@Test func pushOpenKeyRevokeUsesBoundKeyPath() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"revoked":true}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+
+    let revoked = try await service.revokeOpenKey(id: 7, deviceToken: "relay-token")
+
+    #expect(revoked)
+    #expect(await recorder.lastRequest?.url?.path == "/api/devbar/push/open-keys/7")
+    #expect(await recorder.lastRequest?.httpMethod == "DELETE")
+    #expect(await recorder.lastRequestBody == nil)
+}
+
 @Test func pushToStartRegistrationUsesExpectedPathAndBody() async throws {
     let recorder = PushRequestRecorder(responseBody: """
     {"success":true,"code":20000,"data":{"registered":true,"activityType":"devbar_live_message"}}

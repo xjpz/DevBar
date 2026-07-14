@@ -64,6 +64,10 @@
 	<string>Recognize speech for text transcription.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Record audio for speech-to-text conversion.</string>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>INSendMessageIntent</string>
+	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock encrypted memos.</string>
 	<key>NSLocalNetworkUsageDescription</key>

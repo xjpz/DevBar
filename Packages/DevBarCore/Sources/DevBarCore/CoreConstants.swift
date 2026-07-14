@@ -83,6 +83,11 @@ public enum DevBarCoreConstants {
         public static let liveActivitiesPath = "/api/devbar/push/live-activities"
         public static let liveMessagePath = "/api/devbar/push/live-message"
         public static let smsAlertPath = "/api/devbar/push/sms-alert"
+        public static let openKeysPath = "/api/devbar/push/open-keys"
+
+        public static func openKeyPath(id: Int64) -> String {
+            "\(openKeysPath)/\(id)"
+        }
     }
 
     public enum Diagnostics {

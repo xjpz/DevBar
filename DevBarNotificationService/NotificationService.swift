@@ -3,7 +3,7 @@ import UserNotifications
 
 final class NotificationService: UNNotificationServiceExtension {
     private var contentHandler: ((UNNotificationContent) -> Void)?
-    private var bestAttemptContent: UNMutableNotificationContent?
+    private var bestAttemptContent: UNNotificationContent?
     private var downloadTask: URLSessionDataTask?
 
     override func didReceive(
@@ -35,9 +35,7 @@ final class NotificationService: UNNotificationServiceExtension {
                 return
             }
 
-            self.addCommunicationAvatar(data, to: content)
-            self.addAttachment(data, to: content)
-            self.finish()
+            self.applyCommunicationAvatar(data, to: content)
         }
         downloadTask?.resume()
     }
@@ -47,40 +45,38 @@ final class NotificationService: UNNotificationServiceExtension {
         finish()
     }
 
-    private func addCommunicationAvatar(_ data: Data, to content: UNMutableNotificationContent) {
+    private func applyCommunicationAvatar(_ data: Data, to content: UNMutableNotificationContent) {
+        let senderIdentifier = (content.userInfo["notificationType"] as? String)
+            .flatMap { $0.isEmpty ? nil : $0 }
+            ?? "devbar-notification"
+        let senderDisplayName = content.title.isEmpty ? "DevBar" : content.title
         let sender = INPerson(
-            personHandle: INPersonHandle(value: "agent-watcher", type: .unknown),
+            personHandle: INPersonHandle(value: senderIdentifier, type: .unknown),
             nameComponents: nil,
-            displayName: "Agent Watcher",
+            displayName: senderDisplayName,
             image: INImage(imageData: data),
             contactIdentifier: nil,
-            customIdentifier: "agent-watcher"
+            customIdentifier: senderIdentifier
         )
         let intent = INSendMessageIntent(
             recipients: nil,
             outgoingMessageType: .outgoingMessageText,
             content: content.body,
             speakableGroupName: nil,
-            conversationIdentifier: "agent-watcher",
+            conversationIdentifier: senderIdentifier,
             serviceName: "DevBar",
             sender: sender,
             attachments: nil
         )
         let interaction = INInteraction(intent: intent, response: nil)
         interaction.direction = .incoming
-        interaction.donate(completion: nil)
-        if let updated = try? content.updating(from: intent) {
-            bestAttemptContent = updated.mutableCopy() as? UNMutableNotificationContent
+        interaction.donate { [weak self] error in
+            guard let self else { return }
+            if error == nil, let updatedContent = try? content.updating(from: intent) {
+                self.bestAttemptContent = updatedContent
+            }
+            self.finish()
         }
-    }
-
-    private func addAttachment(_ data: Data, to content: UNMutableNotificationContent) {
-        let fileURL = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("agent-watcher-\(UUID().uuidString).png")
-        guard (try? data.write(to: fileURL, options: .atomic)) != nil,
-              let attachment = try? UNNotificationAttachment(identifier: "agent-watcher-icon", url: fileURL)
-        else { return }
-        bestAttemptContent?.attachments = [attachment]
     }
 
     private func finish() {

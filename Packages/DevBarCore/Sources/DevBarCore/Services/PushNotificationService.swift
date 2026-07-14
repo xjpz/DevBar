@@ -102,6 +102,42 @@ public final class PushNotificationService: Sendable {
         )
     }
 
+    public func createOpenKey(
+        name: String,
+        deviceToken: String
+    ) async throws -> PushOpenKeyCreated {
+        try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.openKeysPath,
+            method: "POST",
+            body: PushOpenKeyCreateRequest(name: name),
+            bearerToken: deviceToken
+        )
+    }
+
+    public func listOpenKeys(deviceToken: String) async throws -> [PushOpenKeySummary] {
+        let response: PushOpenKeyListResponse = try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.openKeysPath,
+            method: "GET",
+            body: Optional<EmptyBody>.none,
+            bearerToken: deviceToken
+        )
+        return response.keys
+    }
+
+    @discardableResult
+    public func revokeOpenKey(
+        id: Int64,
+        deviceToken: String
+    ) async throws -> Bool {
+        let response: PushOpenKeyRevokeResponse = try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.openKeyPath(id: id),
+            method: "DELETE",
+            body: Optional<EmptyBody>.none,
+            bearerToken: deviceToken
+        )
+        return response.revoked
+    }
+
     private func sendJSON<RequestBody: Encodable, ResponseBody: Decodable>(
         path: String,
         method: String,

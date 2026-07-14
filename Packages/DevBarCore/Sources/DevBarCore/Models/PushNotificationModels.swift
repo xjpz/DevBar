@@ -53,6 +53,87 @@ public struct PushNotificationPreferences: Codable, Sendable, Equatable {
     }
 }
 
+public struct PushOpenKeyCreateRequest: Codable, Sendable, Equatable {
+    public let name: String
+
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+public struct PushOpenKeySummary: Codable, Sendable, Equatable, Identifiable {
+    public let id: Int64
+    public let name: String
+    public let keyPrefix: String
+    public let lastUsedAt: String?
+    public let createdAt: String
+
+    public init(
+        id: Int64,
+        name: String,
+        keyPrefix: String,
+        lastUsedAt: String?,
+        createdAt: String
+    ) {
+        self.id = id
+        self.name = name
+        self.keyPrefix = keyPrefix
+        self.lastUsedAt = lastUsedAt
+        self.createdAt = createdAt
+    }
+}
+
+public struct PushOpenKeyCreated: Codable, Sendable, Equatable, Identifiable {
+    public let id: Int64
+    public let name: String
+    public let keyPrefix: String
+    public let lastUsedAt: String?
+    public let createdAt: String
+    public let key: String
+
+    public init(
+        id: Int64,
+        name: String,
+        keyPrefix: String,
+        lastUsedAt: String?,
+        createdAt: String,
+        key: String
+    ) {
+        self.id = id
+        self.name = name
+        self.keyPrefix = keyPrefix
+        self.lastUsedAt = lastUsedAt
+        self.createdAt = createdAt
+        self.key = key
+    }
+
+    public var summary: PushOpenKeySummary {
+        PushOpenKeySummary(
+            id: id,
+            name: name,
+            keyPrefix: keyPrefix,
+            lastUsedAt: lastUsedAt,
+            createdAt: createdAt
+        )
+    }
+}
+
+public struct PushOpenKeyListResponse: Codable, Sendable, Equatable {
+    public let keys: [PushOpenKeySummary]
+
+    public init(keys: [PushOpenKeySummary]) {
+        self.keys = keys
+    }
+}
+
+public struct PushOpenKeyRevokeResponse: Codable, Sendable, Equatable {
+    public let revoked: Bool
+
+    public init(revoked: Bool) {
+        self.revoked = revoked
+    }
+}
+
 public enum LiveMessageActivityType: String, Codable, Sendable, Equatable {
     case devBarLiveMessage = "devbar_live_message"
 }

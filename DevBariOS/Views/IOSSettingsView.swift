@@ -1,4 +1,5 @@
 import DevBarCore
+import Combine
 import PhotosUI
 import SwiftData
 import SwiftUI
@@ -868,6 +869,10 @@ private struct IOSPushSettingsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @EnvironmentObject private var languageManager: IOSLanguageManager
     @Environment(\.themeTokens) private var theme
+    @StateObject private var openKeyViewModel = IOSPushOpenKeyViewModel()
+    @State private var pushKeySheet: IOSPushKeySheetDestination?
+    @State private var pendingRevokeKey: PushOpenKeySummary?
+    @State private var hasAPNsToken = false
 
     var body: some View {
         Form {
@@ -899,6 +904,45 @@ private struct IOSPushSettingsView: View {
             } footer: {
                 Text("ios_settings_push_footer")
             }
+
+            Section {
+                Button {
+                    pushKeySheet = .create
+                } label: {
+                    Label("ios_settings_push_key_create", systemImage: "key.badge.plus")
+                }
+                .disabled(!canCreatePushKey || openKeyViewModel.isCreating)
+
+                if openKeyViewModel.isLoading && openKeyViewModel.keys.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if openKeyViewModel.keys.isEmpty {
+                    Text("ios_settings_push_key_empty")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(openKeyViewModel.keys) { key in
+                        IOSPushOpenKeyRow(
+                            key: key,
+                            isRevoking: openKeyViewModel.revokingIDs.contains(key.id)
+                        ) {
+                            pendingRevokeKey = key
+                        }
+                    }
+                }
+
+                if !canCreatePushKey {
+                    Label("ios_settings_push_key_device_not_ready", systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("ios_settings_push_key_section")
+            } footer: {
+                Text("ios_settings_push_key_footer")
+            }
         }
         .scrollContentBackground(.hidden)
         .iosGeekScreenBackground(theme)
@@ -906,6 +950,67 @@ private struct IOSPushSettingsView: View {
         .navigationTitle("ios_settings_push_notifications_section")
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("ios.settings.push.screen")
+        .task(id: relayDeviceToken) {
+            hasAPNsToken = IOSPushNotificationCoordinator.shared.debugSnapshot().apnsToken?.isEmpty == false
+            await openKeyViewModel.load(deviceToken: relayDeviceToken)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .iosAPNsTokenChanged)) { _ in
+            hasAPNsToken = IOSPushNotificationCoordinator.shared.debugSnapshot().apnsToken?.isEmpty == false
+        }
+        .sheet(item: $pushKeySheet, onDismiss: openKeyViewModel.clearCreatedKey) { destination in
+            switch destination {
+            case .create:
+                IOSPushOpenKeyCreateSheet(
+                    viewModel: openKeyViewModel,
+                    deviceToken: relayDeviceToken,
+                    destination: $pushKeySheet
+                )
+            case .created(let key):
+                IOSPushOpenKeyCreatedSheet(createdKey: key)
+            }
+        }
+        .confirmationDialog(
+            localized("ios_settings_push_key_revoke_title"),
+            isPresented: Binding(
+                get: { pendingRevokeKey != nil },
+                set: { if !$0 { pendingRevokeKey = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingRevokeKey
+        ) { key in
+            Button(localized("ios_settings_push_key_revoke"), role: .destructive) {
+                pendingRevokeKey = nil
+                Task {
+                    await openKeyViewModel.revoke(key, deviceToken: relayDeviceToken)
+                }
+            }
+            Button(localized("cancel"), role: .cancel) {
+                pendingRevokeKey = nil
+            }
+        } message: { key in
+            Text("\(key.name) · \(key.keyPrefix)")
+        }
+        .alert(
+            localized("ios_settings_push_key_error_title"),
+            isPresented: Binding(
+                get: { pushKeySheet == nil && openKeyViewModel.errorMessage != nil },
+                set: { if !$0 { openKeyViewModel.errorMessage = nil } }
+            )
+        ) {
+            Button(localized("ios_settings_push_key_acknowledge"), role: .cancel) {
+                openKeyViewModel.errorMessage = nil
+            }
+        } message: {
+            Text(openKeyViewModel.errorMessage ?? "")
+        }
+    }
+
+    private var relayDeviceToken: String? {
+        appViewModel.deviceRelayManager.deviceToken
+    }
+
+    private var canCreatePushKey: Bool {
+        relayDeviceToken?.isEmpty == false && hasAPNsToken
     }
 
     private var pushIconURLBinding: Binding<String> {
@@ -919,6 +1024,176 @@ private struct IOSPushSettingsView: View {
 
     private func localized(_ key: String.LocalizationValue) -> String {
         String(localized: key, locale: languageManager.currentLocale)
+    }
+}
+
+private enum IOSPushKeySheetDestination: Identifiable {
+    case create
+    case created(PushOpenKeyCreated)
+
+    var id: String {
+        switch self {
+        case .create: "create"
+        case .created(let key): "created-\(key.id)"
+        }
+    }
+}
+
+private struct IOSPushOpenKeyRow: View {
+    let key: PushOpenKeySummary
+    let isRevoking: Bool
+    let revoke: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "key.fill")
+                .foregroundStyle(.tint)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(key.name)
+                    .font(.body.weight(.medium))
+                Text(key.keyPrefix)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
+                Text(timestampSummary)
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+
+            Spacer(minLength: 8)
+
+            if isRevoking {
+                ProgressView()
+            } else {
+                Button(role: .destructive, action: revoke) {
+                    Image(systemName: "trash")
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("ios_settings_push_key_revoke")
+            }
+        }
+        .padding(.vertical, 3)
+    }
+
+    private var timestampSummary: String {
+        let created = Self.displayTimestamp(key.createdAt)
+        guard let lastUsedAt = key.lastUsedAt else {
+            return String(format: String(localized: "ios_settings_push_key_created_format"), created)
+        }
+        return String(
+            format: String(localized: "ios_settings_push_key_used_format"),
+            Self.displayTimestamp(lastUsedAt)
+        )
+    }
+
+    private static func displayTimestamp(_ value: String) -> String {
+        String(value.replacingOccurrences(of: "T", with: " ").prefix(16))
+    }
+}
+
+private struct IOSPushOpenKeyCreateSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var viewModel: IOSPushOpenKeyViewModel
+    let deviceToken: String?
+    @Binding var destination: IOSPushKeySheetDestination?
+    @State private var name = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("ios_settings_push_key_name_placeholder", text: $name)
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled()
+                } footer: {
+                    Text("ios_settings_push_key_name_footer")
+                }
+            }
+            .navigationTitle("ios_settings_push_key_create")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task {
+                            await viewModel.create(name: name, deviceToken: deviceToken)
+                            if let createdKey = viewModel.createdKey {
+                                destination = .created(createdKey)
+                            }
+                        }
+                    } label: {
+                        if viewModel.isCreating {
+                            ProgressView()
+                        } else {
+                            Text("ios_settings_push_key_create_action")
+                        }
+                    }
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isCreating)
+                }
+            }
+            .interactiveDismissDisabled(viewModel.isCreating)
+            .alert(
+                "ios_settings_push_key_error_title",
+                isPresented: Binding(
+                    get: { viewModel.errorMessage != nil },
+                    set: { if !$0 { viewModel.errorMessage = nil } }
+                )
+            ) {
+                Button("ios_settings_push_key_acknowledge", role: .cancel) {
+                    viewModel.errorMessage = nil
+                }
+            } message: {
+                Text(viewModel.errorMessage ?? "")
+            }
+        }
+    }
+}
+
+private struct IOSPushOpenKeyCreatedSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let createdKey: PushOpenKeyCreated
+    @State private var didCopy = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(createdKey.key)
+                        .font(.footnote.monospaced())
+                        .textSelection(.enabled)
+                } header: {
+                    Text(createdKey.name)
+                } footer: {
+                    Label("ios_settings_push_key_once_warning", systemImage: "exclamationmark.shield")
+                }
+
+                Section {
+                    Button {
+                        UIPasteboard.general.string = createdKey.key
+                        didCopy = true
+                    } label: {
+                        Label(
+                            didCopy ? "ios_settings_push_key_copied" : "ios_settings_push_key_copy",
+                            systemImage: didCopy ? "checkmark" : "doc.on.doc"
+                        )
+                    }
+
+                    ShareLink(item: createdKey.key) {
+                        Label("ios_settings_push_key_share", systemImage: "square.and.arrow.up")
+                    }
+                }
+            }
+            .navigationTitle("ios_settings_push_key_created")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("ios_settings_push_key_done") { dismiss() }
+                }
+            }
+        }
     }
 }
 
