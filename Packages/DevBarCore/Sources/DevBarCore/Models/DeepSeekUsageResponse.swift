@@ -34,13 +34,13 @@ public struct DeepSeekBizWrapper: Codable, Sendable, Equatable {
 
 public struct DeepSeekUsageData: Codable, Sendable, Equatable {
     public let currentToken: Int?
-    public let monthlyUsage: String?
+    public let monthlyUsage: Int?
     public let totalUsage: Int?
     public let normalWallets: [DeepSeekWallet]?
     public let bonusWallets: [DeepSeekWallet]?
     public let totalAvailableTokenEstimation: String?
     public let monthlyCosts: [DeepSeekMonthlyCost]?
-    public let monthlyTokenUsage: String?
+    public let monthlyTokenUsage: Int?
 
     enum CodingKeys: String, CodingKey {
         case currentToken = "current_token"
@@ -55,13 +55,13 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
 
     public init(
         currentToken: Int?,
-        monthlyUsage: String?,
+        monthlyUsage: Int?,
         totalUsage: Int?,
         normalWallets: [DeepSeekWallet]?,
         bonusWallets: [DeepSeekWallet]?,
         totalAvailableTokenEstimation: String?,
         monthlyCosts: [DeepSeekMonthlyCost]?,
-        monthlyTokenUsage: String?
+        monthlyTokenUsage: Int?
     ) {
         self.currentToken = currentToken
         self.monthlyUsage = monthlyUsage
@@ -71,6 +71,21 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
         self.totalAvailableTokenEstimation = totalAvailableTokenEstimation
         self.monthlyCosts = monthlyCosts
         self.monthlyTokenUsage = monthlyTokenUsage
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        currentToken = try container.decodeIfPresent(Int.self, forKey: .currentToken)
+        monthlyUsage = try container.decodeIntegerOrStringIfPresent(forKey: .monthlyUsage)
+        totalUsage = try container.decodeIfPresent(Int.self, forKey: .totalUsage)
+        normalWallets = try container.decodeIfPresent([DeepSeekWallet].self, forKey: .normalWallets)
+        bonusWallets = try container.decodeIfPresent([DeepSeekWallet].self, forKey: .bonusWallets)
+        totalAvailableTokenEstimation = try container.decodeIfPresent(
+            String.self,
+            forKey: .totalAvailableTokenEstimation
+        )
+        monthlyCosts = try container.decodeIfPresent([DeepSeekMonthlyCost].self, forKey: .monthlyCosts)
+        monthlyTokenUsage = try container.decodeIntegerOrStringIfPresent(forKey: .monthlyTokenUsage)
     }
 
     // MARK: - Computed helpers
@@ -94,7 +109,7 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
 
     /// Monthly token usage.
     public var monthlyTokenUsageValue: Int {
-        Int(monthlyTokenUsage ?? "0") ?? 0
+        monthlyTokenUsage ?? 0
     }
 
     /// Cost usage percentage: monthlyCost / (totalBalance + monthlyCost) * 100
@@ -142,6 +157,29 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
         }
 
         return rows
+    }
+}
+
+private extension KeyedDecodingContainer {
+    func decodeIntegerOrStringIfPresent(forKey key: Key) throws -> Int? {
+        guard contains(key), try !decodeNil(forKey: key) else {
+            return nil
+        }
+        if let value = try? decode(Int.self, forKey: key) {
+            return value
+        }
+        if let string = try? decode(String.self, forKey: key),
+           let value = Int(string) {
+            return value
+        }
+
+        throw DecodingError.typeMismatch(
+            Int.self,
+            DecodingError.Context(
+                codingPath: codingPath + [key],
+                debugDescription: "Expected an integer or an integer string"
+            )
+        )
     }
 }
 

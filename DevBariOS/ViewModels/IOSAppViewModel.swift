@@ -114,9 +114,11 @@ final class IOSAppViewModel: ObservableObject {
     }
     @Published var glmCredentials: AuthCredentials?
     @Published private(set) var lastRefreshTrigger: RefreshTrigger?
+    @Published private(set) var isRefreshingQuota = false
     @Published var refreshInterval: TimeInterval {
         didSet {
             UserDefaults.standard.set(refreshInterval, forKey: DevBarCoreConstants.Defaults.refreshIntervalKey)
+            restartQuotaAutoRefreshTimerIfNeeded()
         }
     }
     @Published var liveActivitySettings: LiveActivitySettings {
@@ -202,8 +204,10 @@ final class IOSAppViewModel: ObservableObject {
     private var hermesNavigationReservationTask: Task<Void, Never>?
     private var hasPendingHermesNavigationReservation = false
     private var hermesChatActivityDepth = 0
-    private var lastRefreshAttemptAt: Date?
-    private let automaticRefreshCooldown: TimeInterval = 20
+    private var quotaRefreshTimer: Timer?
+    private var isQuotaAutoRefreshActive = false
+    private var latestQuotaRefreshAttemptByProvider: [QuotaProvider: Date] = [:]
+    private var providerQuotaOperationThrottle = ProviderQuotaOperationThrottle()
     private var usesDefaultHomeScreenShortcutSelection: Bool
     private var hasPairedMacForShortcuts = false
     private var relayStartupTask: Task<Void, Never>?
@@ -440,6 +444,15 @@ final class IOSAppViewModel: ObservableObject {
         case .deepseek:
             return deepSeekQuotaViewModel.lastUpdated
         }
+    }
+
+    private func latestQuotaRefreshDate(for provider: QuotaProvider) -> Date? {
+        let localDate = localQuotaLastUpdated(for: provider)
+        let syncedDate = syncedQuotaSnapshots.values
+            .filter { $0.provider == provider }
+            .map(\.fetchedAt)
+            .max()
+        return [localDate, syncedDate].compactMap { $0 }.max()
     }
 
     func hasAuthenticatedSession(for provider: QuotaProvider) -> Bool {
@@ -734,6 +747,7 @@ final class IOSAppViewModel: ObservableObject {
     }
 
     func refreshOnForeground() async {
+        startAutoRefreshIfNeeded()
         guard hasStartedDeferredLaunchWork else { return }
         debugLog("foreground refresh begin route=\(selectedTab.debugLabel) depth=\(hermesChatActivityDepth)")
         guard !shouldDeferAutomaticLaunchRefresh else {
@@ -748,21 +762,59 @@ final class IOSAppViewModel: ObservableObject {
         refreshDevBarLiveMessageReadiness()
         await refreshHomeScreenShortcuts()
 
-        guard let lastRefresh = latestRefreshDate else {
-            await refreshAll(trigger: .foreground, silent: true)
-            debugLog("foreground refresh end missingLastRefresh")
-            return
-        }
         guard refreshInterval > 0 else {
             debugLog("foreground refresh end disabled")
             return
         }
-        if Date().timeIntervalSince(lastRefresh) >= refreshInterval {
-            await refreshAll(trigger: .foreground, silent: true)
-        } else {
-            await syncLiveActivity()
-        }
+        await refreshStaleProviders(trigger: .foreground, silent: true)
         debugLog("foreground refresh end")
+    }
+
+    func startAutoRefreshIfNeeded() {
+        isQuotaAutoRefreshActive = true
+        guard refreshInterval > 0, quotaRefreshTimer == nil else { return }
+        scheduleNextQuotaAutoRefresh()
+    }
+
+    private func scheduleNextQuotaAutoRefresh() {
+        quotaRefreshTimer?.invalidate()
+        quotaRefreshTimer = nil
+        guard isQuotaAutoRefreshActive, refreshInterval > 0 else { return }
+
+        let refreshableProviders = enabledProviders.filter { hasAuthenticatedSession(for: $0) }
+        let latestRefreshByProvider = Dictionary(
+            uniqueKeysWithValues: refreshableProviders.compactMap { provider in
+                latestQuotaRefreshDate(for: provider).map { (provider, $0) }
+            }
+        )
+        guard let delay = ProviderQuotaRefreshPolicy.nextRefreshDelay(
+            refreshableProviders,
+            latestRefreshByProvider: latestRefreshByProvider,
+            latestAttemptByProvider: latestQuotaRefreshAttemptByProvider,
+            interval: refreshInterval
+        ) else { return }
+
+        quotaRefreshTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.quotaRefreshTimer = nil
+                await self.refreshStaleProviders(trigger: .foreground, silent: true)
+                self.scheduleNextQuotaAutoRefresh()
+            }
+        }
+        debugLog("quota auto refresh scheduled interval=\(refreshInterval) delay=\(delay)")
+    }
+
+    func stopAutoRefresh() {
+        isQuotaAutoRefreshActive = false
+        quotaRefreshTimer?.invalidate()
+        quotaRefreshTimer = nil
+        debugLog("quota auto refresh stopped")
+    }
+
+    private func restartQuotaAutoRefreshTimerIfNeeded() {
+        guard isQuotaAutoRefreshActive else { return }
+        scheduleNextQuotaAutoRefresh()
     }
 
     private func startRelayIfNeeded(resume: Bool = false) async {
@@ -817,20 +869,63 @@ final class IOSAppViewModel: ObservableObject {
     }
 
     func refreshAll(trigger: RefreshTrigger = .manual, silent: Bool = false) async {
-        guard shouldRefresh(for: trigger) else {
+        let refreshableProviders = enabledProviders.filter { hasAuthenticatedSession(for: $0) }
+        await refreshProviders(Set(refreshableProviders), trigger: trigger, silent: silent)
+    }
+
+    private func refreshStaleProviders(trigger: RefreshTrigger, silent: Bool) async {
+        let refreshableProviders = enabledProviders.filter { hasAuthenticatedSession(for: $0) }
+        let latestRefreshByProvider = Dictionary(
+            uniqueKeysWithValues: refreshableProviders.compactMap { provider in
+                latestQuotaRefreshDate(for: provider).map { (provider, $0) }
+            }
+        )
+        let staleProviders = ProviderQuotaRefreshPolicy.providersNeedingRefresh(
+            refreshableProviders,
+            latestRefreshByProvider: latestRefreshByProvider,
+            interval: refreshInterval
+        )
+        await refreshProviders(staleProviders, trigger: trigger, silent: silent)
+    }
+
+    private func refreshProviders(
+        _ providers: Set<QuotaProvider>,
+        trigger: RefreshTrigger,
+        silent: Bool
+    ) async {
+        guard !providers.isEmpty else {
             await syncLiveActivity()
             return
         }
-        lastRefreshAttemptAt = Date()
+        guard !isRefreshingQuota,
+              providerQuotaOperationThrottle.shouldStartRefresh() else {
+            debugLog("quota refresh skipped trigger=\(trigger.summaryText)")
+            await syncLiveActivity()
+            return
+        }
+
+        isRefreshingQuota = true
+        let attemptDate = Date()
+        for provider in providers {
+            latestQuotaRefreshAttemptByProvider[provider] = attemptDate
+        }
+        defer {
+            isRefreshingQuota = false
+            if isQuotaAutoRefreshActive {
+                scheduleNextQuotaAutoRefresh()
+            }
+        }
         lastRefreshTrigger = trigger
         guard !Task.isCancelled else { return }
 
-        let glmRefresh = isProviderEnabled(.glm) ? glmCredentials : nil
-        let openAIRefresh = isProviderEnabled(.openai) && !openAIAccessToken.isEmpty
+        let glmRefresh = providers.contains(.glm) && isProviderEnabled(.glm) ? glmCredentials : nil
+        let openAIRefresh = providers.contains(.openai) && isProviderEnabled(.openai) && !openAIAccessToken.isEmpty
             ? (accessToken: openAIAccessToken, accountId: settingsStore.loadOpenAIAccountId())
             : nil
-        let mimoRefresh = isProviderEnabled(.mimo) && !mimoServiceToken.isEmpty ? mimoServiceToken : nil
-        let deepSeekRefresh = deepSeekRefreshCredentials()
+        let mimoRefresh = providers.contains(.mimo) && isProviderEnabled(.mimo) && !mimoServiceToken.isEmpty
+            ? mimoServiceToken
+            : nil
+        let deepSeekRefresh = providers.contains(.deepseek) ? deepSeekRefreshCredentials() : nil
 
         async let glmTask: Void = refreshGLMQuota(credentials: glmRefresh, silent: silent)
         async let openAITask: Void = refreshOpenAIQuota(refresh: openAIRefresh, silent: silent)
@@ -1754,9 +1849,38 @@ final class IOSAppViewModel: ObservableObject {
 
     private func handleProviderCredentialUpdate(_ message: DeviceRelayMessage) {
         guard let encoded = message.payload["encodedPayload"],
-              let credential = try? DeviceRelayProviderSyncPayloadCodec.decode(ProviderCredentialEnvelope.self, from: encoded),
-              let account = providerAccounts.first(where: { $0.id == credential.accountID && $0.provider == credential.provider }),
-              account.syncPolicy.credentialSyncEnabled else {
+              let credential = try? DeviceRelayProviderSyncPayloadCodec.decode(
+                ProviderCredentialEnvelope.self,
+                from: encoded
+              ) else {
+            return
+        }
+
+        guard let account = providerAccounts.first(where: {
+            $0.id == credential.accountID && $0.provider == credential.provider
+        }) else {
+            sendProviderSyncAckIfPossible(
+                to: message.fromDeviceId,
+                requestId: message.requestId,
+                accountID: credential.accountID,
+                provider: credential.provider,
+                revision: credential.revision,
+                status: "missing_account",
+                message: "Provider account must be synchronized before its credential"
+            )
+            return
+        }
+
+        guard account.syncPolicy.credentialSyncEnabled else {
+            sendProviderSyncAckIfPossible(
+                to: message.fromDeviceId,
+                requestId: message.requestId,
+                accountID: credential.accountID,
+                provider: credential.provider,
+                revision: credential.revision,
+                status: "disabled",
+                message: "Credential synchronization is disabled for this account"
+            )
             return
         }
 
@@ -1814,7 +1938,8 @@ final class IOSAppViewModel: ObservableObject {
         accountID: String,
         provider: QuotaProvider,
         revision: Int,
-        status: String
+        status: String,
+        message: String? = nil
     ) {
         guard let targetDeviceID,
               let localDeviceID = deviceRelayManager.localDeviceID else {
@@ -1825,7 +1950,8 @@ final class IOSAppViewModel: ObservableObject {
                 accountID: accountID,
                 provider: provider,
                 status: status,
-                revision: revision
+                revision: revision,
+                message: message
             )
             if let message = try? DeviceRelayManager.makeProviderSyncAckMessage(
                 localDeviceID: localDeviceID,
@@ -1953,18 +2079,6 @@ final class IOSAppViewModel: ObservableObject {
         devBarLiveMessageStatus = .ready
     }
 
-    private var latestRefreshDate: Date? {
-        [
-            quotaViewModel.lastUpdated,
-            openAIQuotaViewModel.lastUpdated,
-            mimoQuotaViewModel.lastUpdated,
-            deepSeekQuotaViewModel.lastUpdated,
-            syncedQuotaSnapshots.values.map(\.fetchedAt).max(),
-        ]
-            .compactMap { $0 }
-            .max()
-    }
-
     private var localProviderStates: [LocalProviderState] {
         let accountStates = providerAccounts.map { account in
             let credential = KeychainService.shared.loadProviderCredential(for: account)
@@ -2024,16 +2138,6 @@ final class IOSAppViewModel: ObservableObject {
             }
         }
         return result
-    }
-
-    private func shouldRefresh(for trigger: RefreshTrigger) -> Bool {
-        switch trigger {
-        case .manual, .importTransfer:
-            return true
-        case .launch, .foreground:
-            guard let lastRefreshAttemptAt else { return true }
-            return Date().timeIntervalSince(lastRefreshAttemptAt) >= automaticRefreshCooldown
-        }
     }
 
     private func normalizeGLMAuthorization(_ value: String) -> String {

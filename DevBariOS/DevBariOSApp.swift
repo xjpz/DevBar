@@ -31,6 +31,9 @@ struct DevBariOSApp: App {
                 .preferredColorScheme(themeManager.preferredColorScheme)
                 .id("app.root.\(languageManager.selectedLanguage.rawValue)")
                 .task {
+                    if scenePhase == .active {
+                        appViewModel.startAutoRefreshIfNeeded()
+                    }
                     await appViewModel.startDeferredLaunchWork()
                 }
                 .onChange(of: scenePhase) { _, newPhase in
@@ -38,12 +41,14 @@ struct DevBariOSApp: App {
                     case .active:
                         IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: false)
                         IOSAppIconController.shared.synchronizePreferredIcon()
+                        appViewModel.startAutoRefreshIfNeeded()
                         Task {
                             appViewModel.flushDiagnosticsInBackground()
                             await appViewModel.refreshOnForeground()
                         }
                     case .background:
                         IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: true)
+                        appViewModel.stopAutoRefresh()
                         DiagnosticLogger.shared.record(
                             level: .info,
                             category: "app.lifecycle",

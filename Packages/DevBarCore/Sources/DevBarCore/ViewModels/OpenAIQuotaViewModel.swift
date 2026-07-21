@@ -89,16 +89,42 @@ public final class OpenAIQuotaViewModel: ObservableObject {
             isRefreshing = false
             return response
         } catch let error as APIError {
-            errorMessage = error.errorDescription
+            errorMessage = Self.displayMessage(for: error)
             isLoading = false
             isRefreshing = false
             throw error
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = Self.displayMessage(for: error)
             isLoading = false
             isRefreshing = false
             throw error
         }
+    }
+
+    nonisolated static func displayMessage(for error: Error) -> String {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet:
+                return CoreL10n.text("openai_network_offline")
+            case .timedOut:
+                return CoreL10n.text("openai_network_timeout")
+            case .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed:
+                return CoreL10n.text("openai_network_unreachable")
+            case .networkConnectionLost:
+                return CoreL10n.text("openai_network_connection_lost")
+            default:
+                return String(format: CoreL10n.text("network_error"), urlError.localizedDescription)
+            }
+        }
+
+        if let apiError = error as? APIError {
+            if case .decodingError = apiError {
+                return CoreL10n.text("openai_protocol_changed")
+            }
+            return apiError.errorDescription ?? CoreL10n.text("invalid_response")
+        }
+
+        return error.localizedDescription
     }
 
     private func fetchUsageInBackground(accessToken: String, accountId: String?) async throws -> OpenAIUsageResponse {

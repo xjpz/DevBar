@@ -2,8 +2,8 @@ import Testing
 @testable import DevBar
 
 struct MenuBarQuotaDisplayPolicyTests {
-    @Test func openAIErrorDoesNotReplaceCachedQuotaRows() {
-        #expect(MenuBarQuotaDisplayPolicy.shouldShowError(rowCount: 1, errorMessage: "Loading failed") == false)
+    @Test func openAIErrorShowsAlongsideCachedQuotaRows() {
+        #expect(MenuBarQuotaDisplayPolicy.shouldShowError(rowCount: 1, errorMessage: "Loading failed") == true)
     }
 
     @Test func openAIErrorShowsWhenNoCachedQuotaRowsExist() {

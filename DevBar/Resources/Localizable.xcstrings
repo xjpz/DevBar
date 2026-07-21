@@ -10737,6 +10737,102 @@
         }
       }
     },
+    "openai_codex_account_mismatch" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The configured OpenAI account does not match the Codex login. DevBar kept the existing credentials."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前 OpenAI 账号与 Codex 登录账号不一致，DevBar 未替换现有凭证。"
+          }
+        }
+      }
+    },
+    "openai_codex_auth_unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Access Token expired, and ~/.codex/auth.json could not be read. Sign in to Codex again or update the token in Settings."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access Token 已过期，且无法读取 ~/.codex/auth.json。请重新登录 Codex 或在设置中更新 Token。"
+          }
+        }
+      }
+    },
+    "openai_codex_cli_missing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Access Token expired, and the Codex CLI was not found, so it could not be refreshed automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access Token 已过期，但未找到 Codex CLI，无法自动刷新。"
+          }
+        }
+      }
+    },
+    "openai_codex_refresh_failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Access Token expired, and Codex could not refresh it. Sign in to Codex again and retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access Token 已过期，Codex 自动刷新失败。请重新登录 Codex 后重试。"
+          }
+        }
+      }
+    },
+    "openai_codex_refresh_token_missing" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Access Token expired, and the Codex login has no refresh token. Sign in to Codex again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Access Token 已过期，Codex 登录中没有 Refresh Token，请重新登录 Codex。"
+          }
+        }
+      }
+    },
+    "openai_codex_refreshed_token_unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex completed token recovery but did not provide a new Access Token. Sign in to Codex again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Codex 已执行凭证恢复，但未生成新的 Access Token，请重新登录 Codex。"
+          }
+        }
+      }
+    },
     "openai_configure_hint" : {
       "localizations" : {
         "en" : {
@@ -10781,6 +10877,91 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已达到速率限制"
+          }
+        }
+      }
+    },
+    "openai_network_connection_lost" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The network connection was interrupted while updating OpenAI quota."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新 OpenAI 额度时网络连接中断。"
+          }
+        }
+      }
+    },
+    "openai_network_offline" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No network connection. Showing the last successfully updated OpenAI quota."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前无网络连接，正在显示上次成功更新的 OpenAI 额度。"
+          }
+        }
+      }
+    },
+    "openai_network_timeout" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The OpenAI quota request timed out. Check the network or proxy and retry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI 额度请求超时，请检查网络或代理后重试。"
+          }
+        }
+      }
+    },
+    "openai_network_unreachable" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI could not be reached. Check the network, DNS, or proxy settings."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法连接 OpenAI，请检查网络、DNS 或代理设置。"
+          }
+        }
+      }
+    },
+    "openai_protocol_changed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI returned unrecognized quota data. The API response format may have changed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OpenAI 返回了无法识别的额度数据，API 响应协议可能已变更。"
           }
         }
       }
@@ -10851,7 +11032,6 @@
       }
     },
     "openai_token_required" : {
-      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

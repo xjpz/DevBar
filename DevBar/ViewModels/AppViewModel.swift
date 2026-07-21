@@ -52,6 +52,7 @@ final class AppViewModel: ObservableObject {
     @Published var authState: AuthState = .loading
     @Published var credentials: AuthCredentials?
     @Published var mimoCookieRenewalState: MimoCookieRenewalState = .idle
+    @Published private(set) var isRefreshingQuota = false
 
     private let authService = AuthService()
     private let mimoCookieRenewalService = MimoCookieRenewalService()
@@ -81,6 +82,7 @@ final class AppViewModel: ObservableObject {
     private var handledRelayRequestIDs: Set<String> = []
     private var recentSMSAlertDedupKeys: [String: Date] = [:]
     private var mimoCookieRenewalTimer: Timer?
+    private var quotaRefreshTimer: Timer?
     weak var languageManager: LanguageManager?
 
     // MARK: - Account Configs
@@ -119,6 +121,8 @@ final class AppViewModel: ObservableObject {
 
     private let accountSettingsStore = UserDefaultsAccountSettingsStore()
     private var lastProviderSnapshotPushByPeer: [String: Date] = [:]
+    private var providerCredentialSyncTracker = ProviderCredentialSyncTracker()
+    private var providerQuotaOperationThrottle = ProviderQuotaOperationThrottle()
 
     private func saveAccountConfigs() {
         if let data = try? JSONEncoder().encode(accountConfigs) {
@@ -170,6 +174,7 @@ final class AppViewModel: ObservableObject {
 
     func refreshAuthenticationState() {
         syncAuthState()
+        updateQuotaRefreshTimerForAuthState()
         updateStatusText()
     }
 
@@ -233,6 +238,7 @@ final class AppViewModel: ObservableObject {
             accountConfigs[idx].isEnabled = isEnabled
         }
         syncAuthState()
+        updateQuotaRefreshTimerForAuthState()
         updateStatusText()
         if provider == .mimo {
             updateMimoCookieRenewalTimer()
@@ -247,6 +253,7 @@ final class AppViewModel: ObservableObject {
         providerAccounts[index].isEnabled = isEnabled
         providerAccounts[index].updatedAt = Date()
         syncAuthState()
+        updateQuotaRefreshTimerForAuthState()
         updateStatusText()
         if providerAccounts[index].provider == .mimo {
             updateMimoCookieRenewalTimer()
@@ -440,55 +447,15 @@ final class AppViewModel: ObservableObject {
             }
         }
 
-        if hasAuthenticatedSession(for: .glm) {
+        if authState == .loggedIn {
+            startRefreshIfNeeded()
             Task { @MainActor [weak self] in
                 await Task.yield()
-                guard let self else { return }
-                await self.quotaViewModel.loadInitialData(credentials: self.effectiveGLMCredentials)
-                self.updateStatusText(after: .milliseconds(200))
-                self.checkAndNotify()
-                self.startRefreshIfNeeded()
+                await self?.refreshAllProviders(silent: true, loadInitialGLMData: true)
             }
         }
 
-        // Load OpenAI data if enabled
-        if isProviderEnabled(.openai) {
-            let token = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey)
-            if let token, !token.isEmpty {
-                Task { @MainActor [weak self] in
-                    await openAIQuotaViewModel.fetchUsage(silent: true)
-                    self?.checkAndNotify()
-                }
-            }
-        }
-
-        if isProviderEnabled(.mimo) {
-            let token = KeychainService.shared.load(key: DevBarCoreConstants.Keychain.mimoServiceTokenKey)
-            if let token, !token.isEmpty {
-                Task { @MainActor [weak self] in
-                    await self?.refreshMimoQuotaWithAutoRenew(silent: true)
-                    self?.checkAndNotify()
-                }
-            }
-        }
         updateMimoCookieRenewalTimer()
-
-        // Load DeepSeek data if enabled
-        if isProviderEnabled(.deepseek) {
-            if let account = providerAccounts.first(where: { $0.provider == .deepseek }),
-               let credential = KeychainService.shared.loadProviderCredential(for: account),
-               let token = credential.token, !token.isEmpty,
-               let cookie = credential.cookieString, !cookie.isEmpty {
-                Task { @MainActor [weak self] in
-                    await self?.deepSeekQuotaViewModel.fetchUsage(
-                        token: token,
-                        cookieString: cookie,
-                        silent: true
-                    )
-                    self?.checkAndNotify()
-                }
-            }
-        }
 
         // Setup WeChat service if enabled
         Task { @MainActor [weak self] in
@@ -666,11 +633,37 @@ final class AppViewModel: ObservableObject {
             await sendCurrentProviderSnapshotsIfNeeded(to: message.fromDeviceId)
         case .smsAlert:
             await handleRelaySMSAlert(message)
+        case .providerSyncAck:
+            handleProviderSyncAck(message)
         case .relayPaired, .relayHeartbeat, .relayPing:
             await sendCurrentProviderSnapshotsIfNeeded(to: message.fromDeviceId)
         default:
             return
         }
+    }
+
+    private func handleProviderSyncAck(_ message: DeviceRelayMessage) {
+        guard let peerDeviceID = message.fromDeviceId,
+              let requestID = message.requestId,
+              let encoded = message.payload["encodedPayload"],
+              let acknowledgement = try? DeviceRelayProviderSyncPayloadCodec.decode(
+                DeviceRelayProviderSyncAck.self,
+                from: encoded
+              ) else {
+            return
+        }
+
+        let completed = providerCredentialSyncTracker.recordAcknowledgement(
+            requestID: requestID,
+            peerDeviceID: peerDeviceID,
+            acknowledgement: acknowledgement
+        )
+        print(
+            "[DevBar:ProviderSync] ack peer=\(peerDeviceID.suffix(6)) "
+                + "account=\(acknowledgement.accountID.suffix(6)) "
+                + "revision=\(acknowledgement.revision) status=\(acknowledgement.status) "
+                + "completed=\(completed)"
+        )
     }
 
     private func handleRelaySMSAlert(_ message: DeviceRelayMessage) async {
@@ -1005,6 +998,7 @@ final class AppViewModel: ObservableObject {
             }
             print("[DevBar] ⑥② startRefreshIfNeeded")
             self.startRefreshIfNeeded()
+            await self.refreshAllProviders(silent: true, loadInitialGLMData: true)
             self.isHandlingLogin = false
         }
     }
@@ -1012,6 +1006,7 @@ final class AppViewModel: ObservableObject {
     deinit {
         statusTextUpdateTask?.cancel()
         mimoCookieRenewalTimer?.invalidate()
+        quotaRefreshTimer?.invalidate()
         print("[DevBar] AppViewModel DEINIT")
     }
 
@@ -1152,41 +1147,82 @@ final class AppViewModel: ObservableObject {
         try TransferPayloadCodec.makeURL(for: makeTransferPayload(expirationInterval: expirationInterval))
     }
 
-    /// Refresh data when the popover opens, unless refreshed within 30s.
+    /// Refresh data when the popover opens. The shared refresh throttle decides
+    /// whether the last accepted refresh is old enough to run again.
     func refreshOnPopoverOpenIfNeeded() {
         guard authState == .loggedIn else { return }
-        let minimumInterval: TimeInterval = 30
-        if selectedRefreshProvider == .glm,
-           let last = quotaViewModel.lastUpdated,
-           Date().timeIntervalSince(last) < minimumInterval {
-            return
-        }
         Task { await refreshQuota(silent: true) }
     }
 
     func refreshQuota(silent: Bool = false) async {
+        await refreshAllProviders(silent: silent, loadInitialGLMData: false)
+    }
+
+    private func refreshAllProviders(silent: Bool, loadInitialGLMData: Bool) async {
+        guard authState == .loggedIn,
+              !isRefreshingQuota,
+              providerQuotaOperationThrottle.shouldStartRefresh() else {
+            return
+        }
+
+        isRefreshingQuota = true
+        defer { isRefreshingQuota = false }
+
+        let glmTask = Task { @MainActor [weak self] in
+            await self?.refreshGLMQuota(silent: silent, loadInitialData: loadInitialGLMData)
+        }
+        let openAITask = Task { @MainActor [weak self] in
+            await self?.refreshOpenAIQuotaIfNeeded(silent: silent)
+        }
+        let mimoTask = Task { @MainActor [weak self] in
+            await self?.refreshMimoQuotaIfNeeded(silent: silent)
+        }
+        let deepSeekTask = Task { @MainActor [weak self] in
+            await self?.refreshDeepSeekQuotaIfNeeded(silent: silent)
+        }
+
+        await glmTask.value
+        await openAITask.value
+        await mimoTask.value
+        await deepSeekTask.value
+
+        for provider in enabledProviders where hasAuthenticatedSession(for: provider) {
+            await broadcastQuotaSnapshotIfPossible(for: provider)
+        }
+
+        checkAndNotify()
+    }
+
+    private func refreshGLMQuota(silent: Bool, loadInitialData: Bool) async {
         if isProviderEnabled(.glm), let glmCredentials = effectiveGLMCredentials {
-            await quotaViewModel.fetchQuota(credentials: glmCredentials, silent: silent)
-            await broadcastQuotaSnapshotIfPossible(for: .glm)
+            if loadInitialData {
+                await quotaViewModel.loadInitialData(credentials: glmCredentials)
+            } else {
+                await quotaViewModel.fetchQuota(credentials: glmCredentials, silent: silent)
+            }
             updateStatusText(after: .milliseconds(200))
             if quotaViewModel.errorMessage == String(localized: "login_expired") {
                 authState = hasAuthenticatedSession(for: .openai) ? .loggedIn : .expired
                 updateStatusText()
             }
         }
+    }
 
+    private func refreshOpenAIQuotaIfNeeded(silent: Bool) async {
         if isProviderEnabled(.openai), hasAuthenticatedSession(for: .openai) {
-            await openAIQuotaViewModel.fetchUsage(silent: true)
-            await broadcastQuotaSnapshotIfPossible(for: .openai)
+            await refreshOpenAIQuotaWithAutoRenew(silent: silent)
         }
+    }
 
+    private func refreshMimoQuotaIfNeeded(silent: Bool) async {
         if isProviderEnabled(.mimo), hasAuthenticatedSession(for: .mimo) {
             await refreshMimoQuotaWithAutoRenew(silent: silent)
-            await broadcastQuotaSnapshotIfPossible(for: .mimo)
         }
+    }
 
+    private func refreshDeepSeekQuotaIfNeeded(silent: Bool) async {
         if isProviderEnabled(.deepseek), hasAuthenticatedSession(for: .deepseek) {
-            if let account = providerAccounts.first(where: { $0.provider == .deepseek }),
+            if let account = providerAccounts.first(where: { $0.provider == .deepseek && $0.isEnabled }),
                let credential = KeychainService.shared.loadProviderCredential(for: account),
                let token = credential.token, !token.isEmpty,
                let cookie = credential.cookieString, !cookie.isEmpty {
@@ -1195,11 +1231,62 @@ final class AppViewModel: ObservableObject {
                     cookieString: cookie,
                     silent: silent
                 )
-                await broadcastQuotaSnapshotIfPossible(for: .deepseek)
             }
         }
+    }
 
-        checkAndNotify()
+    private func refreshOpenAIQuotaWithAutoRenew(silent: Bool) async {
+        guard let storedAccessToken = KeychainService.shared.load(key: Constants.Keychain.openAIAccessTokenKey),
+              !storedAccessToken.isEmpty else {
+            openAIQuotaViewModel.errorMessage = String(localized: "openai_token_required")
+            return
+        }
+
+        let configuredAccountID = UserDefaults.standard.string(forKey: Constants.OpenAI.accountIdKey)
+        do {
+            _ = try await openAIQuotaViewModel.fetchUsage(
+                accessToken: storedAccessToken,
+                accountId: configuredAccountID,
+                silent: silent
+            )
+            return
+        } catch APIError.openAIUnauthorized {
+            // Continue with Codex-managed token recovery below.
+        } catch {
+            return
+        }
+
+        do {
+            let credential = try await Task.detached(priority: .utility) {
+                try CodexAuthTokenRefreshService.recoverCredential(
+                    storedAccessToken: storedAccessToken,
+                    configuredAccountID: configuredAccountID
+                )
+            }.value
+
+            let accountID = credential.accountID ?? configuredAccountID
+            _ = KeychainService.shared.save(
+                key: Constants.Keychain.openAIAccessTokenKey,
+                value: credential.accessToken
+            )
+            if let accountID, !accountID.isEmpty {
+                UserDefaults.standard.set(accountID, forKey: Constants.OpenAI.accountIdKey)
+            }
+            upsertCredentialForPrimaryAccount(
+                provider: .openai,
+                token: credential.accessToken,
+                cookieString: nil,
+                accountIdentifier: accountID
+            )
+
+            _ = try await openAIQuotaViewModel.fetchUsage(
+                accessToken: credential.accessToken,
+                accountId: accountID,
+                silent: silent
+            )
+        } catch {
+            openAIQuotaViewModel.errorMessage = error.localizedDescription
+        }
     }
 
     private func refreshMimoQuotaWithAutoRenew(silent: Bool) async {
@@ -1316,24 +1403,59 @@ final class AppViewModel: ObservableObject {
             guard let localDeviceID = self.deviceRelayManager.localDeviceID else { return }
 
             for peer in peers {
-                do {
-                    let accountMessage = try DeviceRelayManager.makeProviderAccountUpsertMessage(
-                        localDeviceID: localDeviceID,
-                        targetDeviceId: peer.deviceId,
-                        account: account
-                    )
-                    try await self.deviceRelayManager.send(accountMessage)
-
-                    let message = try DeviceRelayManager.makeProviderCredentialUpdateMessage(
-                        localDeviceID: localDeviceID,
-                        targetDeviceId: peer.deviceId,
-                        credential: credential
-                    )
-                    try await self.deviceRelayManager.send(message)
-                } catch {
-                    print("[DevBar:ProviderSync] credential send failed peer=\(peer.deviceId) account=\(credential.accountID.suffix(6)) \(error)")
-                }
+                await self.sendProviderCredentialIfNeeded(
+                    credential,
+                    account: account,
+                    to: peer,
+                    localDeviceID: localDeviceID
+                )
             }
+        }
+    }
+
+    private func sendProviderCredentialIfNeeded(
+        _ credential: ProviderCredentialEnvelope,
+        account: ProviderAccount,
+        to peer: DeviceRelayDevice,
+        localDeviceID: String
+    ) async {
+        guard providerCredentialSyncTracker.shouldSend(
+            peerDeviceID: peer.deviceId,
+            accountID: credential.accountID,
+            provider: credential.provider,
+            revision: credential.revision
+        ) else {
+            return
+        }
+
+        do {
+            let accountMessage = try DeviceRelayManager.makeProviderAccountUpsertMessage(
+                localDeviceID: localDeviceID,
+                targetDeviceId: peer.deviceId,
+                account: account
+            )
+            try await deviceRelayManager.send(accountMessage)
+
+            let message = try DeviceRelayManager.makeProviderCredentialUpdateMessage(
+                localDeviceID: localDeviceID,
+                targetDeviceId: peer.deviceId,
+                credential: credential
+            )
+            if let requestID = message.requestId {
+                providerCredentialSyncTracker.recordSend(
+                    requestID: requestID,
+                    peerDeviceID: peer.deviceId,
+                    accountID: credential.accountID,
+                    provider: credential.provider,
+                    revision: credential.revision
+                )
+            }
+            try await deviceRelayManager.send(message)
+        } catch {
+            print(
+                "[DevBar:ProviderSync] credential send failed "
+                    + "peer=\(peer.deviceId.suffix(6)) account=\(credential.accountID.suffix(6)) \(error)"
+            )
         }
     }
 
@@ -1361,19 +1483,37 @@ final class AppViewModel: ObservableObject {
 
         let now = Date()
         if let lastPushed = lastProviderSnapshotPushByPeer[peerDeviceID],
-           now.timeIntervalSince(lastPushed) < 20 {
+           now.timeIntervalSince(lastPushed) < ProviderQuotaOperationThrottle.minimumSupportedInterval {
             return
         }
         lastProviderSnapshotPushByPeer[peerDeviceID] = now
 
         for account in providerAccounts
-            .filter({ $0.isEnabled && $0.syncPolicy.quotaSyncEnabled })
+            .filter({
+                $0.isEnabled
+                    && ($0.syncPolicy.quotaSyncEnabled || $0.syncPolicy.credentialSyncEnabled)
+            })
             .sorted(by: { $0.order < $1.order }) {
-            guard let snapshot = makeQuotaSnapshot(for: account)
-                ?? WidgetDataManager.shared.loadQuotaSnapshot(accountID: account.id) else {
-                continue
+            if account.syncPolicy.credentialSyncEnabled,
+               let credential = KeychainService.shared.loadProviderCredential(for: account) {
+                await sendProviderCredentialIfNeeded(
+                    credential,
+                    account: account,
+                    to: peer,
+                    localDeviceID: localDeviceID
+                )
             }
-            await sendProviderQuotaSnapshot(snapshot, account: account, to: peer, localDeviceID: localDeviceID)
+
+            if account.syncPolicy.quotaSyncEnabled,
+               let snapshot = makeQuotaSnapshot(for: account)
+                ?? WidgetDataManager.shared.loadQuotaSnapshot(accountID: account.id) {
+                await sendProviderQuotaSnapshot(
+                    snapshot,
+                    account: account,
+                    to: peer,
+                    localDeviceID: localDeviceID
+                )
+            }
         }
     }
 
@@ -1383,6 +1523,13 @@ final class AppViewModel: ObservableObject {
         to peer: DeviceRelayDevice,
         localDeviceID: String
     ) async {
+        guard providerQuotaOperationThrottle.shouldStartSync(
+            peerDeviceID: peer.deviceId,
+            accountID: snapshot.accountID
+        ) else {
+            return
+        }
+
         do {
             let accountMessage = try DeviceRelayManager.makeProviderAccountUpsertMessage(
                 localDeviceID: localDeviceID,
@@ -1486,19 +1633,28 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    /// Start refresh if not already running (prevents duplicate timers)
+    /// Start one all-provider timer if not already running.
     func startRefreshIfNeeded() {
-        guard refreshInterval > 0 else { return } // Don't start if "Never"
-        guard let glmCredentials = effectiveGLMCredentials else { return }
-        print("[DevBar] ⑦ startRefreshIfNeeded, hasCredentials=\(glmCredentials.token.isEmpty == false)")
-        quotaViewModel.startAutoRefresh(
-            credentials: glmCredentials,
-            interval: refreshInterval,
-            onFetchComplete: { [weak self] in
-                self?.updateStatusText(after: .milliseconds(200))
-                self?.checkAndNotify()
+        guard refreshInterval > 0, authState == .loggedIn else {
+            stopAutoRefresh()
+            return
+        }
+        guard quotaRefreshTimer == nil else { return }
+
+        print("[DevBar] ⑦ startRefreshIfNeeded, interval=\(refreshInterval)")
+        quotaRefreshTimer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.refreshQuota(silent: true)
             }
-        )
+        }
+    }
+
+    private func updateQuotaRefreshTimerForAuthState() {
+        if authState == .loggedIn {
+            startRefreshIfNeeded()
+        } else {
+            stopAutoRefresh()
+        }
     }
 
     private func checkAndNotify() {
@@ -1539,7 +1695,8 @@ final class AppViewModel: ObservableObject {
     }
 
     func stopAutoRefresh() {
-        quotaViewModel.stopAutoRefresh()
+        quotaRefreshTimer?.invalidate()
+        quotaRefreshTimer = nil
     }
 
     var glmAPIKeyForModelCall: String? {
@@ -1686,10 +1843,6 @@ final class AppViewModel: ObservableObject {
             return apiError.errorDescription ?? String(describing: apiError)
         }
         return error.localizedDescription
-    }
-
-    private var selectedRefreshProvider: QuotaProvider {
-        enabledProviders.first(where: { hasAuthenticatedSession(for: $0) }) ?? enabledProviders.first ?? .glm
     }
 
     @Published var isHiddenFromDock: Bool {

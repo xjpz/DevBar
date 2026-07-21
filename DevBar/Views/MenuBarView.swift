@@ -213,6 +213,10 @@ private struct LoggedInContentView: View {
     }
 
     private var isSelectedProviderLoading: Bool {
+        if appViewModel.isRefreshingQuota {
+            return true
+        }
+
         switch selectedProvider {
         case .glm:
             return quotaViewModel.isLoading
@@ -278,6 +282,18 @@ private struct LoggedInContentView: View {
 
     private var openAIQuotaListView: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if MenuBarQuotaDisplayPolicy.shouldShowError(
+                rowCount: openAIQuotaViewModel.quotaRows.count,
+                errorMessage: openAIQuotaViewModel.errorMessage
+            ), let error = openAIQuotaViewModel.errorMessage {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                    Text(error)
+                }
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+
             if let planType = openAIQuotaViewModel.planType {
                 openAIPlanRow(planType)
             }
@@ -597,8 +613,8 @@ private struct LoggedInContentView: View {
 }
 
 enum MenuBarQuotaDisplayPolicy {
-    static func shouldShowError(rowCount: Int, errorMessage: String?) -> Bool {
+    static func shouldShowError(rowCount _: Int, errorMessage: String?) -> Bool {
         guard errorMessage?.isEmpty == false else { return false }
-        return rowCount == 0
+        return true
     }
 }
