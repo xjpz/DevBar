@@ -11,6 +11,40 @@ struct NotificationQuotaItem {
     let key: String
     let name: String
     let percentage: Int
+    let resetAt: Int?
+
+    init(key: String, name: String, percentage: Int, resetAt: Int? = nil) {
+        self.key = key
+        self.name = name
+        self.percentage = percentage
+        self.resetAt = resetAt
+    }
+}
+
+enum QuotaResetNotificationPolicy {
+    static func shouldNotify(
+        provider: QuotaProvider,
+        previous: NotificationQuotaItem?,
+        current: NotificationQuotaItem
+    ) -> Bool {
+        guard let previous,
+              previous.key == current.key,
+              current.percentage < previous.percentage else {
+            return false
+        }
+
+        if provider == .openai {
+            if let previousResetAt = previous.resetAt,
+               let currentResetAt = current.resetAt,
+               currentResetAt > previousResetAt {
+                return true
+            }
+
+            return previous.percentage > 0 && current.percentage == 0
+        }
+
+        return previous.percentage >= 100
+    }
 }
 
 @MainActor
@@ -129,10 +163,12 @@ final class NotificationService: ObservableObject {
         let previousDict = Dictionary(uniqueKeysWithValues: previousItems.map { ($0.key, $0) })
 
         for current in items {
-            if let previous = previousDict[current.key] {
-                if hasReset(current: current, previous: previous) {
-                    resetTypes.append(current.name)
-                }
+            if QuotaResetNotificationPolicy.shouldNotify(
+                provider: provider,
+                previous: previousDict[current.key],
+                current: current
+            ) {
+                resetTypes.append(current.name)
             }
         }
 
@@ -144,14 +180,6 @@ final class NotificationService: ObservableObject {
             )
             recordResetNotificationTime(for: provider)
         }
-    }
-
-    private func hasReset(current: NotificationQuotaItem, previous: NotificationQuotaItem) -> Bool {
-        // Reset detected if:
-        // 1. Previous was exhausted (percentage >= 100)
-        // 2. Current has lower percentage than previous (meaning reset happened)
-        guard previous.percentage >= 100 else { return false }
-        return current.percentage < previous.percentage
     }
 
     private func notificationKey(_ baseKey: String, provider: QuotaProvider) -> String {

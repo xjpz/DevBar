@@ -77,7 +77,6 @@ final class AppViewModel: ObservableObject {
     private var isHandlingLogin = false
     private var settingsWindow: NSWindow?
     private var previousGLMNotificationItems: [NotificationQuotaItem]?
-    private var previousOpenAINotificationItems: [NotificationQuotaItem]?
     private var hasLaunched = false
     private var handledRelayRequestIDs: Set<String> = []
     private var recentSMSAlertDedupKeys: [String: Date] = [:]
@@ -1168,6 +1167,10 @@ final class AppViewModel: ObservableObject {
         isRefreshingQuota = true
         defer { isRefreshingQuota = false }
 
+        let previousOpenAINotificationItems = makeOpenAINotificationItems(
+            from: openAIQuotaViewModel.usageResponse
+        )
+
         let glmTask = Task { @MainActor [weak self] in
             await self?.refreshGLMQuota(silent: silent, loadInitialData: loadInitialGLMData)
         }
@@ -1190,7 +1193,7 @@ final class AppViewModel: ObservableObject {
             await broadcastQuotaSnapshotIfPossible(for: provider)
         }
 
-        checkAndNotify()
+        checkAndNotify(previousOpenAIItems: previousOpenAINotificationItems)
     }
 
     private func refreshGLMQuota(silent: Bool, loadInitialData: Bool) async {
@@ -1657,7 +1660,7 @@ final class AppViewModel: ObservableObject {
         }
     }
 
-    private func checkAndNotify() {
+    private func checkAndNotify(previousOpenAIItems: [NotificationQuotaItem]?) {
         guard DevBarCoreConstants.Features.notificationRemindersEnabled else { return }
         if let limits = quotaViewModel.quotaData?.limits {
             let glmItems = limits.map {
@@ -1676,22 +1679,38 @@ final class AppViewModel: ObservableObject {
             previousGLMNotificationItems = glmItems
         }
 
-        if !openAIQuotaViewModel.quotaRows.isEmpty {
-            let openAIItems = openAIQuotaViewModel.quotaRows.map {
-                NotificationQuotaItem(
-                    key: $0.name,
-                    name: $0.name,
-                    percentage: $0.percentage
-                )
-            }
+        if let openAIItems = makeOpenAINotificationItems(from: openAIQuotaViewModel.usageResponse) {
             notificationService.checkAndNotify(
                 provider: .openai,
                 items: openAIItems,
                 settings: notificationSettings,
-                previousItems: previousOpenAINotificationItems
+                previousItems: previousOpenAIItems
             )
-            previousOpenAINotificationItems = openAIItems
         }
+    }
+
+    private func makeOpenAINotificationItems(
+        from response: OpenAIUsageResponse?
+    ) -> [NotificationQuotaItem]? {
+        guard let rateLimit = response?.rateLimit else { return nil }
+
+        var items: [NotificationQuotaItem] = []
+
+        func append(role: String, window: OpenAIUsageWindow?) {
+            guard let window else { return }
+            items.append(
+                NotificationQuotaItem(
+                    key: "openai.\(role).\(window.limitWindowSeconds ?? -1)",
+                    name: window.displayName,
+                    percentage: window.usedPercent,
+                    resetAt: window.resetAt
+                )
+            )
+        }
+
+        append(role: "primary", window: rateLimit.primaryWindow)
+        append(role: "secondary", window: rateLimit.secondaryWindow)
+        return items.isEmpty ? nil : items
     }
 
     func stopAutoRefresh() {
