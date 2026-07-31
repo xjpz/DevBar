@@ -78,6 +78,19 @@ public final class PushNotificationService: Sendable {
         )
     }
 
+    @discardableResult
+    public func unregisterLiveActivity(
+        activityId: String,
+        deviceToken: String
+    ) async throws -> LiveActivityUnregistrationResponse {
+        try await sendJSON(
+            path: DevBarCoreConstants.PushNotifications.liveActivityPath(activityId: activityId),
+            method: "DELETE",
+            body: Optional<EmptyBody>.none,
+            bearerToken: deviceToken
+        )
+    }
+
     public func sendLiveMessage(
         _ message: LiveMessageRequest,
         deviceToken: String

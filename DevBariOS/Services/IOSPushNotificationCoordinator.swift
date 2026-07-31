@@ -24,7 +24,8 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
     private var latestRelayDeviceToken: String?
 #if canImport(ActivityKit)
     private var isObservingLiveActivityTokens = false
-    private var observedActivityIDs: Set<String> = []
+    private var observedLiveMessageActivityIDs: Set<String> = []
+    private var observedQuotaActivityIDs: Set<String> = []
 #endif
 
     private override init() {
@@ -159,7 +160,8 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
         latestRelayDeviceToken = relayDeviceToken
         guard let relayDeviceToken, !relayDeviceToken.isEmpty else { return }
 
-        let fingerprint = "\(registration.activityPushToken)|\(registration.bundleId)|\(registration.environment.rawValue)|\(relayDeviceToken)|\(registration.startedBy.rawValue)"
+        let registrationFingerprint = (try? JSONEncoder().encode(registration).base64EncodedString()) ?? registration.activityPushToken
+        let fingerprint = "\(registrationFingerprint)|\(relayDeviceToken)"
         let key = Keys.lastLiveActivityRegistrationPrefix + registration.activityId
         guard defaults.string(forKey: key) != fingerprint else { return }
 
@@ -168,6 +170,21 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
             defaults.set(fingerprint, forKey: key)
         } catch {
             print("[DevBar:iOSPush] Live Activity update token sync failed: \(error)")
+        }
+    }
+
+    func unregisterLiveActivity(activityId: String, relayDeviceToken: String?) async {
+        latestRelayDeviceToken = relayDeviceToken
+        guard let relayDeviceToken, !relayDeviceToken.isEmpty else { return }
+
+        do {
+            _ = try await service.unregisterLiveActivity(
+                activityId: activityId,
+                deviceToken: relayDeviceToken
+            )
+            defaults.removeObject(forKey: Keys.lastLiveActivityRegistrationPrefix + activityId)
+        } catch {
+            print("[DevBar:iOSPush] Live Activity unregister failed: \(error)")
         }
     }
 
@@ -203,18 +220,28 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
         Task { @MainActor [weak self] in
             guard let self else { return }
             for activity in Activity<DevBarLiveMessageActivityAttributes>.activities {
-                self.observeLiveActivityUpdateTokens(activity)
+                self.observeLiveMessageActivityUpdateTokens(activity)
             }
             for await activity in Activity<DevBarLiveMessageActivityAttributes>.activityUpdates {
-                self.observeLiveActivityUpdateTokens(activity)
+                self.observeLiveMessageActivityUpdateTokens(activity)
+            }
+        }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            for activity in Activity<DevBarQuotaActivityAttributes>.activities {
+                self.observeQuotaActivityUpdateTokens(activity)
+            }
+            for await activity in Activity<DevBarQuotaActivityAttributes>.activityUpdates {
+                self.observeQuotaActivityUpdateTokens(activity)
             }
         }
         #endif
     }
 
     #if canImport(ActivityKit)
-    private func observeLiveActivityUpdateTokens(_ activity: Activity<DevBarLiveMessageActivityAttributes>) {
-        guard observedActivityIDs.insert(activity.id).inserted else { return }
+    private func observeLiveMessageActivityUpdateTokens(_ activity: Activity<DevBarLiveMessageActivityAttributes>) {
+        guard observedLiveMessageActivityIDs.insert(activity.id).inserted else { return }
         Task { @MainActor [weak self] in
             guard let self else { return }
             if let pushToken = activity.pushToken {
@@ -240,6 +267,26 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
                         environment: Self.pushEnvironment,
                         startedBy: .remote
                     ),
+                    relayDeviceToken: self.latestRelayDeviceToken
+                )
+            }
+        }
+    }
+
+    private func observeQuotaActivityUpdateTokens(_ activity: Activity<DevBarQuotaActivityAttributes>) {
+        guard observedQuotaActivityIDs.insert(activity.id).inserted else { return }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if let registration = IOSLiveActivityManager.registration(for: activity) {
+                await self.syncLiveActivityRegistration(
+                    registration,
+                    relayDeviceToken: self.latestRelayDeviceToken
+                )
+            }
+            for await _ in activity.pushTokenUpdates {
+                guard let registration = IOSLiveActivityManager.registration(for: activity) else { continue }
+                await self.syncLiveActivityRegistration(
+                    registration,
                     relayDeviceToken: self.latestRelayDeviceToken
                 )
             }

@@ -991,11 +991,24 @@ final class IOSAppViewModel: ObservableObject {
     }
 
     func syncLiveActivity() async {
-        await IOSLiveActivityManager.shared.sync(
+        let outcome = await IOSLiveActivityManager.shared.sync(
             settings: liveActivitySettings,
             configs: accountConfigs,
             dataByProvider: liveActivityProviderData()
         )
+        let relayDeviceToken = deviceRelayManager.deviceToken
+        if let registration = outcome.registration {
+            await IOSPushNotificationCoordinator.shared.syncLiveActivityRegistration(
+                registration,
+                relayDeviceToken: relayDeviceToken
+            )
+        }
+        for activityId in outcome.endedActivityIDs {
+            await IOSPushNotificationCoordinator.shared.unregisterLiveActivity(
+                activityId: activityId,
+                relayDeviceToken: relayDeviceToken
+            )
+        }
     }
 
     private func debugLog(_ message: String) {

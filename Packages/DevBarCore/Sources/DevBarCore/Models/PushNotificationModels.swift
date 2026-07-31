@@ -136,6 +136,7 @@ public struct PushOpenKeyRevokeResponse: Codable, Sendable, Equatable {
 
 public enum LiveMessageActivityType: String, Codable, Sendable, Equatable {
     case devBarLiveMessage = "devbar_live_message"
+    case devBarQuota = "devbar_quota"
 }
 
 public enum LiveActivityStartedBy: String, Codable, Sendable, Equatable {
@@ -196,6 +197,8 @@ public struct LiveActivityPushRegistration: Codable, Sendable, Equatable {
     public let bundleId: String
     public let environment: PushEnvironment
     public let startedBy: LiveActivityStartedBy
+    public let scheduledEndAtEpochSeconds: Int64?
+    public let contentState: DevBarQuotaActivityContentState?
 
     public init(
         activityId: String,
@@ -203,7 +206,9 @@ public struct LiveActivityPushRegistration: Codable, Sendable, Equatable {
         activityPushToken: String,
         bundleId: String,
         environment: PushEnvironment,
-        startedBy: LiveActivityStartedBy
+        startedBy: LiveActivityStartedBy,
+        scheduledEndAtEpochSeconds: Int64? = nil,
+        contentState: DevBarQuotaActivityContentState? = nil
     ) {
         self.activityId = activityId
         self.activityType = activityType
@@ -211,6 +216,8 @@ public struct LiveActivityPushRegistration: Codable, Sendable, Equatable {
         self.bundleId = bundleId
         self.environment = environment
         self.startedBy = startedBy
+        self.scheduledEndAtEpochSeconds = scheduledEndAtEpochSeconds
+        self.contentState = contentState
     }
 }
 
@@ -220,6 +227,16 @@ public struct LiveActivityPushRegistrationResponse: Codable, Sendable, Equatable
 
     public init(registered: Bool, activityId: String) {
         self.registered = registered
+        self.activityId = activityId
+    }
+}
+
+public struct LiveActivityUnregistrationResponse: Codable, Sendable, Equatable {
+    public let unregistered: Bool
+    public let activityId: String
+
+    public init(unregistered: Bool, activityId: String) {
+        self.unregistered = unregistered
         self.activityId = activityId
     }
 }

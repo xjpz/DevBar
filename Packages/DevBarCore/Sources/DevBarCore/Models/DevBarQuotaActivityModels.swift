@@ -43,48 +43,50 @@ public struct LiveActivityProviderSnapshot: Codable, Hashable, Identifiable, Sen
     }
 }
 
+public struct DevBarQuotaActivityContentState: Codable, Hashable, Sendable {
+    public var providers: [LiveActivityProviderSnapshot]
+    public var selectedIndex: Int
+    public var updatedAt: Date
+    public var displayEndAt: Date
+
+    public init(
+        providers: [LiveActivityProviderSnapshot],
+        selectedIndex: Int,
+        updatedAt: Date,
+        displayEndAt: Date
+    ) {
+        self.providers = providers
+        self.selectedIndex = selectedIndex
+        self.updatedAt = updatedAt
+        self.displayEndAt = displayEndAt
+    }
+
+    public var selectedProvider: LiveActivityProviderSnapshot? {
+        guard providers.indices.contains(selectedIndex) else {
+            return providers.first
+        }
+        return providers[selectedIndex]
+    }
+
+    public var hasMultipleProviders: Bool {
+        providers.count > 1
+    }
+
+    public func cyclingProvider() -> Self {
+        guard providers.count > 1 else { return self }
+        var copy = self
+        copy.selectedIndex = (selectedIndex + 1) % providers.count
+        copy.updatedAt = Date()
+        return copy
+    }
+}
+
 #if os(iOS) && canImport(ActivityKit)
 import ActivityKit
 import AppIntents
 
 public struct DevBarQuotaActivityAttributes: ActivityAttributes {
-    public struct ContentState: Codable, Hashable, Sendable {
-        public var providers: [LiveActivityProviderSnapshot]
-        public var selectedIndex: Int
-        public var updatedAt: Date
-        public var displayEndAt: Date
-
-        public init(
-            providers: [LiveActivityProviderSnapshot],
-            selectedIndex: Int,
-            updatedAt: Date,
-            displayEndAt: Date
-        ) {
-            self.providers = providers
-            self.selectedIndex = selectedIndex
-            self.updatedAt = updatedAt
-            self.displayEndAt = displayEndAt
-        }
-
-        public var selectedProvider: LiveActivityProviderSnapshot? {
-            guard providers.indices.contains(selectedIndex) else {
-                return providers.first
-            }
-            return providers[selectedIndex]
-        }
-
-        public var hasMultipleProviders: Bool {
-            providers.count > 1
-        }
-
-        public func cyclingProvider() -> Self {
-            guard providers.count > 1 else { return self }
-            var copy = self
-            copy.selectedIndex = (selectedIndex + 1) % providers.count
-            copy.updatedAt = Date()
-            return copy
-        }
-    }
+    public typealias ContentState = DevBarQuotaActivityContentState
 
     public let title: String
 

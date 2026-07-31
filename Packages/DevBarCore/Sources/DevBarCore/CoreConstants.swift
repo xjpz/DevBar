@@ -88,6 +88,10 @@ public enum DevBarCoreConstants {
         public static func openKeyPath(id: Int64) -> String {
             "\(openKeysPath)/\(id)"
         }
+
+        public static func liveActivityPath(activityId: String) -> String {
+            "\(liveActivitiesPath)/\(activityId)"
+        }
     }
 
     public enum Diagnostics {

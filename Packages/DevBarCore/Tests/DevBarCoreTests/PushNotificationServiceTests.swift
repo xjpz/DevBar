@@ -139,6 +139,68 @@ import Testing
     #expect(json["startedBy"] == "local")
 }
 
+@Test func quotaLiveActivityRegistrationCarriesEndScheduleAndContentState() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"registered":true,"activityId":"quota-activity"}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+    let contentState = DevBarQuotaActivityContentState(
+        providers: [
+            LiveActivityProviderSnapshot(
+                providerRawValue: "openai",
+                providerName: "OpenAI",
+                planName: "Plus",
+                limits: [
+                    LiveActivityLimitSnapshot(kind: .weekly, title: "Weekly", percentage: 42, resetText: nil)
+                ]
+            )
+        ],
+        selectedIndex: 0,
+        updatedAt: Date(timeIntervalSince1970: 1_780_660_000),
+        displayEndAt: Date(timeIntervalSince1970: 1_780_663_600)
+    )
+
+    _ = try await service.registerLiveActivity(
+        .init(
+            activityId: "quota-activity",
+            activityType: .devBarQuota,
+            activityPushToken: "quota-update-token",
+            bundleId: "cc.xjpz.DevBariOS",
+            environment: .production,
+            startedBy: .local,
+            scheduledEndAtEpochSeconds: 1_780_663_600,
+            contentState: contentState
+        ),
+        deviceToken: "relay-token"
+    )
+
+    let body = try #require(await recorder.lastRequestBody)
+    let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+    #expect(json["activityType"] as? String == "devbar_quota")
+    #expect(json["scheduledEndAtEpochSeconds"] as? Int == 1_780_663_600)
+    let encodedState = try #require(json["contentState"] as? [String: Any])
+    #expect(encodedState["selectedIndex"] as? Int == 0)
+    #expect(encodedState["providers"] as? [[String: Any]] != nil)
+}
+
+@Test func liveActivityUnregisterUsesActivityBoundDeletePath() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"unregistered":true,"activityId":"quota-activity"}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+
+    let response = try await service.unregisterLiveActivity(
+        activityId: "quota-activity",
+        deviceToken: "relay-token"
+    )
+
+    #expect(response.unregistered)
+    #expect(response.activityId == "quota-activity")
+    #expect(await recorder.lastRequest?.url?.path == "/api/devbar/push/live-activities/quota-activity")
+    #expect(await recorder.lastRequest?.httpMethod == "DELETE")
+    #expect(await recorder.lastRequestBody == nil)
+}
+
 @Test func liveMessageSendUsesRemoteStartAndFallbackFlags() async throws {
     let recorder = PushRequestRecorder(responseBody: """
     {"success":true,"code":20000,"data":{"delivery":"live_activity","activityId":"activity-unit","startedBy":"remote","fallbackSent":false}}
