@@ -49,6 +49,7 @@ struct IOSRootView: View {
             }
             .toolbarBackground(rootChromeBackground, for: .tabBar)
             .toolbarBackground(.visible, for: .tabBar)
+            .minimizeTabBarOnScrollDownWhenAvailable()
         }
         .id("tabs.\(languageManager.selectedLanguage.rawValue)")
         .accessibilityIdentifier("ios.root.tabs")
@@ -151,5 +152,16 @@ struct IOSRootView: View {
         )
 
         return pinnedIDs.compactMap { toolByID[$0] }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func minimizeTabBarOnScrollDownWhenAvailable() -> some View {
+        if #available(iOS 26.0, *) {
+            tabBarMinimizeBehavior(.onScrollDown)
+        } else {
+            self
+        }
     }
 }
