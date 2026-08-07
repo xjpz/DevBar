@@ -389,6 +389,16 @@ final class AppViewModel: ObservableObject {
             osName: "macOS",
             osVersion: ProcessInfo.processInfo.operatingSystemVersionString
         )
+        DiagnosticLogger.shared.record(
+            level: .info,
+            category: "diagnostics",
+            name: "diagnostics_bootstrap",
+            message: "macOS diagnostics initialized",
+            tags: ["diagnostics"],
+            details: [
+                "relayBaseURL": DevBarCoreConstants.DeviceRelay.baseURL,
+            ]
+        )
         providerPingConfigs = providerPingSettingsStore.loadProviderPingConfigs()
         WidgetDataManager.shared.saveEnabledProviders(
             configs
@@ -600,7 +610,20 @@ final class AppViewModel: ObservableObject {
     }
 
     private func flushDiagnosticsInBackground() {
-        guard let token = deviceRelayManager.deviceToken else { return }
+        guard let token = deviceRelayManager.deviceToken else {
+            DiagnosticLogger.shared.record(
+                level: .warning,
+                category: "diagnostics",
+                name: "diagnostics_flush_skipped",
+                message: "Diagnostics flush skipped because relay device token is missing",
+                tags: ["diagnostics"],
+                details: [
+                    "hasLocalDeviceID": String(deviceRelayManager.localDeviceID != nil),
+                ]
+            )
+            print("[DevBar:Diagnostics] macOS flush skipped: missing relay device token")
+            return
+        }
         DiagnosticLogger.shared.configure(
             platform: "macos",
             deviceId: deviceRelayManager.localDeviceID,
@@ -609,7 +632,22 @@ final class AppViewModel: ObservableObject {
             osVersion: ProcessInfo.processInfo.operatingSystemVersionString
         )
         Task.detached(priority: .utility) {
-            try? await DiagnosticsUploadService.shared.flush(deviceToken: token)
+            do {
+                let result = try await DiagnosticsUploadService.shared.flush(deviceToken: token)
+                print("[DevBar:Diagnostics] macOS flush accepted=\(result.accepted) duplicate=\(result.duplicate) rejected=\(result.rejected)")
+            } catch {
+                print("[DevBar:Diagnostics] macOS flush failed: \(error)")
+                DiagnosticLogger.shared.record(
+                    level: .warning,
+                    category: "diagnostics",
+                    name: "diagnostics_flush_failed",
+                    message: "Diagnostics upload failed",
+                    tags: ["diagnostics"],
+                    details: [
+                        "error": String(describing: error),
+                    ]
+                )
+            }
         }
     }
 

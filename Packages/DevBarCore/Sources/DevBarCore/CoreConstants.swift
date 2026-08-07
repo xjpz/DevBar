@@ -26,6 +26,7 @@ public enum DevBarCoreConstants {
         public static let cookieKey = "cookie_string"
         public static let glmAPIKeyKey = "glm_api_key"
         public static let hermesAPIKeyKey = "hermes_api_key"
+        public static let homeAssistantTokenKey = "home_assistant_token"
         public static let openAIAccessTokenKey = "openai_access_token"
         public static let mimoServiceTokenKey = "mimo_service_token"
         public static let macRelayDeviceIDKey = "relay_device_id_mac"
@@ -162,6 +163,17 @@ public enum DevBarCoreConstants {
         public static let macThemeWidgetUserNameKey = "mac_theme_widget_user_name"
         public static let relayMacEnabledKey = "relay_mac_enabled"
         public static let iCloudSyncSettingsKey = "icloud_sync_settings_v1"
+        public static let iCloudSyncSettingsEnvelopeKey = "icloud_sync_settings_envelope_v1"
+        public static let homeAssistantSettingsKey = "home_assistant_settings_v1"
+        public static let homeAssistantSettingsCloudUpdatedAtKey = "home_assistant_settings_cloud_updated_at_v1"
+        public static let homeAssistantLayoutSuggestionKey = "home_assistant_layout_suggestion_v1"
+        public static let homeAssistantTopologyHashKey = "home_assistant_topology_hash_v1"
+        public static let homeAssistantDeviceVisibilityKey = "home_assistant_device_visibility_v1"
+        public static let homeAssistantDevicePresentationKey = "home_assistant_device_presentation_v1"
+        public static let homeAssistantAccessoryPresentationKey = "home_assistant_accessory_presentation_v2"
+        public static let homeAssistantAccessoryGroupingKey = "home_assistant_accessory_grouping_v1"
+        public static let homeAssistantTranslationCatalogKey = "home_assistant_translation_catalog_v1"
+        public static let homeAssistantDashboardLayoutKey = "home_assistant_dashboard_layout_v1"
         public static let devBarActiveUserIDKey = "devbar_active_user_id_v1"
         public static let devBarProfileCachePrefix = "devbar_profile_cache_v1_"
     }
@@ -179,5 +191,11 @@ public enum DevBarCoreConstants {
         public static func messageReadPath(messageId: String) -> String {
             "\(messagesPath)/by-id/\(messageId)/read"
         }
+    }
+
+    public enum HomeAssistant {
+        public static let snapshotCacheSchemaVersion = 1
+        public static let snapshotCacheDirectoryName = "HomeAssistant"
+        public static let snapshotCacheMaximumBytes = 10 * 1_024 * 1_024
     }
 }

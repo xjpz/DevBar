@@ -50,7 +50,11 @@ public final class DiagnosticLogger: DiagnosticReporting, @unchecked Sendable {
         let enriched = enrich(event)
         let currentStore = store
         lock.unlock()
-        try? currentStore.append(enriched)
+        do {
+            try currentStore.append(enriched)
+        } catch {
+            print("[DevBar:Diagnostics] local append failed event=\(event.name) error=\(error)")
+        }
     }
 
     public func record(

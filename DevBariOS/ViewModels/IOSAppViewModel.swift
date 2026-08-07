@@ -212,6 +212,8 @@ final class IOSAppViewModel: ObservableObject {
     private var usesDefaultHomeScreenShortcutSelection: Bool
     private var hasPairedMacForShortcuts = false
     private var relayStartupTask: Task<Void, Never>?
+    private var diagnosticsFlushTask: Task<Void, Never>?
+    private var diagnosticsFlushRequestedWhileRunning = false
     private var lastMacThemeStatusRequestAt: Date?
     private let macThemeStatusRequestCooldown: TimeInterval = 60
     private let macThemeSystemMetricsTTL: TimeInterval = 120
@@ -261,6 +263,17 @@ final class IOSAppViewModel: ObservableObject {
             deviceName: relayDeviceName,
             osName: UIDevice.current.systemName,
             osVersion: UIDevice.current.systemVersion
+        )
+        DiagnosticLogger.shared.record(
+            level: .info,
+            category: "diagnostics",
+            name: "diagnostics_bootstrap",
+            message: "iOS diagnostics initialized",
+            tags: ["diagnostics"],
+            details: [
+                "relayBaseURL": DevBarCoreConstants.DeviceRelay.baseURL,
+                "hasRelayDeviceName": String(!relayDeviceName.isEmpty),
+            ]
         )
         self.macThemeWidgetUserName = Self.loadMacThemeWidgetUserName()
         self.macThemeWidgetAvatarFileName = Self.loadMacThemeWidgetAvatarFileName()
@@ -841,7 +854,18 @@ final class IOSAppViewModel: ObservableObject {
     }
 
     func flushDiagnosticsInBackground() {
-        guard let token = deviceRelayManager.deviceToken else { return }
+        scheduleDiagnosticsFlush(after: .zero)
+    }
+
+    private func scheduleDiagnosticsFlush(after delay: Duration) {
+        if diagnosticsFlushTask != nil {
+            diagnosticsFlushRequestedWhileRunning = true
+            return
+        }
+        guard let token = deviceRelayManager.deviceToken else {
+            print("[DevBar:Diagnostics] iOS flush skipped: missing relay device token")
+            return
+        }
         DiagnosticLogger.shared.configure(
             platform: "ios",
             deviceId: deviceRelayManager.localDeviceID,
@@ -849,9 +873,39 @@ final class IOSAppViewModel: ObservableObject {
             osName: UIDevice.current.systemName,
             osVersion: UIDevice.current.systemVersion
         )
-        Task.detached(priority: .utility) {
-            try? await DiagnosticsUploadService.shared.flush(deviceToken: token)
+        diagnosticsFlushTask = Task(priority: .utility) { @MainActor [weak self] in
+            if delay != .zero {
+                try? await Task.sleep(for: delay)
+            }
+            guard !Task.isCancelled else {
+                self?.finishDiagnosticsFlush()
+                return
+            }
+            do {
+                let result = try await DiagnosticsUploadService.shared.flush(deviceToken: token)
+                print("[DevBar:Diagnostics] iOS flush accepted=\(result.accepted) duplicate=\(result.duplicate) rejected=\(result.rejected)")
+            } catch {
+                print("[DevBar:Diagnostics] iOS flush failed: \(error)")
+                DiagnosticLogger.shared.record(
+                    level: .warning,
+                    category: "diagnostics",
+                    name: "diagnostics_flush_failed",
+                    message: "Diagnostics upload failed",
+                    tags: ["diagnostics"],
+                    details: [
+                        "error": String(describing: error),
+                    ]
+                )
+            }
+            self?.finishDiagnosticsFlush()
         }
+    }
+
+    private func finishDiagnosticsFlush() {
+        diagnosticsFlushTask = nil
+        guard diagnosticsFlushRequestedWhileRunning else { return }
+        diagnosticsFlushRequestedWhileRunning = false
+        scheduleDiagnosticsFlush(after: .milliseconds(250))
     }
 
     private func syncPushStateInBackground(force: Bool) {

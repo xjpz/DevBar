@@ -71,7 +71,14 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock encrypted memos.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>DevBar uses the local network to connect your iPhone directly to your paired Mac when both devices are on the same Wi-Fi.</string>
+	<string>DevBar uses the local network to connect to your paired Mac and your Home Assistant instance while your iPhone is on Wi-Fi.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>DevBar uses your current Wi-Fi name to connect to Home Assistant over the local network only when you are at home.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_devbar-relay._tcp</string>

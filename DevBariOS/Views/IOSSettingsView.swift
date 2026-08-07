@@ -109,6 +109,14 @@ struct IOSSettingsView: View {
                 ) {
                     IOSHermesSettingsView()
                 }
+
+                settingsLink(
+                    title: "Home Assistant",
+                    systemImage: "house.fill",
+                    summary: homeAssistantSummary
+                ) {
+                    IOSHomeAssistantSettingsView()
+                }
             }
 
             Section("ios_settings_device_system_section") {
@@ -265,6 +273,18 @@ struct IOSSettingsView: View {
             return model.isEmpty ? "Hermes HTTP" : "Hermes HTTP · \(model)"
         }
         return "未配置"
+    }
+
+    private var homeAssistantSummary: String {
+        let store = HomeAssistantSettingsStore()
+        let settings = store.load()
+        guard settings.isConfigured, !store.loadToken().isEmpty else { return "未配置" }
+        if let host = URL(string: settings.externalURL)?.host {
+            return settings.internalURL.isEmpty || settings.internalSSIDs.isEmpty
+                ? host
+                : "家庭 Wi-Fi 内网优先 · \(host)"
+        }
+        return "已配置"
     }
 
     private var liveActivitySummary: String {

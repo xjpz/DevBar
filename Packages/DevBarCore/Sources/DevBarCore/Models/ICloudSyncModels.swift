@@ -60,6 +60,49 @@ public struct ICloudSyncSettings: Codable, Equatable, Sendable {
     }
 }
 
+public struct ICloudPreferenceState<Value: Codable & Equatable & Sendable>: Codable, Equatable, Sendable {
+    public var value: Value
+    public var updatedAt: Date
+
+    public init(value: Value, updatedAt: Date) {
+        self.value = value
+        self.updatedAt = updatedAt
+    }
+}
+
+public struct HomeAssistantCloudSyncSnapshot: Codable, Equatable, Sendable {
+    public static let schemaVersion = 1
+
+    public var schemaVersion: Int
+    public var connectionSettings: HomeAssistantConnectionSettings
+    public var instanceFingerprint: String?
+    public var deviceVisibility: HomeAssistantDeviceVisibilitySettings?
+    public var dashboardLayout: HomeAssistantDashboardLayoutSettings?
+    public var devicePresentations: HomeAssistantDevicePresentationSettings?
+    public var accessoryPresentations: HomeAssistantAccessoryPresentationSettings?
+    public var accessoryGrouping: HomeAssistantAccessoryGroupingSettings?
+
+    public init(
+        connectionSettings: HomeAssistantConnectionSettings,
+        instanceFingerprint: String? = nil,
+        deviceVisibility: HomeAssistantDeviceVisibilitySettings? = nil,
+        dashboardLayout: HomeAssistantDashboardLayoutSettings? = nil,
+        devicePresentations: HomeAssistantDevicePresentationSettings? = nil,
+        accessoryPresentations: HomeAssistantAccessoryPresentationSettings? = nil,
+        accessoryGrouping: HomeAssistantAccessoryGroupingSettings? = nil,
+        schemaVersion: Int = Self.schemaVersion
+    ) {
+        self.schemaVersion = schemaVersion
+        self.connectionSettings = connectionSettings
+        self.instanceFingerprint = instanceFingerprint
+        self.deviceVisibility = deviceVisibility
+        self.dashboardLayout = dashboardLayout
+        self.devicePresentations = devicePresentations
+        self.accessoryPresentations = accessoryPresentations
+        self.accessoryGrouping = accessoryGrouping
+    }
+}
+
 public struct ICloudSyncRecord: Codable, Equatable, Sendable {
     public var id: String
     public var entity: ICloudSyncEntity

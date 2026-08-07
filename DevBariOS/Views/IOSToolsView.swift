@@ -358,6 +358,7 @@ enum IOSToolCatalog {
             IOSToolDefinition(id: "speech-to-text", title: "语音转文字", subtitle: "Speech to Text", systemImage: "mic.fill", iconColor: .pink, tabTitle: "Speech"),
             IOSToolDefinition(id: "memo", title: "备忘录", subtitle: "Memo", systemImage: "note.text", iconColor: .brown, tabTitle: "Memo"),
             IOSToolDefinition(id: "chatbot-hermes", title: "Hermes", subtitle: "ChatBot", systemImage: "bubble.left.and.bubble.right.fill", iconColor: .green, tabTitle: "Hermes"),
+            IOSToolDefinition(id: "home-assistant", title: "Home Assistant", subtitle: "家庭控制台", systemImage: "apple.homekit", iconColor: .blue, tabTitle: "家庭"),
         ])
 
         return tools
@@ -409,6 +410,8 @@ struct IOSToolDestinationView: View {
                 IOSMemoListView()
             case "chatbot-hermes":
                 IOSHermesConversationListView(provider: .hermes)
+            case "home-assistant":
+                IOSHomeAssistantDashboardView()
             default:
                 EmptyView()
             }
