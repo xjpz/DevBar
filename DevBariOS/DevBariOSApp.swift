@@ -132,6 +132,7 @@ private struct ThemeRootView: View {
     var body: some View {
         IOSRootView()
             .onAppear {
+                themeManager.systemColorScheme = systemColorScheme
                 themeManager.updateBarAppearance()
             }
             .onChange(of: systemColorScheme) { _, newScheme in

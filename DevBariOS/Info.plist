@@ -26,10 +26,10 @@
 				<key>CFBundleIconName</key>
 				<string>AppIconSmileBlueV2</string>
 			</dict>
-			<key>AppIconSmileBlueBorder</key>
+			<key>AppIcon</key>
 			<dict>
 				<key>CFBundleIconName</key>
-				<string>AppIconSmileBlueBorder</string>
+				<string>AppIcon</string>
 			</dict>
 			<key>AppIconLightBluePurple</key>
 			<dict>
@@ -40,7 +40,7 @@
 		<key>CFBundlePrimaryIcon</key>
 		<dict>
 			<key>CFBundleIconName</key>
-			<string>AppIcon</string>
+			<string>AppIconSmileBlueBorder</string>
 		</dict>
 	</dict>
 	<key>CFBundleURLTypes</key>

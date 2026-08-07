@@ -139,9 +139,6 @@ final class IOSAppIconController {
     }
 
     private func registeredIconName(for option: IOSAppIconOption) -> String? {
-        if option == .default {
-            return primaryIconDictionary()["CFBundleIconName"] as? String
-        }
         return registeredIconName(forIconName: option.alternateIconName)
     }
 
@@ -180,7 +177,7 @@ final class IOSAppIconController {
             "registeredDesiredIconName": registeredIconName(forIconName: desiredIconName) ?? "<missing>",
             "registeredDesiredIconFiles": iconFilesDescription(desiredIconFiles),
             "desiredIconResources": iconResourceStatusDescription(desiredIconFiles),
-            "primaryIconName": registeredIconName(for: .default) ?? "<missing>",
+            "primaryIconName": registeredIconName(for: .smileBlueBorder) ?? "<missing>",
             "primaryIconFiles": iconFilesDescription(primaryIconFiles),
             "primaryIconResources": iconResourceStatusDescription(primaryIconFiles),
             "assetsCatalogExists": String(Bundle.main.path(forResource: "Assets", ofType: "car") != nil),

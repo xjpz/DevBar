@@ -18,6 +18,11 @@ struct IOSAppIconPlistTests {
         )
         let bundleIcons = try #require(plist["CFBundleIcons"] as? [String: Any])
         let alternateIcons = try #require(bundleIcons["CFBundleAlternateIcons"] as? [String: Any])
+        let primaryIcon = try #require(bundleIcons["CFBundlePrimaryIcon"] as? [String: Any])
+
+        #expect(primaryIcon["CFBundleIconName"] as? String == "AppIconSmileBlueBorder")
+        #expect(alternateIcons["AppIcon"] != nil)
+        #expect(alternateIcons["AppIconSmileBlueBorder"] == nil)
 
         for (iconName, iconValue) in alternateIcons {
             let icon = try #require(iconValue as? [String: Any])

@@ -1,16 +1,20 @@
 import Foundation
 
 public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
+    case smileBlueBorder
     case `default`
     case dockBlue
     case lightBluePurple
     case frostedLilacGray
     case graphiteMono
     case smileBlue
-    case smileBlueBorder
+
+    public static let primaryBundleIconName = "AppIconSmileBlueBorder"
 
     public var id: String {
         switch self {
+        case .smileBlueBorder:
+            "smile-blue-border"
         case .default:
             "default"
         case .dockBlue:
@@ -23,15 +27,15 @@ public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
             "graphite-mono"
         case .smileBlue:
             "smile-blue"
-        case .smileBlueBorder:
-            "smile-blue-border"
         }
     }
 
     public var displayName: String {
         switch self {
+        case .smileBlueBorder:
+            "Smile blue border"
         case .default:
-            "Default"
+            "Original"
         case .dockBlue:
             "Dock blue"
         case .lightBluePurple:
@@ -42,15 +46,15 @@ public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
             "Graphite mono"
         case .smileBlue:
             "Smile blue"
-        case .smileBlueBorder:
-            "Smile blue border"
         }
     }
 
     public var alternateIconName: String? {
         switch self {
-        case .default:
+        case .smileBlueBorder:
             nil
+        case .default:
+            "AppIcon"
         case .dockBlue:
             "AppIconDockBlue"
         case .lightBluePurple:
@@ -61,17 +65,17 @@ public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
             "AppIconGraphiteMono"
         case .smileBlue:
             "AppIconSmileBlueV2"
-        case .smileBlueBorder:
-            "AppIconSmileBlueBorder"
         }
     }
 
     public var expectedBundleIconName: String {
-        alternateIconName ?? "AppIcon"
+        alternateIconName ?? Self.primaryBundleIconName
     }
 
     public var previewAssetName: String {
         switch self {
+        case .smileBlueBorder:
+            "AppIconPreviewSmileBlueBorder"
         case .default:
             "AppIconPreviewDefault"
         case .dockBlue:
@@ -84,15 +88,19 @@ public enum IOSAppIconOption: String, CaseIterable, Identifiable, Sendable {
             "AppIconPreviewGraphiteMono"
         case .smileBlue:
             "AppIconPreviewSmileBlue"
-        case .smileBlueBorder:
-            "AppIconPreviewSmileBlueBorder"
         }
     }
 
     public static func option(forAlternateIconName alternateIconName: String?) -> IOSAppIconOption {
+        // Before Smile Blue Border became the primary icon, it was registered under this
+        // alternate name. Resolve it to the new primary option so foreground synchronization
+        // migrates existing installations back to a nil alternate icon name.
+        if alternateIconName == "AppIconSmileBlueBorder" {
+            return .smileBlueBorder
+        }
         if alternateIconName == "AppIconSmileBlue" || alternateIconName == "AppIconSmileBlueDark" {
             return .smileBlue
         }
-        return allCases.first { $0.alternateIconName == alternateIconName } ?? .default
+        return allCases.first { $0.alternateIconName == alternateIconName } ?? .smileBlueBorder
     }
 }
