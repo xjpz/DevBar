@@ -799,6 +799,7 @@ private struct IOSAppIconSettingsView: View {
 @MainActor
 private struct IOSDeviceWidgetSettingsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
+    @EnvironmentObject private var accountViewModel: IOSAccountViewModel
     @EnvironmentObject private var languageManager: IOSLanguageManager
     @Environment(\.themeTokens) private var theme
     @State private var selectedMacThemeAvatarItem: PhotosPickerItem?
@@ -814,12 +815,26 @@ private struct IOSDeviceWidgetSettingsView: View {
                     accessibilityIdentifier: "ios.settings.relayDeviceName"
                 )
 
-                IOSIconTextFieldRow(
-                    title: localized("ios_settings_user_name"),
-                    systemImage: "person.text.rectangle",
-                    text: $appViewModel.macThemeWidgetUserName,
-                    accessibilityIdentifier: "ios.settings.macThemeWidgetUserName"
-                )
+                if accountViewModel.isAuthenticated {
+                    NavigationLink {
+                        IOSProfileView()
+                    } label: {
+                        LabeledContent {
+                            Text(accountViewModel.profile?.displayName ?? "DevBar 用户")
+                                .foregroundStyle(theme.textSecondary)
+                        } label: {
+                            Label(localized("ios_settings_user_name"), systemImage: "person.text.rectangle")
+                        }
+                    }
+                    .accessibilityIdentifier("ios.settings.serverProfile")
+                } else {
+                    IOSIconTextFieldRow(
+                        title: localized("ios_settings_user_name"),
+                        systemImage: "person.text.rectangle",
+                        text: $appViewModel.macThemeWidgetUserName,
+                        accessibilityIdentifier: "ios.settings.macThemeWidgetUserName"
+                    )
+                }
             } footer: {
                 Text("ios_settings_device_widget_footer")
             }
