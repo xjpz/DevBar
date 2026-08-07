@@ -85,16 +85,33 @@ final class MacSystemMetricsProvider {
         guard result == KERN_SUCCESS else { return nil }
 
         let pageSize = UInt64(vm_kernel_page_size)
-        let free = UInt64(stats.free_count) * pageSize
-        let active = UInt64(stats.active_count) * pageSize
-        let inactive = UInt64(stats.inactive_count) * pageSize
-        let wired = UInt64(stats.wire_count) * pageSize
-        let compressed = UInt64(stats.compressor_page_count) * pageSize
-        let used = active + inactive + wired + compressed
-        let total = used + free
-        guard total > 0 else { return nil }
+        return Self.memoryPercent(
+            totalBytes: ProcessInfo.processInfo.physicalMemory,
+            pageSize: pageSize,
+            freePageCount: UInt64(stats.free_count),
+            fileBackedPageCount: UInt64(stats.external_page_count),
+            purgeablePageCount: UInt64(stats.purgeable_count)
+        )
+    }
 
-        return clampedPercent(Double(used) / Double(total) * 100)
+    static func memoryPercent(
+        totalBytes: UInt64,
+        pageSize: UInt64,
+        freePageCount: UInt64,
+        fileBackedPageCount: UInt64,
+        purgeablePageCount: UInt64
+    ) -> Int? {
+        guard totalBytes > 0, pageSize > 0 else { return nil }
+
+        // Activity Monitor treats file-backed and purgeable pages as cached,
+        // reusable memory. Counting every inactive page as used makes macOS
+        // appear permanently full because the system intentionally fills RAM
+        // with caches.
+        let reclaimablePageCount = freePageCount + fileBackedPageCount + purgeablePageCount
+        let reclaimableBytes = min(reclaimablePageCount * pageSize, totalBytes)
+        let usedBytes = totalBytes - reclaimableBytes
+        let percent = Double(usedBytes) / Double(totalBytes) * 100
+        return min(max(Int(percent.rounded()), 0), 100)
     }
 
     private func networkSpeeds() -> (downBytesPerSecond: Int?, upBytesPerSecond: Int?)? {
