@@ -54,17 +54,34 @@ final class ICloudSyncCoordinator: ObservableObject {
     @Published private(set) var lastCheckedAt: Date?
 
     private let settingsStore: ICloudSyncSettingsStore
+    private let hermesSettingsStore: UserDefaultsHermesSettingsStore
+    private let homeAssistantSettingsStore: HomeAssistantSettingsStore
     private let container: CKContainer
+    private var observers = Set<AnyCancellable>()
     private var pendingAssetURLs: [URL] = []
     private let zoneID = CKRecordZone.ID(zoneName: "DevBarUserDataV1", ownerName: CKCurrentUserDefaultName)
 
     init(
-        settingsStore: ICloudSyncSettingsStore = UserDefaultsICloudSyncSettingsStore(),
+        settingsStore: ICloudSyncSettingsStore = UbiquitousICloudSyncSettingsStore(),
+        hermesSettingsStore: UserDefaultsHermesSettingsStore = UserDefaultsHermesSettingsStore(),
+        homeAssistantSettingsStore: HomeAssistantSettingsStore = HomeAssistantSettingsStore(),
         container: CKContainer = CKContainer(identifier: DevBarCoreConstants.ICloud.containerIdentifier)
     ) {
         self.settingsStore = settingsStore
+        self.hermesSettingsStore = hermesSettingsStore
+        self.homeAssistantSettingsStore = homeAssistantSettingsStore
         self.container = container
         self.settings = settingsStore.load()
+        NotificationCenter.default.publisher(
+            for: NSUbiquitousKeyValueStore.didChangeExternallyNotification,
+            object: NSUbiquitousKeyValueStore.default
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] _ in
+            guard let self else { return }
+            self.settings = self.settingsStore.load()
+        }
+        .store(in: &observers)
     }
 
     func setEnabled(_ isEnabled: Bool) {
@@ -424,15 +441,68 @@ final class ICloudSyncCoordinator: ObservableObject {
                 )
             }
         }
+        if settings.isSyncEnabled(for: .hermesSettings),
+           let state = hermesSettingsStore.loadCloudSyncState() {
+            records.append(
+                try ICloudSyncPayloadFactory.preferencesPayload(
+                    entity: .hermesSettings,
+                    value: state.value,
+                    updatedAt: state.updatedAt
+                )
+            )
+        }
+        if settings.isSyncEnabled(for: .homeAssistantSettings),
+           let state = homeAssistantSettingsStore.loadCloudSyncState() {
+            records.append(
+                try ICloudSyncPayloadFactory.preferencesPayload(
+                    entity: .homeAssistantSettings,
+                    value: state.value,
+                    updatedAt: state.updatedAt
+                )
+            )
+        }
         return records
     }
 
     private func importRemoteRecords(_ records: [ICloudSyncRecord], modelContext: ModelContext) throws {
+        let didImportHermesSettings = importHermesSettings(records.filter { $0.entity == .hermesSettings })
+        let didImportHomeAssistantSettings = importHomeAssistantSettings(
+            records.filter { $0.entity == .homeAssistantSettings }
+        )
         try importMemos(records.filter { $0.entity == .memo }, modelContext: modelContext)
         try importMarkdownDocuments(records.filter { $0.entity == .markdownDocument }, modelContext: modelContext)
         try importTerminalServers(records.filter { $0.entity == .terminalServer }, modelContext: modelContext)
         try importChatConversations(records.filter { $0.entity == .chatConversation }, modelContext: modelContext)
         try importChatMessages(records.filter { $0.entity == .chatMessage }, modelContext: modelContext)
+        if didImportHermesSettings || didImportHomeAssistantSettings {
+            NotificationCenter.default.post(name: .iCloudSyncedPreferencesDidChange, object: nil)
+        }
+    }
+
+    private func importHermesSettings(_ records: [ICloudSyncRecord]) -> Bool {
+        guard let record = records.max(by: { $0.updatedAt < $1.updatedAt }),
+              let snapshot = ICloudSyncPayloadFactory.decodePreferences(
+                HermesCloudSyncSnapshot.self,
+                from: record
+              ) else {
+            return false
+        }
+        return hermesSettingsStore.applyCloudSyncState(
+            ICloudPreferenceState(value: snapshot, updatedAt: record.updatedAt)
+        )
+    }
+
+    private func importHomeAssistantSettings(_ records: [ICloudSyncRecord]) -> Bool {
+        guard let record = records.max(by: { $0.updatedAt < $1.updatedAt }),
+              let snapshot = ICloudSyncPayloadFactory.decodePreferences(
+                HomeAssistantCloudSyncSnapshot.self,
+                from: record
+              ) else {
+            return false
+        }
+        return homeAssistantSettingsStore.applyCloudSyncState(
+            ICloudPreferenceState(value: snapshot, updatedAt: record.updatedAt)
+        )
     }
 
     private func importMemos(_ records: [ICloudSyncRecord], modelContext: ModelContext) throws {
@@ -686,6 +756,12 @@ private extension ICloudSyncRecord {
     }
 }
 
+extension Notification.Name {
+    static let iCloudSyncedPreferencesDidChange = Notification.Name(
+        "cc.xjpz.DevBar.iCloudSyncedPreferencesDidChange"
+    )
+}
+
 private extension ICloudSyncEntity {
     var cloudRecordType: String {
         switch self {
@@ -703,12 +779,17 @@ private extension ICloudSyncEntity {
             return "TerminalServer"
         case .webHistoryRecord:
             return "WebHistoryRecord"
+        case .hermesSettings:
+            return "HermesSettings"
+        case .homeAssistantSettings:
+            return "HomeAssistantSettings"
         }
     }
 
     var isFirstVersionCloudKitEntity: Bool {
         switch self {
-        case .memo, .markdownDocument, .chatConversation, .chatMessage, .terminalServer:
+        case .memo, .markdownDocument, .chatConversation, .chatMessage, .terminalServer,
+             .hermesSettings, .homeAssistantSettings:
             return true
         case .apiRecord, .webHistoryRecord:
             return false

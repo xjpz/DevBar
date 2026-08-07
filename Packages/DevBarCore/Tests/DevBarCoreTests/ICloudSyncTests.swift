@@ -13,6 +13,8 @@ func iCloudSyncSettingsDefaultToSafeRecoverableDataTypes() {
     #expect(settings.isSyncEnabled(for: .chatMessage))
     #expect(!settings.isSyncEnabled(for: .apiRecord))
     #expect(settings.isSyncEnabled(for: .terminalServer))
+    #expect(settings.isSyncEnabled(for: .hermesSettings))
+    #expect(settings.isSyncEnabled(for: .homeAssistantSettings))
     #expect(!settings.isSyncEnabled(for: .webHistoryRecord))
     #expect(!settings.syncAPISensitiveFields)
     #expect(!settings.syncTerminalSecrets)
@@ -37,6 +39,26 @@ func iCloudSyncSettingsStoreNormalizesUnsupportedSavedEntities() throws {
 }
 
 @Test
+func iCloudSyncSettingsStoreMigratesLegacySettingsToConfigurationEntities() throws {
+    let suiteName = "DevBarCoreTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    defaults.set(
+        Data(
+            """
+            {"isEnabled":true,"enabledEntities":["memo"],"syncAPISensitiveFields":false,"syncTerminalSecrets":false,"syncProviderCredentials":false}
+            """.utf8
+        ),
+        forKey: DevBarCoreConstants.Defaults.iCloudSyncSettingsKey
+    )
+
+    let loaded = UserDefaultsICloudSyncSettingsStore(defaults: defaults).load()
+
+    #expect(loaded.schemaVersion == ICloudSyncSettings.schemaVersion)
+    #expect(loaded.enabledEntities == [.memo, .hermesSettings, .homeAssistantSettings])
+}
+
+@Test
 func iCloudSyncSettingsStoreRoundTripsValues() throws {
     let suiteName = "DevBarCoreTests.\(UUID().uuidString)"
     let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -53,6 +75,125 @@ func iCloudSyncSettingsStoreRoundTripsValues() throws {
     store.save(settings)
 
     #expect(store.load() == settings)
+}
+
+@Test
+func ubiquitousICloudSyncSettingsRestoreIntoFreshLocalDefaults() throws {
+    let sourceName = "DevBarCoreTests.source.\(UUID().uuidString)"
+    let restoredName = "DevBarCoreTests.restored.\(UUID().uuidString)"
+    let cloudName = "DevBarCoreTests.cloud.\(UUID().uuidString)"
+    let sourceDefaults = try #require(UserDefaults(suiteName: sourceName))
+    let restoredDefaults = try #require(UserDefaults(suiteName: restoredName))
+    let cloudDefaults = try #require(UserDefaults(suiteName: cloudName))
+    defer {
+        sourceDefaults.removePersistentDomain(forName: sourceName)
+        restoredDefaults.removePersistentDomain(forName: restoredName)
+        cloudDefaults.removePersistentDomain(forName: cloudName)
+    }
+    let sourceStore = UbiquitousICloudSyncSettingsStore(
+        defaults: sourceDefaults,
+        ubiquitousStore: cloudDefaults
+    )
+    let expected = ICloudSyncSettings(
+        isEnabled: true,
+        enabledEntities: [.memo, .hermesSettings, .homeAssistantSettings]
+    )
+    sourceStore.save(expected)
+
+    let restoredStore = UbiquitousICloudSyncSettingsStore(
+        defaults: restoredDefaults,
+        ubiquitousStore: cloudDefaults
+    )
+
+    #expect(restoredStore.load() == expected)
+    #expect(restoredDefaults.data(forKey: DevBarCoreConstants.Defaults.iCloudSyncSettingsKey) != nil)
+}
+
+@Test
+func hermesCloudSnapshotRestoresBaseURLWithoutCredentialFields() throws {
+    let sourceName = "DevBarCoreTests.hermes.source.\(UUID().uuidString)"
+    let restoredName = "DevBarCoreTests.hermes.restored.\(UUID().uuidString)"
+    let sourceDefaults = try #require(UserDefaults(suiteName: sourceName))
+    let restoredDefaults = try #require(UserDefaults(suiteName: restoredName))
+    defer {
+        sourceDefaults.removePersistentDomain(forName: sourceName)
+        restoredDefaults.removePersistentDomain(forName: restoredName)
+    }
+    let sourceStore = UserDefaultsHermesSettingsStore(defaults: sourceDefaults)
+    let expected = HermesSettings(
+        apiBaseURL: "https://xjpz.cc/hermes",
+        hermesModel: "glm-5",
+        hermesProvider: "zhipu",
+        isStreamingEnabled: false,
+        hermesChatRemark: "Personal",
+        hermesChatTag: "iCloud"
+    )
+    sourceStore.save(expected)
+    let sourceState = try #require(sourceStore.loadCloudSyncState())
+    let payload = try ICloudSyncPayloadFactory.preferencesPayload(
+        entity: .hermesSettings,
+        value: sourceState.value,
+        updatedAt: sourceState.updatedAt
+    )
+    let encodedPayload = try JSONEncoder().encode(payload)
+
+    #expect(!String(decoding: encodedPayload, as: UTF8.self).contains("hermes_api_key"))
+    let restoredSnapshot = try #require(
+        ICloudSyncPayloadFactory.decodePreferences(HermesCloudSyncSnapshot.self, from: payload)
+    )
+    let restoredStore = UserDefaultsHermesSettingsStore(defaults: restoredDefaults)
+    #expect(restoredStore.applyCloudSyncState(
+        ICloudPreferenceState(value: restoredSnapshot, updatedAt: payload.updatedAt)
+    ))
+    #expect(restoredStore.load() == expected)
+}
+
+@Test
+func homeAssistantCloudSnapshotRestoresConnectionThenInstanceLayout() throws {
+    let sourceName = "DevBarCoreTests.ha.source.\(UUID().uuidString)"
+    let restoredName = "DevBarCoreTests.ha.restored.\(UUID().uuidString)"
+    let sourceDefaults = try #require(UserDefaults(suiteName: sourceName))
+    let restoredDefaults = try #require(UserDefaults(suiteName: restoredName))
+    defer {
+        sourceDefaults.removePersistentDomain(forName: sourceName)
+        restoredDefaults.removePersistentDomain(forName: restoredName)
+    }
+    let sourceStore = HomeAssistantSettingsStore(defaults: sourceDefaults)
+    let connection = HomeAssistantConnectionSettings(
+        externalURL: "https://ha.example.com",
+        internalURL: "http://homeassistant.local:8123",
+        internalSSIDs: ["Home Wi-Fi"],
+        aiAnalysisEnabled: true,
+        showsDiagnosticEntities: true
+    )
+    try sourceStore.save(connection, token: nil)
+    let fingerprint = try #require(
+        HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: connection.externalURL)
+    )
+    sourceStore.saveDeviceVisibility(
+        HomeAssistantDeviceVisibilitySettings(hiddenCardIDs: ["device-secret-room"]),
+        instanceFingerprint: fingerprint
+    )
+    sourceStore.saveDashboardLayout(
+        HomeAssistantDashboardLayoutSettings(cardOrderByRoom: ["living": ["light.main"]]),
+        instanceFingerprint: fingerprint
+    )
+    let sourceState = try #require(sourceStore.loadCloudSyncState())
+    let restoredStore = HomeAssistantSettingsStore(defaults: restoredDefaults)
+    let normalizedConnection = try HomeAssistantEndpointSelector.normalizedSettings(connection)
+
+    #expect(restoredStore.applyCloudSyncState(sourceState))
+    #expect(restoredStore.load() == normalizedConnection)
+    #expect(restoredStore.loadDeviceVisibility(instanceFingerprint: fingerprint).hiddenCardIDs == ["device-secret-room"])
+    #expect(
+        restoredStore.loadDashboardLayout(instanceFingerprint: fingerprint).cardOrderByRoom["living"] == ["light.main"]
+    )
+    let payload = try ICloudSyncPayloadFactory.preferencesPayload(
+        entity: .homeAssistantSettings,
+        value: sourceState.value,
+        updatedAt: sourceState.updatedAt
+    )
+    #expect(!String(decoding: try JSONEncoder().encode(payload), as: UTF8.self).contains("home_assistant_token"))
 }
 
 @Test

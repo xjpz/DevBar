@@ -35,6 +35,33 @@ public struct UserDefaultsHermesSettingsStore: HermesSettingsStore {
     }
 
     public func save(_ settings: HermesSettings) {
+        persist(settings)
+        markCloudSettingsModified()
+    }
+
+    public func loadCloudSyncState() -> ICloudPreferenceState<HermesCloudSyncSnapshot>? {
+        let settings = load()
+        if let updatedAt = cloudSettingsUpdatedAt {
+            return ICloudPreferenceState(value: HermesCloudSyncSnapshot(settings: settings), updatedAt: updatedAt)
+        }
+        guard settings != .defaults else { return nil }
+        let migratedAt = Date(timeIntervalSince1970: 0)
+        setCloudSettingsUpdatedAt(migratedAt)
+        return ICloudPreferenceState(value: HermesCloudSyncSnapshot(settings: settings), updatedAt: migratedAt)
+    }
+
+    @discardableResult
+    public func applyCloudSyncState(_ state: ICloudPreferenceState<HermesCloudSyncSnapshot>) -> Bool {
+        guard state.value.schemaVersion == HermesCloudSyncSnapshot.schemaVersion else { return false }
+        if let localUpdatedAt = cloudSettingsUpdatedAt, localUpdatedAt > state.updatedAt {
+            return false
+        }
+        persist(state.value.settings)
+        setCloudSettingsUpdatedAt(state.updatedAt)
+        return true
+    }
+
+    private func persist(_ settings: HermesSettings) {
         defaults.set(
             settings.apiBaseURL.trimmingCharacters(in: .whitespacesAndNewlines),
             forKey: DevBarCoreConstants.Defaults.hermesAPIBaseURLKey
@@ -62,6 +89,28 @@ public struct UserDefaultsHermesSettingsStore: HermesSettingsStore {
         defaults.set(
             settings.hermesChatTag.trimmingCharacters(in: .whitespacesAndNewlines),
             forKey: DevBarCoreConstants.Defaults.hermesChatHermesTagKey
+        )
+    }
+
+    private var cloudSettingsUpdatedAt: Date? {
+        guard defaults.object(forKey: DevBarCoreConstants.Defaults.hermesSettingsCloudUpdatedAtKey) != nil else {
+            return nil
+        }
+        return Date(
+            timeIntervalSince1970: defaults.double(
+                forKey: DevBarCoreConstants.Defaults.hermesSettingsCloudUpdatedAtKey
+            )
+        )
+    }
+
+    private func markCloudSettingsModified() {
+        setCloudSettingsUpdatedAt(Date())
+    }
+
+    private func setCloudSettingsUpdatedAt(_ date: Date) {
+        defaults.set(
+            date.timeIntervalSince1970,
+            forKey: DevBarCoreConstants.Defaults.hermesSettingsCloudUpdatedAtKey
         )
     }
 

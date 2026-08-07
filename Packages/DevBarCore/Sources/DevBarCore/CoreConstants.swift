@@ -146,6 +146,7 @@ public enum DevBarCoreConstants {
         public static let hermesChatTabProviderKey = "hermes_chat_tab_provider"
         public static let hermesChatHermesRemarkKey = "hermes_chat_hermes_remark"
         public static let hermesChatHermesTagKey = "hermes_chat_hermes_tag"
+        public static let hermesSettingsCloudUpdatedAtKey = "hermes_settings_cloud_updated_at_v1"
         public static let hermesQuickStartItemsKey = "hermes_quick_start_items_v1"
         public static let iosWebKitTabEnabledKey = "ios_webkit_tab_enabled"
         public static let glmQuotaCacheKey = "glm_quota_cache"

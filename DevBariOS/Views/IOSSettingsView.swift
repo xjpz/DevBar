@@ -469,12 +469,14 @@ private struct IOSICloudSyncSettingsView: View {
                 entityToggle("Markdown 文档", systemImage: "doc.plaintext", entity: .markdownDocument)
                 entityToggle("SSH 服务器列表", systemImage: "terminal", entity: .terminalServer)
                 chatRecordsToggle()
+                entityToggle("Hermes 设置", systemImage: "bubble.left.and.text.bubble.right", entity: .hermesSettings)
+                entityToggle("Home Assistant 设置", systemImage: "house", entity: .homeAssistantSettings)
                 entityToggle("API Record 元数据（即将支持）", systemImage: "network", entity: .apiRecord, isAvailable: false)
                 entityToggle("Web 历史（即将支持）", systemImage: "clock.arrow.circlepath", entity: .webHistoryRecord, isAvailable: false)
             } header: {
                 Text("同步数据")
             } footer: {
-                Text("当前同步备忘录、Markdown 文档、SSH 服务器列表和聊天记录。API Record 和 Web 历史会在后续版本开放。")
+                Text("当前同步备忘录、Markdown 文档、SSH 服务器列表、聊天记录，以及 Hermes 和 Home Assistant 的非敏感设置。API Key、Token 等凭据只保存在本机 Keychain。")
             }
 
             Section {

@@ -8,9 +8,14 @@ public enum ICloudSyncEntity: String, Codable, CaseIterable, Sendable {
     case apiRecord
     case terminalServer
     case webHistoryRecord
+    case hermesSettings
+    case homeAssistantSettings
 }
 
 public struct ICloudSyncSettings: Codable, Equatable, Sendable {
+    public static let schemaVersion = 2
+
+    public var schemaVersion: Int
     public var isEnabled: Bool
     public var enabledEntities: Set<ICloudSyncEntity>
     public var syncAPISensitiveFields: Bool
@@ -18,12 +23,14 @@ public struct ICloudSyncSettings: Codable, Equatable, Sendable {
     public var syncProviderCredentials: Bool
 
     public init(
+        schemaVersion: Int = Self.schemaVersion,
         isEnabled: Bool = false,
         enabledEntities: Set<ICloudSyncEntity> = Self.defaultEnabledEntities,
         syncAPISensitiveFields: Bool = false,
         syncTerminalSecrets: Bool = false,
         syncProviderCredentials: Bool = false
     ) {
+        self.schemaVersion = schemaVersion
         self.isEnabled = isEnabled
         self.enabledEntities = enabledEntities
         self.syncAPISensitiveFields = syncAPISensitiveFields
@@ -37,6 +44,8 @@ public struct ICloudSyncSettings: Codable, Equatable, Sendable {
         .chatConversation,
         .chatMessage,
         .terminalServer,
+        .hermesSettings,
+        .homeAssistantSettings,
     ]
 
     public static let `default` = ICloudSyncSettings()
@@ -47,6 +56,8 @@ public struct ICloudSyncSettings: Codable, Equatable, Sendable {
         .chatConversation,
         .chatMessage,
         .terminalServer,
+        .hermesSettings,
+        .homeAssistantSettings,
     ]
 
     public func isSyncEnabled(for entity: ICloudSyncEntity) -> Bool {
@@ -55,8 +66,32 @@ public struct ICloudSyncSettings: Codable, Equatable, Sendable {
 
     public var normalizedForFirstVersion: ICloudSyncSettings {
         var copy = self
+        if copy.schemaVersion < Self.schemaVersion {
+            copy.enabledEntities.formUnion([.hermesSettings, .homeAssistantSettings])
+            copy.schemaVersion = Self.schemaVersion
+        }
         copy.enabledEntities = copy.enabledEntities.intersection(Self.firstVersionSupportedEntities)
         return copy
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case isEnabled
+        case enabledEntities
+        case syncAPISensitiveFields
+        case syncTerminalSecrets
+        case syncProviderCredentials
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
+        enabledEntities = try container.decodeIfPresent(Set<ICloudSyncEntity>.self, forKey: .enabledEntities)
+            ?? Self.defaultEnabledEntities
+        syncAPISensitiveFields = try container.decodeIfPresent(Bool.self, forKey: .syncAPISensitiveFields) ?? false
+        syncTerminalSecrets = try container.decodeIfPresent(Bool.self, forKey: .syncTerminalSecrets) ?? false
+        syncProviderCredentials = try container.decodeIfPresent(Bool.self, forKey: .syncProviderCredentials) ?? false
     }
 }
 
@@ -67,6 +102,42 @@ public struct ICloudPreferenceState<Value: Codable & Equatable & Sendable>: Coda
     public init(value: Value, updatedAt: Date) {
         self.value = value
         self.updatedAt = updatedAt
+    }
+}
+
+public struct HermesCloudSyncSnapshot: Codable, Equatable, Sendable {
+    public static let schemaVersion = 1
+
+    public var schemaVersion: Int
+    public var apiBaseURL: String
+    public var hermesModel: String
+    public var hermesProvider: String
+    public var isStreamingEnabled: Bool
+    public var chatTabProvider: ChatBotProviderKind
+    public var hermesChatRemark: String
+    public var hermesChatTag: String
+
+    public init(settings: HermesSettings, schemaVersion: Int = Self.schemaVersion) {
+        self.schemaVersion = schemaVersion
+        self.apiBaseURL = settings.apiBaseURL
+        self.hermesModel = settings.hermesModel
+        self.hermesProvider = settings.hermesProvider
+        self.isStreamingEnabled = settings.isStreamingEnabled
+        self.chatTabProvider = settings.normalizedChatTabProvider
+        self.hermesChatRemark = settings.hermesChatRemark
+        self.hermesChatTag = settings.hermesChatTag
+    }
+
+    public var settings: HermesSettings {
+        HermesSettings(
+            apiBaseURL: apiBaseURL,
+            hermesModel: hermesModel,
+            hermesProvider: hermesProvider,
+            isStreamingEnabled: isStreamingEnabled,
+            chatTabProvider: chatTabProvider,
+            hermesChatRemark: hermesChatRemark,
+            hermesChatTag: hermesChatTag
+        )
     }
 }
 

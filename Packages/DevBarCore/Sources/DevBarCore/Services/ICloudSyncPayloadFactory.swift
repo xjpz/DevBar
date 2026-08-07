@@ -221,8 +221,38 @@ public enum ICloudSyncPayloadFactory {
         )
     }
 
+    public static func preferencesPayload<Value: Encodable>(
+        entity: ICloudSyncEntity,
+        value: Value,
+        updatedAt: Date
+    ) throws -> ICloudSyncRecord {
+        let data = try JSONEncoder().encode(value)
+        return ICloudSyncRecord(
+            id: recordID(entity: entity, localID: "current"),
+            entity: entity,
+            localID: "current",
+            updatedAt: updatedAt,
+            fields: ["snapshot": data.base64EncodedString()]
+        )
+    }
+
+    public static func decodePreferences<Value: Decodable>(
+        _ type: Value.Type,
+        from record: ICloudSyncRecord
+    ) -> Value? {
+        guard let encoded = record.fields["snapshot"],
+              let data = Data(base64Encoded: encoded) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(type, from: data)
+    }
+
     public static func recordID(entity: ICloudSyncEntity, id: UUID) -> String {
         "\(entity.rawValue):\(id.uuidString.lowercased())"
+    }
+
+    public static func recordID(entity: ICloudSyncEntity, localID: String) -> String {
+        "\(entity.rawValue):\(localID.lowercased())"
     }
 
     private static func encodeDate(_ date: Date) -> String {

@@ -130,7 +130,9 @@ final class IOSAppViewModel: ObservableObject {
     }
     @Published var hermesSettings: HermesSettings {
         didSet {
-            hermesSettingsStore.save(hermesSettings)
+            if !isApplyingICloudSyncedHermesSettings {
+                hermesSettingsStore.save(hermesSettings)
+            }
         }
     }
     @Published private(set) var hermesSettingsRevision = 0
@@ -204,6 +206,7 @@ final class IOSAppViewModel: ObservableObject {
     private var deferredHermesInteractionEndTask: Task<Void, Never>?
     private var hermesNavigationReservationTask: Task<Void, Never>?
     private var hasPendingHermesNavigationReservation = false
+    private var isApplyingICloudSyncedHermesSettings = false
     private var hermesChatActivityDepth = 0
     private var quotaRefreshTimer: Timer?
     private var isQuotaAutoRefreshActive = false
@@ -303,6 +306,24 @@ final class IOSAppViewModel: ObservableObject {
                         force: true
                     )
                     self.refreshDevBarLiveMessageReadiness()
+                }
+            }
+            .store(in: &childObservers)
+        NotificationCenter.default.publisher(for: .iCloudSyncedPreferencesDidChange)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.isApplyingICloudSyncedHermesSettings = true
+                    self.hermesSettings = self.hermesSettingsStore.load()
+                    self.isApplyingICloudSyncedHermesSettings = false
+                    self.hermesSettingsRevision += 1
+                }
+            }
+            .store(in: &childObservers)
+        NotificationCenter.default.publisher(for: .homeAssistantDiagnosticRecorded)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.scheduleDiagnosticsFlush(after: .milliseconds(750))
                 }
             }
             .store(in: &childObservers)
