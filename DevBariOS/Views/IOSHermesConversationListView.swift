@@ -300,11 +300,9 @@ struct IOSHermesConversationListView: View {
         case .local(let conversation):
             let start = CFAbsoluteTimeGetCurrent()
             debugLog("open tap local id=\(conversation.id.uuidString) messages=\(conversation.messages.count)")
-            let snapshot = IOSHermesChatViewModel.messageSnapshot(in: conversation)
-            debugLog("open snapshot ready local id=\(conversation.id.uuidString) count=\(snapshot.count) dt=\(elapsedMilliseconds(since: start))ms")
             destination = ChatDestination(
                 id: "conversation.\(conversation.id.uuidString)",
-                kind: .conversation(conversation, snapshot),
+                kind: .conversation(conversation, nil),
                 settings: appViewModel.hermesSettings,
                 apiKey: appViewModel.hermesAPIKey
             )
@@ -620,7 +618,7 @@ struct IOSHermesConversationListView: View {
 private struct ChatDestination: Identifiable {
     enum Kind {
         case new
-        case conversation(IOSHermesConversation, [IOSHermesChatViewModel.Message])
+        case conversation(IOSHermesConversation, [IOSHermesChatViewModel.Message]?)
         case quickStart(String)
     }
 

@@ -153,7 +153,7 @@ final class IOSHermesChatViewModel: ObservableObject {
         } else {
             self.provider = provider
         }
-        if let conversation {
+        if let conversation, prefetchedMessages != nil {
             load(conversation: conversation, prefetchedMessages: prefetchedMessages)
         }
     }

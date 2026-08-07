@@ -101,7 +101,7 @@ struct IOSHermesChatView: View {
                     performInitialScrollToBottom(proxy)
                 }
                 .onChange(of: viewModel.messages) { _, messages in
-                    guard let lastID = messages.last?.id else { return }
+                    guard let lastID = latestVisibleMessageID else { return }
                     // Messages loaded after the view appeared (async fetch). Keep the
                     // initial-scroll flag in sync so the jump-to-bottom still happens.
                     if !hasPerformedInitialScroll {
@@ -519,6 +519,10 @@ struct IOSHermesChatView: View {
         }
     }
 
+    private var latestVisibleMessageID: UUID? {
+        visibleMessages.last?.id
+    }
+
     private var headerTitle: String {
         providerDisplayTitle
     }
@@ -881,7 +885,7 @@ struct IOSHermesChatView: View {
 
     private func performInitialScrollToBottom(_ proxy: ScrollViewProxy) {
         guard !hasPerformedInitialScroll else { return }
-        guard let lastID = viewModel.messages.last?.id else { return }
+        guard let lastID = latestVisibleMessageID else { return }
         hasPerformedInitialScroll = true
         // Prefetched conversations arrive fully populated, so viewModel.messages
         // never "changes" and the onChange scroll never fires — the list would sit
@@ -896,7 +900,7 @@ struct IOSHermesChatView: View {
     }
 
     private func scrollToLatestMessage(_ proxy: ScrollViewProxy) {
-        guard let lastID = viewModel.messages.last?.id else { return }
+        guard let lastID = latestVisibleMessageID else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             withAnimation(.easeOut(duration: 0.2)) {
                 proxy.scrollTo(lastID, anchor: .bottom)
