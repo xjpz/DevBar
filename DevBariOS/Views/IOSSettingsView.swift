@@ -15,6 +15,11 @@ struct IOSSettingsView: View {
     @State private var copiedDebugItemID: String?
     @State private var currentAppIconOption: IOSAppIconOption = .default
     @StateObject private var iCloudSyncCoordinator = ICloudSyncCoordinator.shared
+    @AppStorage(
+        QuotaResetTimeDisplayMode.defaultsKey,
+        store: QuotaResetTimeDisplayMode.sharedDefaults
+    )
+    private var resetTimeDisplayMode = QuotaResetTimeDisplayMode.exact.rawValue
 
     private let intervals: [(LocalizedStringKey, TimeInterval)] = [
         ("ios_settings_interval_3m", 180),
@@ -75,6 +80,17 @@ struct IOSSettingsView: View {
             }
 
             Section("ios_settings_ai_quota_section") {
+                Picker(selection: $resetTimeDisplayMode) {
+                    Text("quota_reset_time_exact").tag(QuotaResetTimeDisplayMode.exact.rawValue)
+                    Text("quota_reset_time_countdown").tag(QuotaResetTimeDisplayMode.countdown.rawValue)
+                } label: {
+                    Label("quota_reset_time_display", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                }
+                .accessibilityIdentifier("ios.settings.quotaResetTimeDisplay")
+                .onChange(of: resetTimeDisplayMode) { _, _ in
+                    WidgetDataManager.shared.reloadAllTimelines()
+                }
+
                 Picker(selection: $appViewModel.refreshInterval) {
                     ForEach(intervals, id: \.1) { label, value in
                         Text(label).tag(value)

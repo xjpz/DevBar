@@ -31,29 +31,16 @@ struct QuotaTimelineProvider: AppIntentTimelineProvider {
         let now = Date()
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: now)!
 
-        var entries = [
+        let entries = QuotaWidgetResetPresentation.timelineDates(
+            from: now,
+            through: nextUpdate,
+            limits: data.limits
+        ).map { entryDate in
             QuotaEntry(
                 data: data,
                 selectedProvider: resolved.provider,
                 isLoggedIn: isLoggedIn,
-                date: now
-            )
-        ]
-
-        let earliestReset = data.limits
-            .compactMap { $0.formattedResetTime }
-            .compactMap { Self.parseResetTime($0) }
-            .filter { $0 > now && $0 < nextUpdate }
-            .min()
-
-        if let resetTime = earliestReset {
-            entries.append(
-                QuotaEntry(
-                    data: data,
-                    selectedProvider: resolved.provider,
-                    isLoggedIn: isLoggedIn,
-                    date: resetTime
-                )
+                date: entryDate
             )
         }
 
@@ -90,12 +77,6 @@ struct QuotaTimelineProvider: AppIntentTimelineProvider {
         return decoded
     }
 
-    private static func parseResetTime(_ formatted: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd HH:mm"
-        formatter.locale = Locale.current
-        return formatter.date(from: formatted)
-    }
 }
 
 struct QuotaEntry: TimelineEntry {
@@ -172,7 +153,8 @@ struct DevBarWidgetEntryView: View {
                 level: entry.data.level,
                 availableResetCount: entry.data.availableResetCount,
                 provider: entry.data.provider,
-                visualStyle: visualStyle
+                visualStyle: visualStyle,
+                referenceDate: entry.date
             )
         case .systemMedium:
             QuotaMediumView(
@@ -184,7 +166,8 @@ struct DevBarWidgetEntryView: View {
                 subscriptionExpireDate: entry.data.subscriptionExpireDate,
                 availableResetCount: entry.data.availableResetCount,
                 lastUpdated: entry.data.lastUpdated,
-                visualStyle: visualStyle
+                visualStyle: visualStyle,
+                referenceDate: entry.date
             )
         case .systemLarge:
             QuotaLargeView(
@@ -193,7 +176,8 @@ struct DevBarWidgetEntryView: View {
                 subscriptionName: entry.data.subscriptionName,
                 availableResetCount: entry.data.availableResetCount,
                 lastUpdated: entry.data.lastUpdated,
-                visualStyle: visualStyle
+                visualStyle: visualStyle,
+                referenceDate: entry.date
             )
         default:
             QuotaMediumView(
@@ -205,7 +189,8 @@ struct DevBarWidgetEntryView: View {
                 subscriptionExpireDate: entry.data.subscriptionExpireDate,
                 availableResetCount: entry.data.availableResetCount,
                 lastUpdated: entry.data.lastUpdated,
-                visualStyle: visualStyle
+                visualStyle: visualStyle,
+                referenceDate: entry.date
             )
         }
     }

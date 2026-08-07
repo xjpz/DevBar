@@ -20,28 +20,20 @@ struct QuotaRowItemView: View {
                 }
             }
 
-            ProgressView(value: Double(item.percentage), total: 100)
-                .tint(progressColor)
+            QuotaProgressBar(percentage: item.percentage)
             HStack {
                 Text(String(format: String(localized: "used_percentage"), item.percentage))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
                 if let resetTime = item.resetTime {
-                    Text(String(format: String(localized: "reset_at"), resetTime))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    QuotaResetTimeText(
+                        exactText: resetTime,
+                        resetDate: QuotaResetTimePresentation.resetDate(from: resetTime)
+                    )
                 }
             }
         }
         .padding(.vertical, 4)
-    }
-
-    private var progressColor: Color {
-        switch item.percentage {
-        case ..<50: return .green
-        case 50..<80: return .orange
-        default: return .red
-        }
     }
 }

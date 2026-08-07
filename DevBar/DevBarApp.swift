@@ -1,6 +1,7 @@
 // DevBarApp.swift
 // DevBar
 
+import DevBarCore
 import SwiftUI
 
 @main
@@ -10,6 +11,11 @@ struct DevBarApp: App {
     @StateObject private var languageManager = LanguageManager()
 
     init() {
+        if QuotaResetTimeDisplayMode.migrateLegacyValueIfNeeded(
+            to: QuotaResetTimeDisplayMode.sharedDefaults
+        ) {
+            WidgetDataManager.shared.reloadAllTimelines()
+        }
         applyDockVisibility()
     }
 

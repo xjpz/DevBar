@@ -12,6 +12,7 @@ struct QuotaLargeView: View {
     let availableResetCount: Int?
     let lastUpdated: Date
     var visualStyle: WidgetVisualStyle = .liquidGlass
+    var referenceDate: Date = Date()
 
     private var sortedLimits: [WidgetQuotaLimit] {
         limits.sorted { a, b in
@@ -77,7 +78,10 @@ struct QuotaLargeView: View {
                             .font(.caption2)
                             .foregroundStyle(secondaryTextColor)
                         Spacer()
-                        if let reset = limit.formattedResetTime {
+                        if let reset = QuotaWidgetResetPresentation.text(
+                            for: limit.formattedResetTime,
+                            at: referenceDate
+                        ) {
                             Text(String(format: String(localized: "widget_reset_at"), reset))
                                 .font(.caption2)
                                 .foregroundStyle(secondaryTextColor)

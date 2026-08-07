@@ -15,6 +15,7 @@ struct QuotaMediumView: View {
     let availableResetCount: Int?
     let lastUpdated: Date
     var visualStyle: WidgetVisualStyle = .liquidGlass
+    var referenceDate: Date = Date()
 
     private var featuredLimit: WidgetQuotaLimit? {
         sortedLimits.first(where: WidgetQuotaPresentation.isFiveHourLimit) ?? sortedLimits.first
@@ -80,7 +81,10 @@ struct QuotaMediumView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                 Spacer(minLength: 4)
-                if let reset = limit.formattedResetTime {
+                if let reset = QuotaWidgetResetPresentation.text(
+                    for: limit.formattedResetTime,
+                    at: referenceDate
+                ) {
                     Text(reset)
                         .font(.caption2)
                         .foregroundStyle(secondaryTextColor)

@@ -12,6 +12,7 @@ struct QuotaSmallView: View {
     let availableResetCount: Int?
     var provider: WidgetProvider? = nil
     var visualStyle: WidgetVisualStyle = .liquidGlass
+    var referenceDate: Date = Date()
 
     private var visibleLimits: [WidgetQuotaLimit] {
         let sortedLimits = WidgetQuotaPresentation.sortedLimits(limits, provider: provider)
@@ -127,7 +128,10 @@ struct QuotaSmallView: View {
         if let unit = limit.unitDescription, !unit.isEmpty {
             return unit
         }
-        if let reset = limit.formattedResetTime, !reset.isEmpty {
+        if let reset = QuotaWidgetResetPresentation.text(
+            for: limit.formattedResetTime,
+            at: referenceDate
+        ) {
             return "\(reset) 重置"
         }
         return nil

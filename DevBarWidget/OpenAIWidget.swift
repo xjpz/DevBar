@@ -22,17 +22,11 @@ struct OpenAITimelineProvider: TimelineProvider {
         let now = Date()
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: now)!
 
-        var entries = [QuotaEntry(data: data, isLoggedIn: isLoggedIn, date: now)]
-
-        let earliestReset = data.limits
-            .compactMap { $0.formattedResetTime }
-            .compactMap { Self.parseResetTime($0) }
-            .filter { $0 > now && $0 < nextUpdate }
-            .min()
-
-        if let resetTime = earliestReset {
-            entries.append(QuotaEntry(data: data, isLoggedIn: isLoggedIn, date: resetTime))
-        }
+        let entries = QuotaWidgetResetPresentation.timelineDates(
+            from: now,
+            through: nextUpdate,
+            limits: data.limits
+        ).map { QuotaEntry(data: data, isLoggedIn: isLoggedIn, date: $0) }
 
         completion(Timeline(entries: entries, policy: .after(nextUpdate)))
     }
@@ -51,12 +45,6 @@ struct OpenAITimelineProvider: TimelineProvider {
         return decoded
     }
 
-    private static func parseResetTime(_ formatted: String) -> Date? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd HH:mm"
-        formatter.locale = Locale.current
-        return formatter.date(from: formatted)
-    }
 }
 
 struct OpenAIWidget: Widget {

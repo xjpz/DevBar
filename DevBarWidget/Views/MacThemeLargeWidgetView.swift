@@ -308,8 +308,10 @@ struct MacThemeLargeWidgetView: View {
                     .frame(width: density.percentWidth, alignment: .trailing)
 
                 if density.showsInlineReset,
-                   let reset = limit.formattedResetTime,
-                   !reset.isEmpty {
+                   let reset = QuotaWidgetResetPresentation.text(
+                       for: limit.formattedResetTime,
+                       at: entry.date
+                   ) {
                     Text("\(reset)重置")
                         .font(.system(size: density.detailFontSize, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.56))
@@ -547,7 +549,10 @@ struct MacThemeLargeWidgetView: View {
     }
 
     private func quotaDetail(for limit: WidgetQuotaLimit) -> String? {
-        if let reset = limit.formattedResetTime, !reset.isEmpty {
+        if let reset = QuotaWidgetResetPresentation.text(
+            for: limit.formattedResetTime,
+            at: entry.date
+        ) {
             return "\(reset) 重置"
         }
         if let unit = limit.unitDescription, !unit.isEmpty {
@@ -564,7 +569,10 @@ struct MacThemeLargeWidgetView: View {
     ) -> String {
         if !canShowResetInBody,
            let resetLimit = limits.first(where: { $0.formattedResetTime?.isEmpty == false }),
-           let reset = resetLimit.formattedResetTime {
+           let reset = QuotaWidgetResetPresentation.text(
+               for: resetLimit.formattedResetTime,
+               at: entry.date
+           ) {
             return "\(quotaMarker(for: resetLimit, provider: provider)) \(reset)重置"
         }
         return fallbackLevel?.capitalized ?? "--"

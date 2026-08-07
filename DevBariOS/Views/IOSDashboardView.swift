@@ -312,6 +312,7 @@ struct IOSDashboardView: View {
                         title: glmLimitTitle(limit),
                         percentage: limit.percentage,
                         resetText: glmLimitResetText(limit),
+                        resetDate: glmLimitResetDate(limit),
                         detailText: nil,
                         locale: languageManager.currentLocale
                     )
@@ -352,6 +353,7 @@ struct IOSDashboardView: View {
                         title: localizedQuotaTitle(row.name, provider: .openai),
                         percentage: row.percentage,
                         resetText: row.resetTime,
+                        resetDate: row.resetDate,
                         detailText: nil,
                         locale: languageManager.currentLocale
                     )
@@ -615,7 +617,8 @@ struct IOSDashboardView: View {
                 LocalizedUsageRow(
                     name: openAIWindowTitle(primary),
                     percentage: primary.usedPercent,
-                    resetTime: openAIWindowResetText(primary)
+                    resetTime: openAIWindowResetText(primary),
+                    resetDate: openAIWindowResetDate(primary)
                 )
             )
         }
@@ -625,7 +628,8 @@ struct IOSDashboardView: View {
                 LocalizedUsageRow(
                     name: openAIWindowTitle(secondary),
                     percentage: secondary.usedPercent,
-                    resetTime: openAIWindowResetText(secondary)
+                    resetTime: openAIWindowResetText(secondary),
+                    resetDate: openAIWindowResetDate(secondary)
                 )
             )
         }
@@ -686,8 +690,12 @@ struct IOSDashboardView: View {
     }
 
     private func glmLimitResetText(_ limit: QuotaLimit) -> String? {
-        guard let nextResetTime = limit.nextResetTime else { return nil }
-        return formattedDateTime(from: TimeInterval(nextResetTime) / 1000)
+        guard let resetDate = glmLimitResetDate(limit) else { return nil }
+        return formattedResetDate(resetDate)
+    }
+
+    private func glmLimitResetDate(_ limit: QuotaLimit) -> Date? {
+        limit.nextResetTime.map { Date(timeIntervalSince1970: TimeInterval($0) / 1000) }
     }
 
     private func openAIWindowTitle(_ window: OpenAIUsageWindow) -> String {
@@ -704,8 +712,12 @@ struct IOSDashboardView: View {
     }
 
     private func openAIWindowResetText(_ window: OpenAIUsageWindow) -> String? {
-        guard let resetAt = window.resetAt else { return nil }
-        return formattedDateTime(from: TimeInterval(resetAt))
+        guard let resetDate = openAIWindowResetDate(window) else { return nil }
+        return formattedResetDate(resetDate)
+    }
+
+    private func openAIWindowResetDate(_ window: OpenAIUsageWindow) -> Date? {
+        window.resetAt.map { Date(timeIntervalSince1970: TimeInterval($0)) }
     }
 
     private func formattedDateTime(from timestamp: TimeInterval) -> String {
@@ -724,49 +736,7 @@ struct IOSDashboardView: View {
     }
 
     private func parsedResetDate(from text: String) -> Date? {
-        let formatsWithYear = [
-            "yyyy/M/d HH:mm",
-            "yyyy/MM/dd HH:mm",
-            "yyyy-MM-dd HH:mm",
-        ]
-        for format in formatsWithYear {
-            if let date = resetDateFormatter(format: format).date(from: text) {
-                return date
-            }
-        }
-
-        let formatsWithoutYear = ["M/d HH:mm", "MM/dd HH:mm", "M-d HH:mm", "MM-dd HH:mm"]
-        for format in formatsWithoutYear {
-            let formatter = resetDateFormatter(format: format)
-            guard let parsed = formatter.date(from: text) else { continue }
-            return resetDateNearestToToday(from: parsed)
-        }
-        return nil
-    }
-
-    private func resetDateFormatter(format: String) -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar.current
-        formatter.timeZone = .current
-        formatter.dateFormat = format
-        formatter.isLenient = false
-        return formatter
-    }
-
-    private func resetDateNearestToToday(from dateWithoutCurrentYear: Date) -> Date? {
-        let calendar = Calendar.current
-        let now = Date()
-        let parsedComponents = calendar.dateComponents([.month, .day, .hour, .minute], from: dateWithoutCurrentYear)
-        let currentYear = calendar.component(.year, from: now)
-
-        return [currentYear - 1, currentYear, currentYear + 1]
-            .compactMap { year -> Date? in
-                var components = parsedComponents
-                components.year = year
-                return calendar.date(from: components)
-            }
-            .min { abs($0.timeIntervalSince(now)) < abs($1.timeIntervalSince(now)) }
+        QuotaResetTimePresentation.resetDate(from: text)
     }
 
     @MainActor
@@ -932,9 +902,31 @@ private struct UsageLimitRow: View {
     let title: String
     let percentage: Int
     let resetText: String?
+    let resetDate: Date?
     let detailText: String?
     let locale: Locale
     @Environment(\.themeTokens) private var theme
+    @AppStorage(
+        QuotaResetTimeDisplayMode.defaultsKey,
+        store: QuotaResetTimeDisplayMode.sharedDefaults
+    )
+    private var resetTimeDisplayMode = QuotaResetTimeDisplayMode.exact.rawValue
+
+    init(
+        title: String,
+        percentage: Int,
+        resetText: String?,
+        resetDate: Date? = nil,
+        detailText: String?,
+        locale: Locale
+    ) {
+        self.title = title
+        self.percentage = percentage
+        self.resetText = resetText
+        self.resetDate = resetDate
+        self.detailText = detailText
+        self.locale = locale
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -979,20 +971,49 @@ private struct UsageLimitRow: View {
 
     @ViewBuilder
     private func resetLabel(_ resetText: String, style: ResetPresentationStyle) -> some View {
-        switch style {
-        case .icon, .compressedIcon:
-            HStack(spacing: 3) {
-                Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-                    .accessibilityHidden(true)
-                Text(resetText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(style == .compressedIcon ? 0.72 : 1)
+        if displayMode == .countdown,
+           let resetDate = resetDate ?? QuotaResetTimePresentation.resetDate(from: resetText) {
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                resetLabelContent(
+                    QuotaResetTimePresentation.countdownText(until: resetDate, now: context.date),
+                    style: style,
+                    isCountdown: true
+                )
             }
-            .font(theme.captionFont)
-            .foregroundStyle(theme.textSecondary)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(String(format: String(localized: "ios_dashboard_reset_at", locale: locale), locale: locale, resetText))
+        } else {
+            resetLabelContent(resetText, style: style, isCountdown: false)
         }
+    }
+
+    private var displayMode: QuotaResetTimeDisplayMode {
+        QuotaResetTimeDisplayMode(rawValue: resetTimeDisplayMode) ?? .exact
+    }
+
+    private func resetLabelContent(
+        _ text: String,
+        style: ResetPresentationStyle,
+        isCountdown: Bool
+    ) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                .accessibilityHidden(true)
+            Text(text)
+                .lineLimit(1)
+                .minimumScaleFactor(style == .compressedIcon ? 0.72 : 1)
+        }
+        .font(theme.captionFont)
+        .foregroundStyle(theme.textSecondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            String(
+                format: String(
+                    localized: isCountdown ? "ios_dashboard_reset_in" : "ios_dashboard_reset_at",
+                    locale: locale
+                ),
+                locale: locale,
+                text
+            )
+        )
     }
 
     private var percentageLabel: some View {
@@ -1021,6 +1042,7 @@ private struct LocalizedUsageRow: Identifiable {
     let name: String
     let percentage: Int
     let resetTime: String?
+    let resetDate: Date?
 }
 
 private extension View {

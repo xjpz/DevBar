@@ -45,6 +45,11 @@ struct SettingsAccounts: View {
     @State private var transferExportError: String?
     @State private var isGeneratingTransferQRCode = false
     @State private var selectedInterval: TimeInterval
+    @AppStorage(
+        QuotaResetTimeDisplayMode.defaultsKey,
+        store: QuotaResetTimeDisplayMode.sharedDefaults
+    )
+    private var resetTimeDisplayMode = QuotaResetTimeDisplayMode.exact.rawValue
 
     private let intervals: [(String, TimeInterval)] = [
         (String(localized: "minutes_3"), 180),
@@ -81,6 +86,7 @@ struct SettingsAccounts: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 refreshIntervalCard
+                resetTimeDisplayCard
 
                 introCard
 
@@ -119,6 +125,31 @@ struct SettingsAccounts: View {
                 }
             }
             .pickerStyle(.menu)
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+        )
+    }
+
+    private var resetTimeDisplayCard: some View {
+        HStack {
+            Text("quota_reset_time_display")
+                .font(.subheadline)
+            Spacer()
+            Picker("", selection: $resetTimeDisplayMode) {
+                Text("quota_reset_time_exact").tag(QuotaResetTimeDisplayMode.exact.rawValue)
+                Text("quota_reset_time_countdown").tag(QuotaResetTimeDisplayMode.countdown.rawValue)
+            }
+            .pickerStyle(.menu)
+            .onChange(of: resetTimeDisplayMode) { _, _ in
+                WidgetDataManager.shared.reloadAllTimelines()
+            }
         }
         .padding(12)
         .background(

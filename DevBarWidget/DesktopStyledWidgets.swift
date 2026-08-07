@@ -107,7 +107,23 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
         }
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: now)
             ?? now.addingTimeInterval(300)
-        return Timeline(entries: [entry(date: now, content: content)], policy: .after(nextUpdate))
+        let currentEntry = entry(date: now, content: content)
+        let limits: [WidgetQuotaLimit]
+        switch currentEntry.content {
+        case let .quota(_, dataByProvider):
+            limits = dataByProvider.values.flatMap(\.limits)
+        case let .macTheme(macTheme):
+            limits = macTheme.quotaDataByProvider.values.flatMap(\.limits)
+        default:
+            limits = []
+        }
+        let dates = QuotaWidgetResetPresentation.timelineDates(
+            from: now,
+            through: nextUpdate,
+            limits: limits
+        )
+        let entries = dates.map { entry(date: $0, content: content) }
+        return Timeline(entries: entries, policy: .after(nextUpdate))
     }
 
     private func entry(
@@ -296,7 +312,8 @@ struct DesktopStyledWidgetEntryView: View {
             if family == .systemLarge {
                 DesktopStyledQuotaLargeView(
                     dataByProvider: dataByProvider,
-                    visualStyle: visualStyle
+                    visualStyle: visualStyle,
+                    referenceDate: entry.date
                 )
             } else {
                 DevBarWidgetEntryView(entry: quota, visualStyle: visualStyle)
@@ -316,6 +333,7 @@ struct DesktopStyledWidgetEntryView: View {
 private struct DesktopStyledQuotaLargeView: View {
     let dataByProvider: [WidgetProviderSelection: WidgetSharedData]
     let visualStyle: WidgetVisualStyle
+    let referenceDate: Date
 
     var body: some View {
         let providers = visibleProviders
@@ -535,8 +553,10 @@ private struct DesktopStyledQuotaLargeView: View {
                     .frame(width: density.percentWidth, alignment: .trailing)
 
                 if density.showsInlineReset,
-                   let reset = limit.formattedResetTime,
-                   !reset.isEmpty {
+                   let reset = QuotaWidgetResetPresentation.text(
+                       for: limit.formattedResetTime,
+                       at: referenceDate
+                   ) {
                     Text("\(reset)重置")
                         .font(.system(size: density.detailFontSize, weight: .semibold))
                         .foregroundStyle(secondaryTextColor)
@@ -715,7 +735,10 @@ private struct DesktopStyledQuotaLargeView: View {
     }
 
     private func quotaDetail(for limit: WidgetQuotaLimit) -> String? {
-        if let reset = limit.formattedResetTime, !reset.isEmpty {
+        if let reset = QuotaWidgetResetPresentation.text(
+            for: limit.formattedResetTime,
+            at: referenceDate
+        ) {
             return "\(reset) 重置"
         }
         if let unit = limit.unitDescription, !unit.isEmpty {
@@ -732,7 +755,10 @@ private struct DesktopStyledQuotaLargeView: View {
     ) -> String {
         if !canShowResetInBody,
            let resetLimit = limits.first(where: { $0.formattedResetTime?.isEmpty == false }),
-           let reset = resetLimit.formattedResetTime {
+           let reset = QuotaWidgetResetPresentation.text(
+               for: resetLimit.formattedResetTime,
+               at: referenceDate
+           ) {
             return "\(quotaMarker(for: resetLimit, provider: provider)) \(reset)重置"
         }
         return fallbackLevel?.capitalized ?? "--"

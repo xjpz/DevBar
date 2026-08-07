@@ -22,9 +22,25 @@ struct MacThemeWidgetProvider: AppIntentTimelineProvider {
 
     func timeline(for configuration: MacThemeWidgetConfigurationIntent, in context: Context) async -> Timeline<MacThemeWidgetEntry> {
         let now = Date()
-        let entry = entry(for: configuration, date: now)
+        let currentEntry = entry(for: configuration, date: now)
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: now) ?? now.addingTimeInterval(900)
-        return Timeline(entries: [entry], policy: .after(nextUpdate))
+        let limits = currentEntry.quotaDataByProvider.values.flatMap(\.limits)
+        let entries = QuotaWidgetResetPresentation.timelineDates(
+            from: now,
+            through: nextUpdate,
+            limits: limits
+        ).map { entryDate in
+            MacThemeWidgetEntry(
+                date: entryDate,
+                configuration: configuration,
+                selectedPage: currentEntry.selectedPage,
+                quotaData: currentEntry.quotaData,
+                quotaDataByProvider: currentEntry.quotaDataByProvider,
+                isLoggedIn: currentEntry.isLoggedIn,
+                macTheme: currentEntry.macTheme
+            )
+        }
+        return Timeline(entries: entries, policy: .after(nextUpdate))
     }
 
     func entry(for configuration: MacThemeWidgetConfigurationIntent, date: Date) -> MacThemeWidgetEntry {

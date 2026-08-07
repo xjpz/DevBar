@@ -102,6 +102,10 @@ public final class WidgetDataManager {
         return rawValues.compactMap(QuotaProvider.init(rawValue:))
     }
 
+    public func reloadAllTimelines() {
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
     public func saveMacThemeSnapshot(_ snapshot: MacThemeWidgetSnapshot) {
         guard let defaults else { return }
         do {

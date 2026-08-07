@@ -15,6 +15,11 @@ struct DevBariOSApp: App {
     @StateObject private var accountViewModel = IOSAccountViewModel()
 
     init() {
+        if QuotaResetTimeDisplayMode.migrateLegacyValueIfNeeded(
+            to: QuotaResetTimeDisplayMode.sharedDefaults
+        ) {
+            WidgetDataManager.shared.reloadAllTimelines()
+        }
         Self.ensureSharedModelStoreDirectoryExists()
         self.modelContainer = Self.makeModelContainer()
     }
