@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+profile="${1:-fast}"
+platform="${2:-}"
+cache_root="${CODEX_CACHE_ROOT:-${TMPDIR:-/tmp}/codex-devbar}"
+
+cd "$repo_root"
+
+run_hygiene() {
+  git status --short --branch
+  git diff --check
+  git diff --cached --check
+}
+
+run_core_tests() {
+  swift_args=(
+    test
+    --package-path Packages/DevBarCore
+    --scratch-path "$cache_root/swiftpm"
+  )
+  if [[ "${CODEX_SWIFTPM_DISABLE_SANDBOX:-0}" == "1" ]]; then
+    swift_args+=(--disable-sandbox)
+  fi
+  swift "${swift_args[@]}"
+}
+
+run_xcode_build() {
+  local scheme="$1"
+  local destination="$2"
+  local derived_name="$3"
+  xcodebuild -quiet \
+    -project DevBar.xcodeproj \
+    -scheme "$scheme" \
+    -configuration Debug \
+    -destination "$destination" \
+    -derivedDataPath "$cache_root/derived/$derived_name" \
+    CODE_SIGNING_ALLOWED=NO \
+    build
+}
+
+case "$profile" in
+  fast)
+    run_hygiene
+    run_core_tests
+    ;;
+  build)
+    run_hygiene
+    run_core_tests
+    run_xcode_build DevBar "generic/platform=macOS" macos
+    run_xcode_build DevBariOS "generic/platform=iOS Simulator" ios
+    ;;
+  release)
+    run_hygiene
+    if [[ -n "$(git status --short)" ]]; then
+      echo "release=blocked (dirty worktree)" >&2
+      exit 2
+    fi
+    if [[ "$platform" != "macos" && "$platform" != "ios" ]]; then
+      echo "Usage: ./scripts/codex-verify release <macos|ios>" >&2
+      exit 64
+    fi
+    if [[ "$platform" == "macos" ]]; then
+      scheme="DevBar"
+      destination="generic/platform=macOS"
+    else
+      scheme="DevBariOS"
+      destination="generic/platform=iOS"
+    fi
+    archive_path="$cache_root/release/DevBar-$platform.xcarchive"
+    xcodebuild \
+      -project DevBar.xcodeproj \
+      -scheme "$scheme" \
+      -configuration Release \
+      -destination "$destination" \
+      -archivePath "$archive_path" \
+      archive
+    app_path="$(find "$archive_path/Products/Applications" -maxdepth 1 -type d -name '*.app' -print | head -n 1)"
+    codesign --verify --deep --strict "$app_path"
+    echo "release=local_archive_only"
+    echo "upload_notarize_publish=not_performed"
+    ;;
+  *)
+    echo "Unknown profile: $profile" >&2
+    exit 64
+    ;;
+esac

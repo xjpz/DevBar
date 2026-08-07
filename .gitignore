@@ -23,6 +23,9 @@ tmp/
 
 # Documentation (internal design docs)
 docs/
+!docs/
+docs/*
+!docs/INDEX.md
 
 # Local visual brainstorming previews
 .superpowers/

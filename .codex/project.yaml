@@ -1,0 +1,30 @@
+schema: codex-project/v1
+name: DevBar
+family: devbar
+kind: xcode-multiplatform
+related_projects:
+  playdev-server: ../../scala/playdev-server
+toolchain:
+  xcode_project: DevBar.xcodeproj
+  macos_scheme: DevBar
+  ios_scheme: DevBariOS
+ownership:
+  shared_domain_and_services: Packages/DevBarCore
+  macos_ui_and_lifecycle: DevBar
+  ios_ui_and_lifecycle: DevBariOS
+  widgets: DevBarWidget
+verification:
+  entrypoint: ./scripts/codex-verify
+  profiles: [fast, build, release]
+  fast_scope: DevBarCore tests
+guardrails:
+  preserve_dirty_worktree: true
+  design_directory: docs
+  docs_are_gitignored: true
+  approval_required_after_design: true
+  commit_requires_explicit_authorization: true
+  push_upload_notarize_publish_require_separate_authorization: true
+known_friction:
+  - app-level tests may trigger Keychain prompts with temporary signatures
+  - Package.resolved is ignored
+  - simulator and signing failures must be separated from source regressions
