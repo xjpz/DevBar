@@ -3,6 +3,11 @@ import Testing
 @testable import DevBarCore
 
 @Test
+func serverBaseURLUsesCanonicalProductionHost() {
+    #expect(DevBarCoreConstants.Server.baseURL == "https://xjpz.cc")
+}
+
+@Test
 func deviceRelayRegistrationUsesOpenAPIEnvelopeAndSecret() async throws {
     let recorder = DeviceRelayRequestRecorder(
         responseBody: """
@@ -99,7 +104,7 @@ func deviceRelayRegistrationAcceptsLowercaseOfflineStatus() async throws {
 @Test
 func deviceRelayPairQRCodeRoundTripsWithoutSecret() throws {
     let payload = DeviceRelayPairQRCodePayload(
-        relay: URL(string: "https://dev.xjpz.cc")!,
+        relay: URL(string: "https://xjpz.cc")!,
         pairCode: "A3B7K9",
         macDeviceId: "mac-unit",
         expiresAt: 1716120060000
@@ -142,7 +147,8 @@ func deviceRelayConfirmPairingPostsScannedPayloadAndStoresPeer() async throws {
         macDeviceId: "mac-unit",
         iphoneDeviceId: "iphone-unit",
         iphoneDeviceName: "Unit iPhone",
-        publicKey: "pk-iphone"
+        publicKey: "pk-iphone",
+        deviceSecret: "device-secret-unit"
     )
 
     let request = try #require(await recorder.lastRequest)
@@ -156,6 +162,113 @@ func deviceRelayConfirmPairingPostsScannedPayloadAndStoresPeer() async throws {
     #expect(bodyObject["pairCode"] as? String == "A3B7K9")
     #expect(bodyObject["macDeviceId"] as? String == "mac-unit")
     #expect(bodyObject["iphoneDeviceId"] as? String == "iphone-unit")
+    #expect(bodyObject["deviceSecret"] as? String == "device-secret-unit")
+}
+
+@Test
+func accountBindingQRCodeAcceptsOnlyCurrentTrustedServerAndUnexpiredChallenge() throws {
+    let payload = DeviceAccountBindQRCodePayload(
+        type: "devbar.account-bind",
+        version: 1,
+        baseUrl: URL(string: DevBarCoreConstants.Server.baseURL)!,
+        challenge: String(repeating: "A", count: 43),
+        expiresAt: Int64(Date().addingTimeInterval(120).timeIntervalSince1970 * 1_000)
+    )
+    let encoded = String(data: try JSONEncoder().encode(payload), encoding: .utf8)!
+
+    #expect(DeviceAccountBindQRCodeCodec.matchesType(encoded))
+    #expect(try DeviceAccountBindQRCodeCodec.decode(encoded) == payload)
+
+    let untrusted = encoded.replacingOccurrences(
+        of: "xjpz.cc",
+        with: "evil.example"
+    )
+    #expect(throws: DeviceRelayError.self) {
+        try DeviceAccountBindQRCodeCodec.decode(untrusted)
+    }
+
+    let expiredPayload = DeviceAccountBindQRCodePayload(
+        type: payload.type,
+        version: payload.version,
+        baseUrl: payload.baseUrl,
+        challenge: payload.challenge,
+        expiresAt: Int64(Date().addingTimeInterval(-1).timeIntervalSince1970 * 1_000)
+    )
+    let expired = String(data: try JSONEncoder().encode(expiredPayload), encoding: .utf8)!
+    #expect(throws: DeviceRelayError.self) {
+        try DeviceAccountBindQRCodeCodec.decode(expired)
+    }
+}
+
+@Test
+func accountBindingPreviewUsesDeviceCredentials() async throws {
+    let recorder = DeviceRelayRequestRecorder(
+        responseBody: """
+        {
+          "success": true,
+          "code": 20000,
+          "data": {
+            "accountName": "a***e",
+            "expiresAt": 1912345678000
+          }
+        }
+        """.data(using: .utf8)!
+    )
+    let service = DeviceRelayService(
+        baseURL: URL(string: DevBarCoreConstants.Server.baseURL)!,
+        session: recorder.session
+    )
+
+    let preview = try await service.previewAccountBinding(
+        challenge: String(repeating: "A", count: 43),
+        deviceToken: "drt_v1.iphone",
+        deviceSecret: "device-secret-unit"
+    )
+
+    let request = try #require(await recorder.lastRequest)
+    #expect(preview.accountName == "a***e")
+    #expect(request.url?.path == "/api/devbar/devices/account-bind/preview")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer drt_v1.iphone")
+    #expect(request.value(forHTTPHeaderField: "X-Device-Secret") == "device-secret-unit")
+}
+
+@Test
+func accountBindingConfirmationUsesDeviceCredentialsAndDecodesClaimedHistory() async throws {
+    let recorder = DeviceRelayRequestRecorder(
+        responseBody: """
+        {
+          "success": true,
+          "code": 20000,
+          "data": {
+            "deviceId": "iphone-unit",
+            "deviceType": "iphone",
+            "deviceName": "Unit iPhone",
+            "claimedSnippets": 3
+          }
+        }
+        """.data(using: .utf8)!
+    )
+    let service = DeviceRelayService(
+        baseURL: URL(string: DevBarCoreConstants.Server.baseURL)!,
+        session: recorder.session
+    )
+    let challenge = String(repeating: "B", count: 43)
+
+    let confirmation = try await service.confirmAccountBinding(
+        challenge: challenge,
+        deviceToken: "drt_v1.iphone",
+        deviceSecret: "device-secret-unit"
+    )
+
+    let request = try #require(await recorder.lastRequest)
+    let body = try #require(await recorder.lastRequestBody)
+    let bodyObject = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+    #expect(confirmation.deviceId == "iphone-unit")
+    #expect(confirmation.claimedSnippets == 3)
+    #expect(request.url?.path == "/api/devbar/devices/account-bind/confirm")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer drt_v1.iphone")
+    #expect(request.value(forHTTPHeaderField: "X-Device-Secret") == "device-secret-unit")
+    #expect(bodyObject["challenge"] as? String == challenge)
 }
 
 @Test
@@ -245,7 +358,7 @@ func deviceRelayPeersDecodeOnlineAndOfflineStatus() async throws {
 @Test
 func deviceRelaySocketBuildsWssURLAndRelayMessagesRoundTrip() throws {
     let url = try DeviceRelayService.webSocketURL(
-        baseURL: URL(string: "https://dev.xjpz.cc")!,
+        baseURL: URL(string: "https://xjpz.cc")!,
         deviceId: "iphone unit",
         deviceToken: "drt_v1.token+unit"
     )
@@ -260,7 +373,7 @@ func deviceRelaySocketBuildsWssURLAndRelayMessagesRoundTrip() throws {
     let encoded = try DeviceRelayMessageCodec.encode(message)
     let decoded = try DeviceRelayMessageCodec.decode(encoded)
 
-    #expect(url.absoluteString == "wss://dev.xjpz.cc/ws/devbar-relay?deviceId=iphone%20unit&token=drt_v1.token+unit")
+    #expect(url.absoluteString == "wss://xjpz.cc/ws/devbar-relay?deviceId=iphone%20unit&token=drt_v1.token+unit")
     #expect(decoded == message)
 }
 

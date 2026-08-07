@@ -5,6 +5,32 @@ public enum PushEnvironment: String, Codable, Sendable {
     case production
 }
 
+public enum PushNotificationURLPolicy {
+    public static let maximumLength = 2_048
+
+    private static let allowedSchemes = Set(["http", "https"])
+    private static let forbiddenCharacters = CharacterSet.whitespacesAndNewlines.union(.controlCharacters)
+
+    public static func validatedURL(from rawValue: String?) -> URL? {
+        guard let rawValue else { return nil }
+        let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty,
+              normalized.utf16.count <= maximumLength,
+              normalized.rangeOfCharacter(from: forbiddenCharacters) == nil,
+              let components = URLComponents(string: normalized),
+              let scheme = components.scheme?.lowercased(),
+              allowedSchemes.contains(scheme),
+              let host = components.host,
+              !host.isEmpty,
+              components.user == nil,
+              components.password == nil
+        else {
+            return nil
+        }
+        return components.url
+    }
+}
+
 public struct PushDeviceRegistration: Codable, Sendable, Equatable {
     public let pushToken: String
     public let bundleId: String

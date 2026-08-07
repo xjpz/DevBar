@@ -255,7 +255,12 @@ struct RunMacThemeControlIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         let store = DeviceRelayStore()
-        guard let token = store.loadDeviceToken(), !token.isEmpty else {
+        #if os(iOS)
+        let relayDeviceType = DeviceRelayDeviceType.iPhone
+        #else
+        let relayDeviceType = DeviceRelayDeviceType.mac
+        #endif
+        guard let token = store.loadDeviceToken(for: relayDeviceType), !token.isEmpty else {
             print("[DevBar:WidgetMacControl] Missing relay device token.")
             return .result()
         }

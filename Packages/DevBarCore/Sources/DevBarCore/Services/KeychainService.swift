@@ -1,6 +1,15 @@
 import Foundation
 import Security
 
+protocol DeviceRelaySecureStoring: Sendable {
+    func string(forKey key: String) -> String?
+
+    @discardableResult
+    func setString(_ value: String, forKey key: String) -> Bool
+
+    func removeValue(forKey key: String)
+}
+
 public final class KeychainService: Sendable {
     public static let shared = KeychainService()
 
@@ -148,5 +157,20 @@ public final class KeychainService: Sendable {
             kSecAttrAccount as String: key,
         ]
         SecItemDelete(query as CFDictionary)
+    }
+}
+
+extension KeychainService: DeviceRelaySecureStoring {
+    func string(forKey key: String) -> String? {
+        load(key: key)
+    }
+
+    @discardableResult
+    func setString(_ value: String, forKey key: String) -> Bool {
+        save(key: key, value: value) == errSecSuccess
+    }
+
+    func removeValue(forKey key: String) {
+        delete(key: key)
     }
 }

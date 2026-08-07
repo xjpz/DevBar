@@ -27,6 +27,42 @@ public enum DeviceRelayPairQRCodeCodec {
     }
 }
 
+public enum DeviceAccountBindQRCodeCodec {
+    public static func matchesType(_ rawValue: String) -> Bool {
+        guard let data = rawValue.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+        return object["type"] as? String == "devbar.account-bind"
+    }
+
+    public static func decode(_ rawValue: String) throws -> DeviceAccountBindQRCodePayload {
+        guard let data = rawValue.data(using: .utf8),
+              let payload = try? JSONDecoder().decode(DeviceAccountBindQRCodePayload.self, from: data),
+              payload.type == "devbar.account-bind",
+              payload.version == 1,
+              payload.challenge.range(of: #"^[A-Za-z0-9_-]{43}$"#, options: .regularExpression) != nil,
+              payload.expiresAt > Int64(Date().timeIntervalSince1970 * 1_000),
+              isTrusted(payload.baseUrl) else {
+            throw DeviceRelayError.invalidQRCode
+        }
+        return payload
+    }
+
+    public static func canDecode(_ rawValue: String) -> Bool {
+        (try? decode(rawValue)) != nil
+    }
+
+    private static func isTrusted(_ url: URL) -> Bool {
+        guard url.scheme?.lowercased() == "https",
+              let trusted = URL(string: DevBarCoreConstants.Server.baseURL) else {
+            return false
+        }
+        return url.host?.lowercased() == trusted.host?.lowercased() &&
+            url.port == trusted.port
+    }
+}
+
 public enum DeviceRelayMessageCodec {
     public static func encode(_ message: DeviceRelayMessage) throws -> String {
         let encoder = JSONEncoder()
@@ -165,7 +201,8 @@ public final class DeviceRelayService: Sendable {
         macDeviceId: String,
         iphoneDeviceId: String,
         iphoneDeviceName: String?,
-        publicKey: String?
+        publicKey: String?,
+        deviceSecret: String
     ) async throws -> DeviceRelayConfirmPairResponse {
         try await sendJSON(
             path: DevBarCoreConstants.DeviceRelay.confirmPairPath,
@@ -175,10 +212,41 @@ public final class DeviceRelayService: Sendable {
                 macDeviceId: macDeviceId,
                 iphoneDeviceId: iphoneDeviceId,
                 iphoneDeviceName: iphoneDeviceName,
-                publicKey: publicKey
+                publicKey: publicKey,
+                deviceSecret: deviceSecret
             ),
             bearerToken: nil
         )
+    }
+
+    public func previewAccountBinding(
+        challenge: String,
+        deviceToken: String,
+        deviceSecret: String
+    ) async throws -> DeviceAccountBindPreview {
+        let response: AccountBindPreviewEnvelope = try await sendJSON(
+            path: DevBarCoreConstants.DeviceRelay.accountBindPreviewPath,
+            method: "POST",
+            body: AccountBindChallengeRequest(challenge: challenge),
+            bearerToken: deviceToken,
+            additionalHeaders: ["X-Device-Secret": deviceSecret]
+        )
+        return response.data
+    }
+
+    public func confirmAccountBinding(
+        challenge: String,
+        deviceToken: String,
+        deviceSecret: String
+    ) async throws -> DeviceAccountBindConfirmation {
+        let response: AccountBindConfirmationEnvelope = try await sendJSON(
+            path: DevBarCoreConstants.DeviceRelay.accountBindConfirmPath,
+            method: "POST",
+            body: AccountBindChallengeRequest(challenge: challenge),
+            bearerToken: deviceToken,
+            additionalHeaders: ["X-Device-Secret": deviceSecret]
+        )
+        return response.data
     }
 
     public func revokePair(macDeviceId: String, iphoneDeviceId: String, deviceToken: String) async throws -> Bool {
@@ -231,7 +299,8 @@ public final class DeviceRelayService: Sendable {
         path: String,
         method: String,
         body: RequestBody?,
-        bearerToken: String?
+        bearerToken: String?,
+        additionalHeaders: [String: String] = [:]
     ) async throws -> ResponseBody {
         guard let endpoint = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
             throw DeviceRelayError.invalidURL
@@ -242,6 +311,9 @@ public final class DeviceRelayService: Sendable {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let bearerToken {
             request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
+        }
+        for (name, value) in additionalHeaders {
+            request.setValue(value, forHTTPHeaderField: name)
         }
         if let body {
             request.httpBody = try JSONEncoder().encode(body)
@@ -326,6 +398,19 @@ private struct ConfirmPairRequest: Encodable {
     let iphoneDeviceId: String
     let iphoneDeviceName: String?
     let publicKey: String?
+    let deviceSecret: String
+}
+
+private struct AccountBindChallengeRequest: Encodable {
+    let challenge: String
+}
+
+private struct AccountBindPreviewEnvelope: Decodable {
+    let data: DeviceAccountBindPreview
+}
+
+private struct AccountBindConfirmationEnvelope: Decodable {
+    let data: DeviceAccountBindConfirmation
 }
 
 private struct RevokePairRequest: Encodable {

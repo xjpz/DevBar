@@ -640,6 +640,8 @@ struct IOSMacRelayView: View {
                 relayStatusNow = Date()
                 await relayManager.refreshPeers()
                 await requestMacStatuses()
+            case .accountBinding:
+                scanError = "请使用首页右上角的扫码按钮关联账号。"
             case .providerTransfer:
                 scanError = String(localized: "ios_mac_relay_scan_provider_transfer_unsupported")
             }

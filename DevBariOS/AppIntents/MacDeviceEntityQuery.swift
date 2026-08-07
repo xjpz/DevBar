@@ -18,7 +18,7 @@ struct MacDeviceEntityQuery: EntityQuery {
 
     static func fetchMacDevices() async throws -> [MacDeviceEntity] {
         let store = DeviceRelayStore()
-        guard let token = store.loadDeviceToken(), !token.isEmpty else {
+        guard let token = store.loadDeviceToken(for: .iPhone), !token.isEmpty else {
             return []
         }
         let peers = try await DeviceRelayService.shared.fetchPeers(deviceToken: token)

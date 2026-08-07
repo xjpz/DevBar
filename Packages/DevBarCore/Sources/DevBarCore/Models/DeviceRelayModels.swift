@@ -135,6 +135,58 @@ public struct DeviceRelayPairQRCodePayload: Codable, Sendable, Equatable {
     }
 }
 
+public struct DeviceAccountBindQRCodePayload: Codable, Sendable, Equatable {
+    public let type: String
+    public let version: Int
+    public let baseUrl: URL
+    public let challenge: String
+    public let expiresAt: Int64
+
+    public init(type: String, version: Int, baseUrl: URL, challenge: String, expiresAt: Int64) {
+        self.type = type
+        self.version = version
+        self.baseUrl = baseUrl
+        self.challenge = challenge
+        self.expiresAt = expiresAt
+    }
+}
+
+public struct DeviceAccountBindPreview: Codable, Sendable, Equatable {
+    public let accountName: String
+    public let expiresAt: Int64
+
+    public init(accountName: String, expiresAt: Int64) {
+        self.accountName = accountName
+        self.expiresAt = expiresAt
+    }
+}
+
+public struct DeviceAccountBindScan: Sendable, Equatable, Identifiable {
+    public var id: String { payload.challenge }
+
+    public let payload: DeviceAccountBindQRCodePayload
+    public let preview: DeviceAccountBindPreview
+
+    public init(payload: DeviceAccountBindQRCodePayload, preview: DeviceAccountBindPreview) {
+        self.payload = payload
+        self.preview = preview
+    }
+}
+
+public struct DeviceAccountBindConfirmation: Codable, Sendable, Equatable {
+    public let deviceId: String
+    public let deviceType: DeviceRelayDeviceType
+    public let deviceName: String?
+    public let claimedSnippets: Int
+
+    public init(deviceId: String, deviceType: DeviceRelayDeviceType, deviceName: String?, claimedSnippets: Int) {
+        self.deviceId = deviceId
+        self.deviceType = deviceType
+        self.deviceName = deviceName
+        self.claimedSnippets = claimedSnippets
+    }
+}
+
 public enum DeviceRelayMessageType: String, Codable, Sendable, Equatable {
     case relayConnected = "relay.connected"
     case relayMessage = "relay.message"

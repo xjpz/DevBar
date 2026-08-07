@@ -1,6 +1,10 @@
 import Foundation
 
 public enum DevBarCoreConstants {
+    public enum Server {
+        public static let baseURL = "https://xjpz.cc"
+    }
+
     public enum Features {
         public static let agentWatcherEnabled = true
         public static let flipClockWidgetEnabled = true
@@ -24,11 +28,14 @@ public enum DevBarCoreConstants {
         public static let hermesAPIKeyKey = "hermes_api_key"
         public static let openAIAccessTokenKey = "openai_access_token"
         public static let mimoServiceTokenKey = "mimo_service_token"
+        public static let macRelayDeviceIDKey = "relay_device_id_mac"
+        public static let iPhoneRelayDeviceIDKey = "relay_device_id_iphone"
         public static let macRelayDeviceSecretKey = "relay_device_secret_mac"
         public static let iPhoneRelayDeviceSecretKey = "relay_device_secret_iphone"
         public static let relayDeviceTokenKey = "relay_device_token"
         public static let relayLocalPairSecretPrefix = "relay_local_pair_secret_"
         public static let relayPendingLocalPairSecretPrefix = "relay_pending_local_pair_secret_"
+        public static let devBarAppSessionTokenKey = "devbar_app_session_token_v1"
 
         public static func providerAccountCredentialKey(for accountID: String) -> String {
             "provider_account_\(accountID)_credential"
@@ -53,18 +60,20 @@ public enum DevBarCoreConstants {
     }
 
     public enum TransferRelay {
-        public static let baseURL = "https://dev.xjpz.cc"
+        public static let baseURL = Server.baseURL
         public static let transfersPath = "/api/devbar/transfers"
         public static let directQRCodeLengthThreshold = 1_800
     }
 
     public enum DeviceRelay {
-        public static let baseURL = "https://dev.xjpz.cc"
+        public static let baseURL = Server.baseURL
         public static let registerPath = "/api/devbar/devices/register"
         public static let peersPath = "/api/devbar/devices/peers"
         public static let createPairPath = "/api/devbar/pair/create"
         public static let confirmPairPath = "/api/devbar/pair/confirm"
         public static let revokePairPath = "/api/devbar/pair/revoke"
+        public static let accountBindPreviewPath = "/api/devbar/devices/account-bind/preview"
+        public static let accountBindConfirmPath = "/api/devbar/devices/account-bind/confirm"
         public static let socketPath = "/ws/devbar-relay"
         public static let heartbeatInterval: TimeInterval = 25
         public static let localServiceType = "_devbar-relay._tcp"
@@ -153,5 +162,22 @@ public enum DevBarCoreConstants {
         public static let macThemeWidgetUserNameKey = "mac_theme_widget_user_name"
         public static let relayMacEnabledKey = "relay_mac_enabled"
         public static let iCloudSyncSettingsKey = "icloud_sync_settings_v1"
+        public static let devBarActiveUserIDKey = "devbar_active_user_id_v1"
+        public static let devBarProfileCachePrefix = "devbar_profile_cache_v1_"
+    }
+
+    public enum Account {
+        public static let appleLoginPath = "/api/devbar/auth/apple"
+        public static let logoutPath = "/api/devbar/auth/logout"
+        public static let mePath = "/api/devbar/me"
+        public static let profilePath = "/api/devbar/me/profile"
+        public static let deviceBindingPath = "/api/devbar/me/device-binding"
+        public static let messagesPath = "/api/devbar/messages"
+        public static let unreadCountPath = "/api/devbar/messages/unread-count"
+        public static let markAllReadPath = "/api/devbar/messages/read-all"
+
+        public static func messageReadPath(messageId: String) -> String {
+            "\(messagesPath)/by-id/\(messageId)/read"
+        }
     }
 }

@@ -5,11 +5,13 @@ struct IOSDashboardView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @EnvironmentObject private var languageManager: IOSLanguageManager
     @EnvironmentObject private var themeManager: IOSThemeManager
+    @EnvironmentObject private var accountViewModel: IOSAccountViewModel
     @Environment(\.themeTokens) private var theme
     @State private var isShowingAccounts = false
     @State private var isShowingScanner = false
     @State private var isResolvingScan = false
     @State private var pendingImportPreview: TransferImportPreview?
+    @State private var pendingAccountBinding: DeviceAccountBindScan?
     @State private var pendingRelayTransferURL: URL?
     @State private var scanError: String?
     @State private var handledScanRequestID: UUID?
@@ -41,12 +43,27 @@ struct IOSDashboardView: View {
             .background(Color.clear)
         }
         .id("dashboard.list.\(languageManager.selectedLanguage.rawValue)")
-        .navigationTitle(Text("ios_dashboard_title"))
-        .toolbarTitleDisplayMode(.inlineLarge)
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(dashboardNavigationBackground, for: .navigationBar)
         .toolbarBackground(theme.isGeek ? .visible : .hidden, for: .navigationBar)
         .toolbarColorScheme(theme.isGeek ? .dark : nil, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                NavigationLink {
+                    IOSProfileView()
+                } label: {
+                    IOSProfileEntryAvatar(
+                        avatarData: appViewModel.macThemeWidgetAvatarData,
+                        unreadCount: accountViewModel.unreadCount
+                    )
+                }
+                .buttonStyle(.plain)
+                .buttonBorderShape(.circle)
+                .frame(width: 32, height: 32)
+                .contentShape(Circle())
+                .accessibilityIdentifier("ios.dashboard.profile")
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     isShowingScanner = true
@@ -102,7 +119,13 @@ struct IOSDashboardView: View {
                 await importPayload(preview.payload)
             }
         }
-        .alert("ios_accounts_import_failed", isPresented: Binding(
+        .sheet(item: $pendingAccountBinding) { scan in
+            IOSAccountBindingConfirmationSheet(
+                scan: scan,
+                relayManager: appViewModel.deviceRelayManager
+            )
+        }
+        .alert("二维码处理失败", isPresented: Binding(
             get: { scanError != nil },
             set: { if !$0 { scanError = nil } }
         )) {
@@ -756,6 +779,9 @@ struct IOSDashboardView: View {
             switch try await appViewModel.resolveScannedCode(code) {
             case .macPaired:
                 pendingRelayTransferURL = nil
+            case let .accountBinding(scan):
+                pendingRelayTransferURL = nil
+                pendingAccountBinding = scan
             case let .providerTransfer(preview, relayURL):
                 pendingRelayTransferURL = relayURL
                 pendingImportPreview = preview
@@ -785,6 +811,119 @@ struct IOSDashboardView: View {
             }
         } catch {
             scanError = error.localizedDescription
+        }
+    }
+}
+
+private struct IOSAccountBindingConfirmationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.themeTokens) private var theme
+
+    let scan: DeviceAccountBindScan
+    let relayManager: DeviceRelayManager
+
+    @State private var isConfirming = false
+    @State private var confirmation: DeviceAccountBindConfirmation?
+    @State private var errorMessage: String?
+
+    private var isExpired: Bool {
+        scan.preview.expiresAt <= Int64(Date().timeIntervalSince1970 * 1_000)
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 22) {
+                Image(systemName: confirmation == nil ? "iphone.and.arrow.forward" : "checkmark.circle.fill")
+                    .font(.system(size: 52, weight: .semibold))
+                    .foregroundStyle(confirmation == nil ? theme.brandPrimary : .green)
+
+                if let confirmation {
+                    VStack(spacing: 8) {
+                        Text("关联成功")
+                            .font(.title2.bold())
+                        Text("已关联 \(confirmation.claimedSnippets) 条历史 Snippet")
+                            .font(.subheadline)
+                            .foregroundStyle(theme.textSecondary)
+                    }
+                } else {
+                    VStack(spacing: 10) {
+                        Text("关联开发吧账号")
+                            .font(.title2.bold())
+                        Text("将此 iPhone 关联到账号")
+                            .foregroundStyle(theme.textSecondary)
+                        Text(scan.preview.accountName)
+                            .font(.title3.monospaced().bold())
+                        Text(isExpired ? "二维码已过期" : "确认后，该设备的 Snippet 将显示在此账号中。")
+                            .font(.footnote)
+                            .foregroundStyle(isExpired ? .red : theme.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                }
+
+                Spacer()
+
+                if confirmation == nil {
+                    Button {
+                        Task { await confirmBinding() }
+                    } label: {
+                        HStack {
+                            if isConfirming {
+                                ProgressView()
+                                    .tint(.white)
+                            }
+                            Text(isConfirming ? "正在关联…" : "确认关联")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isConfirming || isExpired)
+                    .accessibilityIdentifier("ios.dashboard.accountBinding.confirm")
+                } else {
+                    Button("完成") {
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(24)
+            .navigationTitle("账号关联")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if confirmation == nil {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("ios_common_cancel") {
+                            dismiss()
+                        }
+                    }
+                }
+            }
+            .accessibilityIdentifier("ios.dashboard.accountBinding.sheet")
+        }
+    }
+
+    @MainActor
+    private func confirmBinding() async {
+        guard !isConfirming, !isExpired else { return }
+        isConfirming = true
+        errorMessage = nil
+        defer { isConfirming = false }
+
+        do {
+            confirmation = try await relayManager.confirmAccountBinding(scan)
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 }

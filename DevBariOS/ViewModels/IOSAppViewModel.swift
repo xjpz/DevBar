@@ -8,6 +8,7 @@ import UserNotifications
 
 enum IOSScannedCodeResolution {
     case macPaired
+    case accountBinding(DeviceAccountBindScan)
     case providerTransfer(preview: TransferImportPreview, relayURL: URL?)
 }
 
@@ -1266,6 +1267,14 @@ final class IOSAppViewModel: ObservableObject {
     }
 
     func resolveScannedCode(_ rawValue: String) async throws -> IOSScannedCodeResolution {
+        if DeviceAccountBindQRCodeCodec.matchesType(rawValue) {
+            let scan = try await deviceRelayManager.previewAccountBinding(
+                from: rawValue,
+                deviceName: relayDeviceName
+            )
+            return .accountBinding(scan)
+        }
+
         if DeviceRelayPairQRCodeCodec.canDecode(rawValue) {
             try await pairMacDevice(from: rawValue)
             return .macPaired
@@ -1381,7 +1390,7 @@ final class IOSAppViewModel: ObservableObject {
         }
 
         let store = DeviceRelayStore()
-        guard let token = store.loadDeviceToken(), !token.isEmpty else {
+        guard let token = store.loadDeviceToken(for: .iPhone), !token.isEmpty else {
             return false
         }
 

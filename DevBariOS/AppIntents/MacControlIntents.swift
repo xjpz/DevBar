@@ -44,7 +44,7 @@ struct SleepMacDisplayIntent: AppIntent {
 enum MacControlIntentRunner {
     static func run(_ command: DeviceRelayCommandType, selectedMac: MacDeviceEntity?) async -> String {
         let store = DeviceRelayStore()
-        guard let token = store.loadDeviceToken(), !token.isEmpty else {
+        guard let token = store.loadDeviceToken(for: .iPhone), !token.isEmpty else {
             return "还没有配对电脑，请先在 DevBar 中扫码配对。"
         }
 

@@ -43,7 +43,7 @@ public final class DeviceRelayManager: ObservableObject {
         self.service = service
         self.store = store
         self.currentSocketService = service
-        self.deviceToken = store.loadDeviceToken()
+        self.deviceToken = nil
         bindLocalTransport()
     }
 
@@ -121,9 +121,11 @@ public final class DeviceRelayManager: ObservableObject {
     public func setup(deviceType: DeviceRelayDeviceType, deviceName: String?) async {
         self.deviceType = deviceType
         self.deviceName = deviceName
-        let deviceID = store.loadOrCreateDeviceID(for: deviceType)
+        let identityResolution = store.resolveOrCreateDeviceID(for: deviceType)
+        let deviceID = identityResolution.deviceID
         let secret = store.loadOrCreateDeviceSecret(for: deviceType)
         localDeviceID = deviceID
+        recordIdentityResolution(identityResolution, type: deviceType)
         appendLog(.info, "注册设备 \(deviceType.rawValue) \(deviceID)")
 
         do {
@@ -136,7 +138,9 @@ public final class DeviceRelayManager: ObservableObject {
                     deviceSecret: secret
                 )
             )
-            store.saveDeviceToken(response.deviceToken)
+            guard store.saveDeviceToken(response.deviceToken, for: deviceType, deviceID: deviceID) else {
+                throw DeviceRelayError.invalidRelayResponse
+            }
             deviceToken = response.deviceToken
             lastErrorMessage = nil
             appendLog(.success, "设备注册成功，开始刷新 peers")
@@ -194,9 +198,12 @@ public final class DeviceRelayManager: ObservableObject {
 
     public func confirmPairing(from rawQRCode: String, deviceName: String?) async throws {
         let payload = try DeviceRelayPairQRCodeCodec.decode(rawQRCode)
-        let deviceID = store.loadOrCreateDeviceID(for: .iPhone)
+        let identityResolution = store.resolveOrCreateDeviceID(for: .iPhone)
+        let deviceID = identityResolution.deviceID
+        let deviceSecret = store.loadOrCreateDeviceSecret(for: .iPhone)
         localDeviceID = deviceID
         deviceType = .iPhone
+        recordIdentityResolution(identityResolution, type: .iPhone)
         if let localSecret = payload.localSecret {
             store.saveLocalPairSecret(localSecret, peerDeviceID: payload.macDeviceId)
         }
@@ -208,10 +215,13 @@ public final class DeviceRelayManager: ObservableObject {
             macDeviceId: payload.macDeviceId,
             iphoneDeviceId: deviceID,
             iphoneDeviceName: deviceName,
-            publicKey: nil
+            publicKey: nil,
+            deviceSecret: deviceSecret
         )
 
-        store.saveDeviceToken(response.deviceToken)
+        guard store.saveDeviceToken(response.deviceToken, for: .iPhone, deviceID: deviceID) else {
+            throw DeviceRelayError.invalidRelayResponse
+        }
         deviceToken = response.deviceToken
         peers = [
             DeviceRelayDevice(
@@ -230,6 +240,37 @@ public final class DeviceRelayManager: ObservableObject {
         localTransport.restartDiscovery()
         connect(using: pairingService)
         await refreshPeers(using: pairingService)
+    }
+
+    public func previewAccountBinding(from rawQRCode: String, deviceName: String?) async throws -> DeviceAccountBindScan {
+        let payload = try DeviceAccountBindQRCodeCodec.decode(rawQRCode)
+        if localDeviceID == nil || deviceToken == nil {
+            await setup(deviceType: .iPhone, deviceName: deviceName)
+        }
+        guard let token = deviceToken else {
+            throw DeviceRelayError.missingDeviceToken
+        }
+        let secret = store.loadOrCreateDeviceSecret(for: .iPhone)
+        let bindingService = DeviceRelayService(baseURL: payload.baseUrl)
+        let preview = try await bindingService.previewAccountBinding(
+            challenge: payload.challenge,
+            deviceToken: token,
+            deviceSecret: secret
+        )
+        return DeviceAccountBindScan(payload: payload, preview: preview)
+    }
+
+    public func confirmAccountBinding(_ scan: DeviceAccountBindScan) async throws -> DeviceAccountBindConfirmation {
+        guard let token = deviceToken else {
+            throw DeviceRelayError.missingDeviceToken
+        }
+        let secret = store.loadOrCreateDeviceSecret(for: .iPhone)
+        let bindingService = DeviceRelayService(baseURL: scan.payload.baseUrl)
+        return try await bindingService.confirmAccountBinding(
+            challenge: scan.payload.challenge,
+            deviceToken: token,
+            deviceSecret: secret
+        )
     }
 
     public func refreshPeers() async {
@@ -986,6 +1027,23 @@ public final class DeviceRelayManager: ObservableObject {
         appendLog(.error, message)
     }
 
+    private func recordIdentityResolution(
+        _ resolution: DeviceRelayIdentityResolution,
+        type: DeviceRelayDeviceType
+    ) {
+        DiagnosticLogger.shared.record(
+            level: .info,
+            category: "device.relay.identity",
+            name: "relay_identity_resolved",
+            message: "Relay device identity resolved",
+            details: [
+                "deviceType": type.rawValue,
+                "source": resolution.source.rawValue,
+                "deviceFingerprint": DeviceRelayStore.fingerprint(resolution.deviceID),
+            ]
+        )
+    }
+
     private func promotePendingLocalSecretsIfNeeded() {
         guard deviceType == .mac,
               let pairQRCodePayload,
@@ -1013,7 +1071,9 @@ public final class DeviceRelayManager: ObservableObject {
                     deviceSecret: secret
                 )
             )
-            store.saveDeviceToken(response.deviceToken)
+            guard store.saveDeviceToken(response.deviceToken, for: deviceType, deviceID: deviceID) else {
+                throw DeviceRelayError.invalidRelayResponse
+            }
             deviceToken = response.deviceToken
             lastErrorMessage = nil
         } catch {

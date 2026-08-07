@@ -296,23 +296,54 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
 
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        willPresent notification: UNNotification
-    ) async -> UNNotificationPresentationOptions {
-        [.banner, .list, .sound]
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        DispatchQueue.main.async {
+            completionHandler([.banner, .list, .sound])
+        }
     }
 
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
-        didReceive response: UNNotificationResponse
-    ) async {
-        guard DevBarCoreConstants.Features.agentWatcherEnabled else { return }
-        await MainActor.run {
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        let userInfo = NotificationUserInfo(response.notification.request.content.userInfo)
+        let actionIdentifier = response.actionIdentifier
+        DispatchQueue.main.async {
+            defer { completionHandler() }
+            guard actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
+
+            if let messageId = userInfo.value["messageId"] as? String, !messageId.isEmpty {
+                NotificationCenter.default.post(
+                    name: .iosDevBarMessageNotificationOpened,
+                    object: nil,
+                    userInfo: ["messageId": messageId]
+                )
+            }
+
+            if let rawURL = userInfo.value["url"] as? String,
+               let url = PushNotificationURLPolicy.validatedURL(from: rawURL) {
+                UIApplication.shared.open(url)
+                return
+            }
+
+            guard DevBarCoreConstants.Features.agentWatcherEnabled else { return }
             NotificationCenter.default.post(
                 name: .iosAgentWatcherNotificationOpened,
                 object: nil,
-                userInfo: response.notification.request.content.userInfo
+                userInfo: userInfo.value
             )
         }
+    }
+}
+
+private struct NotificationUserInfo: @unchecked Sendable {
+    let value: [AnyHashable: Any]
+
+    init(_ value: [AnyHashable: Any]) {
+        self.value = value
     }
 }
 
@@ -326,6 +357,7 @@ struct IOSPushNotificationDebugSnapshot {
 extension Notification.Name {
     static let iosAPNsTokenChanged = Notification.Name("iosAPNsTokenChanged")
     static let iosAgentWatcherNotificationOpened = Notification.Name("iosAgentWatcherNotificationOpened")
+    static let iosDevBarMessageNotificationOpened = Notification.Name("iosDevBarMessageNotificationOpened")
     static let iosLiveActivityPushToStartTokenChanged = Notification.Name("iosLiveActivityPushToStartTokenChanged")
 }
 

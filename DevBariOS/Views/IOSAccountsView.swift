@@ -776,6 +776,9 @@ struct IOSAccountsView: View {
             switch try await appViewModel.resolveScannedCode(code) {
             case .macPaired:
                 pendingRelayTransferURL = nil
+            case .accountBinding:
+                pendingRelayTransferURL = nil
+                transferImportError = "请使用首页右上角的扫码按钮关联账号。"
             case let .providerTransfer(preview, relayURL):
                 pendingRelayTransferURL = relayURL
                 pendingImportPreview = preview

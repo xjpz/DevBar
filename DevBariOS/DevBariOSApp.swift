@@ -12,6 +12,7 @@ struct DevBariOSApp: App {
     @StateObject private var languageManager = IOSLanguageManager()
     @StateObject private var themeManager = IOSThemeManager()
     @StateObject private var shortcutStore = ShortcutStore.shared
+    @StateObject private var accountViewModel = IOSAccountViewModel()
 
     init() {
         Self.ensureSharedModelStoreDirectoryExists()
@@ -25,6 +26,7 @@ struct DevBariOSApp: App {
                 .environmentObject(languageManager)
                 .environmentObject(themeManager)
                 .environmentObject(shortcutStore)
+                .environmentObject(accountViewModel)
                 .environment(\.locale, languageManager.currentLocale)
                 .environment(\.themeTokens, themeManager.resolvedTokens)
                 .font(themeManager.resolvedTokens.bodyFont)
@@ -35,6 +37,7 @@ struct DevBariOSApp: App {
                         appViewModel.startAutoRefreshIfNeeded()
                     }
                     await appViewModel.startDeferredLaunchWork()
+                    await accountViewModel.restoreSession()
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     switch newPhase {
@@ -63,6 +66,10 @@ struct DevBariOSApp: App {
                     Task {
                         await appViewModel.refreshHomeScreenShortcutsForCurrentState()
                     }
+                }
+                .onChange(of: accountViewModel.profile?.profileVersion) { _, _ in
+                    guard let displayName = accountViewModel.profile?.displayName else { return }
+                    appViewModel.macThemeWidgetUserName = displayName
                 }
                 .onOpenURL { url in
                     guard let action = ShortcutStore.action(for: url) else { return }
