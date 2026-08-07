@@ -340,7 +340,11 @@ struct IOSSettingsView: View {
             IOSSettingsDebugInfoItem(title: "Relay State", value: relayConnectionStateText(relayManager.connectionState)),
             IOSSettingsDebugInfoItem(title: "Relay Transport", value: relayManager.activeTransport.rawValue),
             IOSSettingsDebugInfoItem(title: "Push Environment", value: IOSPushNotificationCoordinator.pushEnvironment.rawValue),
-            IOSSettingsDebugInfoItem(title: "APNs Token", value: pushDebug.apnsToken ?? localized("ios_settings_debug_not_registered")),
+            IOSSettingsDebugInfoItem(
+                title: "APNs Token",
+                value: pushDebug.apnsTokenFingerprint.map { "current-process / \($0)" }
+                    ?? localized("ios_settings_debug_not_registered")
+            ),
             IOSSettingsDebugInfoItem(title: "Live Activity Push-to-Start Token", value: pushDebug.liveActivityPushToStartToken ?? localized("ios_settings_debug_not_available")),
             IOSSettingsDebugInfoItem(title: "Last Push Registration", value: pushDebug.lastPushRegistration ?? localized("ios_settings_debug_not_synced")),
             IOSSettingsDebugInfoItem(title: "Last Live Activity Push-to-Start Registration", value: pushDebug.lastLiveActivityPushToStartRegistration ?? localized("ios_settings_debug_not_synced")),
@@ -967,11 +971,11 @@ private struct IOSPushSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("ios.settings.push.screen")
         .task(id: relayDeviceToken) {
-            hasAPNsToken = IOSPushNotificationCoordinator.shared.debugSnapshot().apnsToken?.isEmpty == false
+            hasAPNsToken = IOSPushNotificationCoordinator.shared.debugSnapshot().hasCurrentProcessAPNsToken
             await openKeyViewModel.load(deviceToken: relayDeviceToken)
         }
         .onReceive(NotificationCenter.default.publisher(for: .iosAPNsTokenChanged)) { _ in
-            hasAPNsToken = IOSPushNotificationCoordinator.shared.debugSnapshot().apnsToken?.isEmpty == false
+            hasAPNsToken = IOSPushNotificationCoordinator.shared.debugSnapshot().hasCurrentProcessAPNsToken
         }
         .sheet(item: $pushKeySheet, onDismiss: openKeyViewModel.clearCreatedKey) { destination in
             switch destination {

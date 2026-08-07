@@ -276,8 +276,7 @@ final class IOSAppViewModel: ObservableObject {
                 Task { @MainActor [weak self] in
                     guard let self else { return }
                     await IOSPushNotificationCoordinator.shared.syncRegistration(
-                        relayDeviceToken: self.deviceRelayManager.deviceToken,
-                        force: true
+                        relayDeviceToken: self.deviceRelayManager.deviceToken
                     )
                 }
             }

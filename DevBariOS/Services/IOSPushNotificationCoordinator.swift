@@ -11,8 +11,9 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
     static let shared = IOSPushNotificationCoordinator()
 
     private enum Keys {
-        static let apnsToken = "ios.push.apnsToken"
-        static let lastRegistration = "ios.push.lastRegistration"
+        static let legacyAPNsToken = "ios.push.apnsToken"
+        static let legacyLastRegistration = "ios.push.lastRegistration"
+        static let lastRegistrationSummary = "ios.push.lastRegistrationSummary"
         static let lastLiveActivityPushToStartRegistration = "ios.push.lastLiveActivityPushToStartRegistration"
         static let lastLiveActivityRegistrationPrefix = "ios.push.lastLiveActivityRegistration."
         static let liveActivityPushToStartToken = "ios.push.liveActivityPushToStartToken"
@@ -22,6 +23,8 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
     private let defaults = UserDefaults.standard
     private let service = PushNotificationService.shared
     private var latestRelayDeviceToken: String?
+    private var apnsRegistrationState = APNsRegistrationState()
+    private var isDrainingAPNsRegistration = false
 #if canImport(ActivityKit)
     private var isObservingLiveActivityTokens = false
     private var observedLiveMessageActivityIDs: Set<String> = []
@@ -30,6 +33,8 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
 
     private override init() {
         super.init()
+        defaults.removeObject(forKey: Keys.legacyAPNsToken)
+        defaults.removeObject(forKey: Keys.legacyLastRegistration)
         startLiveActivityTokenObservation()
     }
 
@@ -37,11 +42,36 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-            if let error {
-                print("[DevBar:iOSPush] Notification authorization failed: \(error)")
-            }
-            guard granted else { return }
+            let nsError = error as NSError?
             Task { @MainActor in
+                if let nsError {
+                    DiagnosticLogger.shared.record(
+                        level: .error,
+                        category: "ios.push.apns",
+                        name: "apns_authorization_failed",
+                        message: "Notification authorization request failed",
+                        details: [
+                            "errorDomain": nsError.domain,
+                            "errorCode": String(nsError.code),
+                        ]
+                    )
+                    print("[DevBar:iOSPush] Notification authorization failed domain=\(nsError.domain) code=\(nsError.code)")
+                }
+                guard granted else {
+                    DiagnosticLogger.shared.record(
+                        level: .warning,
+                        category: "ios.push.apns",
+                        name: "apns_authorization_not_granted",
+                        message: "Notification authorization was not granted"
+                    )
+                    return
+                }
+                DiagnosticLogger.shared.record(
+                    level: .info,
+                    category: "ios.push.apns",
+                    name: "apns_authorization_granted",
+                    message: "Notification authorization granted; requesting remote notification registration"
+                )
                 application.registerForRemoteNotifications()
             }
         }
@@ -49,12 +79,44 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
 
     func didRegisterForRemoteNotifications(deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        defaults.set(token, forKey: Keys.apnsToken)
+        let previousFingerprint = apnsRegistrationState.currentAPNsTokenFingerprint
+        apnsRegistrationState.receiveCurrentProcessAPNsToken(token)
+        let fingerprint = PushTokenFingerprint.make(token)
+        DiagnosticLogger.shared.record(
+            level: .info,
+            category: "ios.push.apns",
+            name: "apns_current_process_callback",
+            message: "Received APNs device registration callback for current process",
+            details: [
+                "apnsFingerprint": fingerprint,
+                "previousAPNsFingerprint": previousFingerprint ?? "none",
+                "fingerprintChanged": String(previousFingerprint != fingerprint),
+                "bundleId": Self.bundleIdentifier,
+                "environment": Self.pushEnvironment.rawValue,
+            ]
+        )
+        print("[DevBar:iOSPush] Received current-process APNs token fingerprint=\(fingerprint) changed=\(previousFingerprint != fingerprint)")
         NotificationCenter.default.post(name: .iosAPNsTokenChanged, object: nil)
+        Task { @MainActor [weak self] in
+            await self?.drainAPNsRegistration()
+        }
     }
 
     func didFailToRegisterForRemoteNotifications(error: Error) {
-        print("[DevBar:iOSPush] APNs registration failed: \(error)")
+        let nsError = error as NSError
+        DiagnosticLogger.shared.record(
+            level: .error,
+            category: "ios.push.apns",
+            name: "apns_system_registration_failed",
+            message: "System failed to register for remote notifications",
+            details: [
+                "errorDomain": nsError.domain,
+                "errorCode": String(nsError.code),
+                "bundleId": Self.bundleIdentifier,
+                "environment": Self.pushEnvironment.rawValue,
+            ]
+        )
+        print("[DevBar:iOSPush] APNs registration failed domain=\(nsError.domain) code=\(nsError.code)")
     }
 
     func clearApplicationBadge() {
@@ -67,36 +129,31 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
 
     func syncRegistration(relayDeviceToken: String?, force: Bool = false) async {
         latestRelayDeviceToken = relayDeviceToken
-        guard let relayDeviceToken, !relayDeviceToken.isEmpty,
-              let apnsToken = defaults.string(forKey: Keys.apnsToken), !apnsToken.isEmpty
-        else { return }
-
-        let environment: PushEnvironment
-        #if DEBUG
-        environment = .development
-        #else
-        environment = .production
-        #endif
-
-        let bundleId = Bundle.main.bundleIdentifier ?? "cc.xjpz.DevBariOS"
-        let fingerprint = "\(apnsToken)|\(bundleId)|\(environment.rawValue)|\(relayDeviceToken)"
-        guard force || defaults.string(forKey: Keys.lastRegistration) != fingerprint else { return }
-
-        do {
-            _ = try await service.register(
-                PushDeviceRegistration(
-                    pushToken: apnsToken,
-                    bundleId: bundleId,
-                    environment: environment,
-                    locale: Locale.current.identifier
-                ),
-                deviceToken: relayDeviceToken
-            )
-            defaults.set(fingerprint, forKey: Keys.lastRegistration)
-            await syncLiveActivityPushToStart(relayDeviceToken: relayDeviceToken, force: force)
-        } catch {
-            print("[DevBar:iOSPush] Push token sync failed: \(error)")
+        apnsRegistrationState.updateRegistrationContext(
+            bundleID: Self.bundleIdentifier,
+            environment: Self.pushEnvironment,
+            locale: Locale.current.identifier
+        )
+        apnsRegistrationState.updateRelayDeviceToken(relayDeviceToken)
+        if force {
+            apnsRegistrationState.requestForcedRegistration()
         }
+        DiagnosticLogger.shared.record(
+            level: .info,
+            category: "ios.push.apns",
+            name: "apns_registration_sync_requested",
+            message: "APNs registration synchronization requested",
+            endpoint: DevBarCoreConstants.PushNotifications.registerPath,
+            details: [
+                "force": String(force),
+                "hasCurrentProcessCallback": String(apnsRegistrationState.hasCurrentProcessAPNsToken),
+                "hasRelayCredential": String(relayDeviceToken?.isEmpty == false),
+                "registrationInFlight": String(apnsRegistrationState.isRegistrationInFlight),
+                "bundleId": Self.bundleIdentifier,
+                "environment": Self.pushEnvironment.rawValue,
+            ]
+        )
+        await drainAPNsRegistration()
     }
 
     func syncPreferences(_ preferences: PushNotificationPreferences, relayDeviceToken: String?) async {
@@ -120,11 +177,105 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
 
     func debugSnapshot() -> IOSPushNotificationDebugSnapshot {
         IOSPushNotificationDebugSnapshot(
-            apnsToken: defaults.string(forKey: Keys.apnsToken),
+            apnsTokenFingerprint: apnsRegistrationState.currentAPNsTokenFingerprint,
+            hasCurrentProcessAPNsToken: apnsRegistrationState.hasCurrentProcessAPNsToken,
             liveActivityPushToStartToken: defaults.string(forKey: Keys.liveActivityPushToStartToken),
-            lastPushRegistration: defaults.string(forKey: Keys.lastRegistration),
+            lastPushRegistration: defaults.string(forKey: Keys.lastRegistrationSummary),
             lastLiveActivityPushToStartRegistration: defaults.string(forKey: Keys.lastLiveActivityPushToStartRegistration)
         )
+    }
+
+    private func drainAPNsRegistration() async {
+        guard !isDrainingAPNsRegistration else {
+            DiagnosticLogger.shared.record(
+                level: .info,
+                category: "ios.push.apns",
+                name: "apns_registration_drain_coalesced",
+                message: "APNs registration drain request coalesced with active drain",
+                endpoint: DevBarCoreConstants.PushNotifications.registerPath,
+                details: [
+                    "registrationInFlight": String(apnsRegistrationState.isRegistrationInFlight),
+                ]
+            )
+            return
+        }
+        isDrainingAPNsRegistration = true
+        defer { isDrainingAPNsRegistration = false }
+
+        while let attempt = apnsRegistrationState.beginNextAttempt() {
+            let startedAt = Date()
+            DiagnosticLogger.shared.record(
+                level: .info,
+                category: "ios.push.apns",
+                name: "apns_registration_attempt_started",
+                message: "APNs registration request started",
+                endpoint: DevBarCoreConstants.PushNotifications.registerPath,
+                details: [
+                    "attemptId": String(attempt.id),
+                    "apnsFingerprint": attempt.apnsTokenFingerprint,
+                    "relayFingerprint": attempt.relayTokenFingerprint,
+                    "bundleId": attempt.registration.bundleId,
+                    "environment": attempt.registration.environment.rawValue,
+                ]
+            )
+            do {
+                _ = try await service.register(
+                    attempt.registration,
+                    deviceToken: attempt.relayDeviceToken
+                )
+                let durationMs = Int64(Date().timeIntervalSince(startedAt) * 1_000)
+                let registeredAt = ISO8601DateFormatter().string(from: Date())
+                defaults.set(
+                    "apns:\(attempt.apnsTokenFingerprint)|relay:\(attempt.relayTokenFingerprint)|" +
+                        "\(attempt.registration.bundleId)|\(attempt.registration.environment.rawValue)|\(registeredAt)",
+                    forKey: Keys.lastRegistrationSummary
+                )
+                await syncLiveActivityPushToStart(
+                    relayDeviceToken: attempt.relayDeviceToken,
+                    force: false
+                )
+                apnsRegistrationState.complete(attempt, succeeded: true)
+                DiagnosticLogger.shared.record(
+                    level: .info,
+                    category: "ios.push.apns",
+                    name: "apns_registration_attempt_succeeded",
+                    message: "APNs registration request succeeded",
+                    endpoint: DevBarCoreConstants.PushNotifications.registerPath,
+                    durationMs: durationMs,
+                    details: [
+                        "attemptId": String(attempt.id),
+                        "apnsFingerprint": attempt.apnsTokenFingerprint,
+                        "relayFingerprint": attempt.relayTokenFingerprint,
+                        "bundleId": attempt.registration.bundleId,
+                        "environment": attempt.registration.environment.rawValue,
+                    ]
+                )
+                print("[DevBar:iOSPush] Push registration succeeded attempt=\(attempt.id) apns=\(attempt.apnsTokenFingerprint) relay=\(attempt.relayTokenFingerprint) durationMs=\(durationMs)")
+            } catch {
+                let durationMs = Int64(Date().timeIntervalSince(startedAt) * 1_000)
+                let nsError = error as NSError
+                apnsRegistrationState.complete(attempt, succeeded: false)
+                DiagnosticLogger.shared.record(
+                    level: .error,
+                    category: "ios.push.apns",
+                    name: "apns_registration_attempt_failed",
+                    message: "APNs registration request failed",
+                    endpoint: DevBarCoreConstants.PushNotifications.registerPath,
+                    durationMs: durationMs,
+                    details: [
+                        "attemptId": String(attempt.id),
+                        "apnsFingerprint": attempt.apnsTokenFingerprint,
+                        "relayFingerprint": attempt.relayTokenFingerprint,
+                        "bundleId": attempt.registration.bundleId,
+                        "environment": attempt.registration.environment.rawValue,
+                        "errorDomain": nsError.domain,
+                        "errorCode": String(nsError.code),
+                        "errorType": String(reflecting: type(of: error)),
+                    ]
+                )
+                print("[DevBar:iOSPush] Push registration failed attempt=\(attempt.id) apns=\(attempt.apnsTokenFingerprint) relay=\(attempt.relayTokenFingerprint) domain=\(nsError.domain) code=\(nsError.code) durationMs=\(durationMs)")
+            }
+        }
     }
 
     private func savePreferences(_ preferences: PushNotificationPreferences) {
@@ -348,7 +499,8 @@ private struct NotificationUserInfo: @unchecked Sendable {
 }
 
 struct IOSPushNotificationDebugSnapshot {
-    let apnsToken: String?
+    let apnsTokenFingerprint: String?
+    let hasCurrentProcessAPNsToken: Bool
     let liveActivityPushToStartToken: String?
     let lastPushRegistration: String?
     let lastLiveActivityPushToStartRegistration: String?
