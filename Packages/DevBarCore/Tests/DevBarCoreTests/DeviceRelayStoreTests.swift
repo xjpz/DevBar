@@ -3,13 +3,13 @@ import Testing
 @testable import DevBarCore
 
 @Test
-func relayDeviceIDMigratesFromUserDefaultsToKeychain() {
+func relayDeviceIDMigratesFromUserDefaultsToKeychain() throws {
     let context = makeStoreContext()
     defer { context.cleanup() }
     let expectedID = "iphone-11111111-1111-1111-1111-111111111111"
     context.defaults.set(expectedID, forKey: DevBarCoreConstants.Defaults.relayIPhoneDeviceIDKey)
 
-    let resolution = context.store.resolveOrCreateDeviceID(for: .iPhone)
+    let resolution = try context.store.resolveOrCreateDeviceID(for: .iPhone)
 
     #expect(resolution == DeviceRelayIdentityResolution(
         deviceID: expectedID,
@@ -19,20 +19,20 @@ func relayDeviceIDMigratesFromUserDefaultsToKeychain() {
 }
 
 @Test
-func relayDeviceIDSurvivesUserDefaultsRemovalThroughKeychain() {
+func relayDeviceIDSurvivesUserDefaultsRemovalThroughKeychain() throws {
     let context = makeStoreContext()
     defer { context.cleanup() }
     let expectedID = "iphone-22222222-2222-2222-2222-222222222222"
     context.secureStore.setString(expectedID, forKey: DevBarCoreConstants.Keychain.iPhoneRelayDeviceIDKey)
 
-    let resolution = context.store.resolveOrCreateDeviceID(for: .iPhone)
+    let resolution = try context.store.resolveOrCreateDeviceID(for: .iPhone)
 
     #expect(resolution == DeviceRelayIdentityResolution(deviceID: expectedID, source: .keychain))
     #expect(context.defaults.string(forKey: DevBarCoreConstants.Defaults.relayIPhoneDeviceIDKey) == expectedID)
 }
 
 @Test
-func relayDeviceIDRecoversFromLegacyTokenWhenDefaultsWereRemoved() {
+func relayDeviceIDRecoversFromLegacyTokenWhenDefaultsWereRemoved() throws {
     let context = makeStoreContext()
     defer { context.cleanup() }
     let expectedID = "iphone-33333333-3333-3333-3333-333333333333"
@@ -40,7 +40,7 @@ func relayDeviceIDRecoversFromLegacyTokenWhenDefaultsWereRemoved() {
     context.secureStore.setString("drs_legacy-secret", forKey: DevBarCoreConstants.Keychain.iPhoneRelayDeviceSecretKey)
     context.secureStore.setString(token, forKey: DevBarCoreConstants.Keychain.relayDeviceTokenKey)
 
-    let resolution = context.store.resolveOrCreateDeviceID(for: .iPhone)
+    let resolution = try context.store.resolveOrCreateDeviceID(for: .iPhone)
 
     #expect(resolution == DeviceRelayIdentityResolution(deviceID: expectedID, source: .relayTokenRecovery))
     #expect(context.secureStore.string(forKey: DevBarCoreConstants.Keychain.iPhoneRelayDeviceIDKey) == expectedID)
@@ -65,7 +65,7 @@ func relayDeviceTokenIsRejectedWhenItBelongsToPreviousDeviceID() {
 }
 
 @Test
-func malformedOrWrongTypeTokenDoesNotRecoverRelayDeviceID() {
+func malformedOrWrongTypeTokenDoesNotRecoverRelayDeviceID() throws {
     let malformedContext = makeStoreContext()
     defer { malformedContext.cleanup() }
     malformedContext.secureStore.setString(
@@ -77,7 +77,7 @@ func malformedOrWrongTypeTokenDoesNotRecoverRelayDeviceID() {
         forKey: DevBarCoreConstants.Keychain.relayDeviceTokenKey
     )
 
-    let malformedResolution = malformedContext.store.resolveOrCreateDeviceID(for: .iPhone)
+    let malformedResolution = try malformedContext.store.resolveOrCreateDeviceID(for: .iPhone)
 
     #expect(malformedResolution.source == .generated)
     #expect(malformedResolution.deviceID.hasPrefix("iphone-"))
@@ -96,25 +96,103 @@ func malformedOrWrongTypeTokenDoesNotRecoverRelayDeviceID() {
         forKey: DevBarCoreConstants.Keychain.relayDeviceTokenKey
     )
 
-    let wrongTypeResolution = wrongTypeContext.store.resolveOrCreateDeviceID(for: .iPhone)
+    let wrongTypeResolution = try wrongTypeContext.store.resolveOrCreateDeviceID(for: .iPhone)
 
     #expect(wrongTypeResolution.source == .generated)
     #expect(wrongTypeResolution.deviceID.hasPrefix("iphone-"))
 }
 
 @Test
-func freshRelayDeviceIDIsGeneratedOnceAndMirrored() {
+func freshRelayDeviceIDIsGeneratedOnceAndMirrored() throws {
     let context = makeStoreContext()
     defer { context.cleanup() }
 
-    let first = context.store.resolveOrCreateDeviceID(for: .iPhone)
-    let second = context.store.resolveOrCreateDeviceID(for: .iPhone)
+    let first = try context.store.resolveOrCreateDeviceID(for: .iPhone)
+    let second = try context.store.resolveOrCreateDeviceID(for: .iPhone)
 
     #expect(first.source == .generated)
     #expect(second.source == .keychain)
     #expect(second.deviceID == first.deviceID)
     #expect(context.secureStore.string(forKey: DevBarCoreConstants.Keychain.iPhoneRelayDeviceIDKey) == first.deviceID)
     #expect(context.defaults.string(forKey: DevBarCoreConstants.Defaults.relayIPhoneDeviceIDKey) == first.deviceID)
+}
+
+@Test
+func relayDeviceSecretWriteFailureDoesNotReturnEphemeralSecret() {
+    let secureStore = InMemoryDeviceRelaySecureStore(writeBehavior: .fail)
+    let context = makeStoreContext(secureStore: secureStore)
+    defer { context.cleanup() }
+
+    do {
+        _ = try context.store.loadOrCreateDeviceSecret(for: .mac)
+        Issue.record("Expected secure storage failure")
+    } catch {
+        #expect(error as? DeviceRelayError == .secureStorageUnavailable)
+    }
+    #expect(secureStore.string(forKey: DevBarCoreConstants.Keychain.macRelayDeviceSecretKey) == nil)
+}
+
+@Test
+func relayDeviceSecretReadbackFailureDoesNotReturnEphemeralSecret() {
+    let secureStore = InMemoryDeviceRelaySecureStore(writeBehavior: .discard)
+    let context = makeStoreContext(secureStore: secureStore)
+    defer { context.cleanup() }
+
+    do {
+        _ = try context.store.loadOrCreateDeviceSecret(for: .mac)
+        Issue.record("Expected secure storage readback failure")
+    } catch {
+        #expect(error as? DeviceRelayError == .secureStorageUnavailable)
+    }
+}
+
+@Test
+func freshRelayDeviceIDIsNotMirroredWhenKeychainWriteFails() {
+    let secureStore = InMemoryDeviceRelaySecureStore(writeBehavior: .fail)
+    let context = makeStoreContext(secureStore: secureStore)
+    defer { context.cleanup() }
+
+    do {
+        _ = try context.store.resolveOrCreateDeviceID(for: .mac)
+        Issue.record("Expected secure storage failure")
+    } catch {
+        #expect(error as? DeviceRelayError == .secureStorageUnavailable)
+    }
+    #expect(context.defaults.string(forKey: DevBarCoreConstants.Defaults.relayMacDeviceIDKey) == nil)
+}
+
+@Test
+func relayIdentityResetClearsOnlyRequestedRelayIdentity() throws {
+    let context = makeStoreContext()
+    defer { context.cleanup() }
+    let macID = "mac-11111111-1111-1111-1111-111111111111"
+    let iphoneSecret = "drs_iphone-kept"
+    let token = makeRelayToken(deviceID: macID, type: .mac)
+
+    context.defaults.set(macID, forKey: DevBarCoreConstants.Defaults.relayMacDeviceIDKey)
+    context.secureStore.setString(macID, forKey: DevBarCoreConstants.Keychain.macRelayDeviceIDKey)
+    context.secureStore.setString("drs_mac-removed", forKey: DevBarCoreConstants.Keychain.macRelayDeviceSecretKey)
+    context.secureStore.setString(iphoneSecret, forKey: DevBarCoreConstants.Keychain.iPhoneRelayDeviceSecretKey)
+    context.secureStore.setString("provider-kept", forKey: DevBarCoreConstants.Keychain.openAIAccessTokenKey)
+    context.secureStore.setString(token, forKey: DevBarCoreConstants.Keychain.relayDeviceTokenKey)
+    context.defaults.set(token, forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
+    context.store.saveLocalPairSecret("local-removed", peerDeviceID: "iphone-peer")
+    context.store.savePendingLocalPairSecret("pending-removed", pairCode: "ABC123")
+
+    try context.store.resetIdentity(
+        for: .mac,
+        knownPeerIDs: ["iphone-peer"],
+        pendingPairCode: "ABC123"
+    )
+
+    #expect(context.store.loadDeviceID(for: .mac) == nil)
+    #expect(context.secureStore.string(forKey: DevBarCoreConstants.Keychain.macRelayDeviceSecretKey) == nil)
+    #expect(context.secureStore.string(forKey: DevBarCoreConstants.Keychain.relayDeviceTokenKey) == nil)
+    #expect(context.defaults.string(forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey) == nil)
+    #expect(context.store.loadLocalPairSecret(peerDeviceID: "iphone-peer") == nil)
+    #expect(context.store.loadPendingLocalPairSecret(pairCode: "ABC123") == nil)
+    #expect(context.secureStore.string(forKey: DevBarCoreConstants.Keychain.iPhoneRelayDeviceSecretKey) == iphoneSecret)
+    #expect(context.secureStore.string(forKey: DevBarCoreConstants.Keychain.openAIAccessTokenKey) == "provider-kept")
 }
 
 @Test
@@ -152,7 +230,7 @@ func relayManagerDoesNotPublishCachedTokenBeforeIdentitySetup() {
     #expect(manager.deviceToken == nil)
 }
 
-private struct RelayStoreTestContext {
+struct RelayStoreTestContext {
     let suiteName: String
     let defaults: UserDefaults
     let secureStore: InMemoryDeviceRelaySecureStore
@@ -163,11 +241,12 @@ private struct RelayStoreTestContext {
     }
 }
 
-private func makeStoreContext() -> RelayStoreTestContext {
+func makeStoreContext(
+    secureStore: InMemoryDeviceRelaySecureStore = InMemoryDeviceRelaySecureStore()
+) -> RelayStoreTestContext {
     let suiteName = "cc.xjpz.DevBar.DeviceRelayStoreTests.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: suiteName)!
     defaults.removePersistentDomain(forName: suiteName)
-    let secureStore = InMemoryDeviceRelaySecureStore()
     let store = DeviceRelayStore(
         defaults: defaults,
         sharedDefaults: nil,
@@ -182,9 +261,20 @@ private func makeStoreContext() -> RelayStoreTestContext {
     )
 }
 
-private final class InMemoryDeviceRelaySecureStore: DeviceRelaySecureStoring, @unchecked Sendable {
+final class InMemoryDeviceRelaySecureStore: DeviceRelaySecureStoring, @unchecked Sendable {
+    enum WriteBehavior {
+        case store
+        case fail
+        case discard
+    }
+
     private let lock = NSLock()
     private var values: [String: String] = [:]
+    private let writeBehavior: WriteBehavior
+
+    init(writeBehavior: WriteBehavior = .store) {
+        self.writeBehavior = writeBehavior
+    }
 
     func string(forKey key: String) -> String? {
         lock.withLock { values[key] }
@@ -192,8 +282,15 @@ private final class InMemoryDeviceRelaySecureStore: DeviceRelaySecureStoring, @u
 
     @discardableResult
     func setString(_ value: String, forKey key: String) -> Bool {
-        lock.withLock { values[key] = value }
-        return true
+        switch writeBehavior {
+        case .store:
+            lock.withLock { values[key] = value }
+            return true
+        case .fail:
+            return false
+        case .discard:
+            return true
+        }
     }
 
     func removeValue(forKey key: String) {
@@ -201,7 +298,7 @@ private final class InMemoryDeviceRelaySecureStore: DeviceRelaySecureStoring, @u
     }
 }
 
-private struct NoOpDeviceRelayDiagnosticReporter: DiagnosticReporting {
+struct NoOpDeviceRelayDiagnosticReporter: DiagnosticReporting {
     func record(_ event: DiagnosticLogEvent) {}
 }
 

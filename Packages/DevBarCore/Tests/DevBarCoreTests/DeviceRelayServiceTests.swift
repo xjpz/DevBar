@@ -528,6 +528,78 @@ func deviceRelaySocketDisconnectedErrorIsNotReportedAsUnregistered() {
     #expect(DeviceRelayError.missingDeviceToken.errorDescription == "设备尚未注册")
 }
 
+@MainActor
+@Test
+func invalidDeviceSecretRequiresRecoveryAndIsNotOverwrittenByMissingToken() async {
+    let recorder = DeviceRelayRequestRecorder(
+        responseBody: """
+        {
+          "success": false,
+          "code": 40302,
+          "msg": "invalid_device_secret",
+          "data": null
+        }
+        """.data(using: .utf8)!,
+        statusCode: 403
+    )
+    let context = makeStoreContext()
+    defer { context.cleanup() }
+    let deviceID = "mac-identity-conflict"
+    context.defaults.set(deviceID, forKey: DevBarCoreConstants.Defaults.relayMacDeviceIDKey)
+    context.secureStore.setString(deviceID, forKey: DevBarCoreConstants.Keychain.macRelayDeviceIDKey)
+    context.secureStore.setString(
+        "drs_stable-device-secret-with-more-than-32-chars",
+        forKey: DevBarCoreConstants.Keychain.macRelayDeviceSecretKey
+    )
+    let service = DeviceRelayService(
+        baseURL: URL(string: "https://relay.example.test")!,
+        session: recorder.session
+    )
+    let manager = DeviceRelayManager(service: service, store: context.store)
+
+    await manager.setup(deviceType: .mac, deviceName: "Unit Mac")
+
+    #expect(manager.identityRecoveryRequirement == .secretMismatch)
+    #expect(manager.deviceToken == nil)
+    #expect(manager.lastErrorMessage == "本机中继凭据与服务端记录不一致，需要重置后重新连接 iPhone")
+    let originalMessage = manager.lastErrorMessage
+
+    await manager.createPairQRCode(deviceName: "Unit Mac")
+
+    #expect(manager.lastErrorMessage == originalMessage)
+    #expect(manager.identityRecoveryRequirement == .secretMismatch)
+}
+
+@MainActor
+@Test
+func relayPairedOverwritesOnlyTheConfirmedIPhoneLocalSecret() {
+    let context = makeStoreContext()
+    defer { context.cleanup() }
+    let manager = DeviceRelayManager(store: context.store)
+    let payload = DeviceRelayPairQRCodePayload(
+        relay: URL(string: "https://relay.example.test")!,
+        pairCode: "ABC123",
+        macDeviceId: "mac-unit",
+        expiresAt: 1_900_000_000_000,
+        localSecret: "new-local-secret"
+    )
+    context.store.savePendingLocalPairSecret("new-local-secret", pairCode: payload.pairCode)
+    context.store.saveLocalPairSecret("old-target-secret", peerDeviceID: "iphone-target")
+    context.store.saveLocalPairSecret("other-secret", peerDeviceID: "iphone-other")
+    manager.setPendingPairForTesting(payload, deviceType: .mac)
+
+    manager.handleMessageForTesting(DeviceRelayMessage(
+        type: .relayPaired,
+        fromDeviceId: "iphone-target",
+        targetDeviceId: "mac-unit",
+        payload: ["iphoneDeviceId": "iphone-target"]
+    ))
+
+    #expect(context.store.loadLocalPairSecret(peerDeviceID: "iphone-target") == "new-local-secret")
+    #expect(context.store.loadLocalPairSecret(peerDeviceID: "iphone-other") == "other-secret")
+    #expect(context.store.loadPendingLocalPairSecret(pairCode: payload.pairCode) == nil)
+}
+
 @Test
 @MainActor
 func deviceRelayReconnectBackoffIsCapped() {

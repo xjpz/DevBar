@@ -5,6 +5,10 @@ public enum DeviceRelayDeviceType: String, Codable, Sendable, Equatable {
     case mac
 }
 
+public enum DeviceRelayIdentityRecoveryRequirement: Sendable, Equatable {
+    case secretMismatch
+}
+
 public enum DeviceRelayStatus: String, Codable, Sendable, Equatable {
     case online = "ONLINE"
     case offline = "OFFLINE"
@@ -498,6 +502,7 @@ public enum DeviceRelayError: Error, LocalizedError, Sendable, Equatable {
     case missingDeviceID
     case webSocketNotConnected
     case connectionTimeout
+    case secureStorageUnavailable
 
     public var errorDescription: String? {
         switch self {
@@ -519,6 +524,8 @@ public enum DeviceRelayError: Error, LocalizedError, Sendable, Equatable {
             return "中继 WebSocket 未连接"
         case .connectionTimeout:
             return "等待中继 WebSocket 在线超时"
+        case .secureStorageUnavailable:
+            return "无法安全保存中继身份，请检查钥匙串权限后重试"
         }
     }
 }

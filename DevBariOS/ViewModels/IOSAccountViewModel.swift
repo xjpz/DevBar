@@ -217,8 +217,8 @@ final class IOSAccountViewModel: ObservableObject {
 
         deviceLinkState = .linking
         deviceLinkMessage = nil
-        let deviceSecret = relayStore.loadOrCreateDeviceSecret(for: .iPhone)
         do {
+            let deviceSecret = try relayStore.loadOrCreateDeviceSecret(for: .iPhone)
             _ = try await api.linkCurrentDevice(
                 appToken: appToken,
                 deviceToken: deviceToken,

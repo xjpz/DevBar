@@ -50,33 +50,37 @@ public struct DeviceRelayStore: @unchecked Sendable {
     }
 
     public func loadDeviceID(for type: DeviceRelayDeviceType) -> String? {
-        resolveExistingDeviceID(for: type)?.deviceID
+        (try? resolveExistingDeviceID(for: type))?.deviceID
     }
 
-    public func loadOrCreateDeviceID(for type: DeviceRelayDeviceType) -> String {
-        resolveOrCreateDeviceID(for: type).deviceID
+    public func loadOrCreateDeviceID(for type: DeviceRelayDeviceType) throws -> String {
+        try resolveOrCreateDeviceID(for: type).deviceID
     }
 
-    func resolveOrCreateDeviceID(for type: DeviceRelayDeviceType) -> DeviceRelayIdentityResolution {
-        if let existing = resolveExistingDeviceID(for: type) {
+    func resolveOrCreateDeviceID(for type: DeviceRelayDeviceType) throws -> DeviceRelayIdentityResolution {
+        if let existing = try resolveExistingDeviceID(for: type) {
             logIdentityResolution(existing, type: type)
             return existing
         }
 
         let id = "\(type.rawValue)-\(UUID().uuidString.lowercased())"
-        persistDeviceID(id, for: type)
+        try persistDeviceID(id, for: type)
         let resolution = DeviceRelayIdentityResolution(deviceID: id, source: .generated)
         logIdentityResolution(resolution, type: type)
         return resolution
     }
 
-    public func loadOrCreateDeviceSecret(for type: DeviceRelayDeviceType) -> String {
+    public func loadOrCreateDeviceSecret(for type: DeviceRelayDeviceType) throws -> String {
         let key = deviceSecretKey(for: type)
         if let existing = secureStore.string(forKey: key), !existing.isEmpty {
             return existing
         }
         let secret = "drs_\(randomToken())"
-        secureStore.setString(secret, forKey: key)
+        guard secureStore.setString(secret, forKey: key),
+              secureStore.string(forKey: key) == secret else {
+            secureStore.removeValue(forKey: key)
+            throw DeviceRelayError.secureStorageUnavailable
+        }
         return secret
     }
 
@@ -95,8 +99,7 @@ public struct DeviceRelayStore: @unchecked Sendable {
             return false
         }
 
-        persistDeviceToken(token)
-        return true
+        return persistDeviceToken(token)
     }
 
     public func loadDeviceToken(for type: DeviceRelayDeviceType) -> String? {
@@ -109,7 +112,7 @@ public struct DeviceRelayStore: @unchecked Sendable {
                   claims.deviceId == deviceID else {
                 continue
             }
-            persistDeviceToken(token)
+            guard persistDeviceToken(token) else { return nil }
             return token
         }
 
@@ -125,9 +128,16 @@ public struct DeviceRelayStore: @unchecked Sendable {
         sharedDefaults?.removeObject(forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
     }
 
-    public func saveLocalPairSecret(_ secret: String, peerDeviceID: String) {
-        guard !secret.isEmpty else { return }
-        secureStore.setString(secret, forKey: localPairSecretKey(peerDeviceID: peerDeviceID))
+    @discardableResult
+    public func saveLocalPairSecret(_ secret: String, peerDeviceID: String) -> Bool {
+        guard !secret.isEmpty else { return false }
+        let key = localPairSecretKey(peerDeviceID: peerDeviceID)
+        guard secureStore.setString(secret, forKey: key),
+              secureStore.string(forKey: key) == secret else {
+            secureStore.removeValue(forKey: key)
+            return false
+        }
+        return true
     }
 
     public func loadLocalPairSecret(peerDeviceID: String) -> String? {
@@ -138,9 +148,16 @@ public struct DeviceRelayStore: @unchecked Sendable {
         secureStore.removeValue(forKey: localPairSecretKey(peerDeviceID: peerDeviceID))
     }
 
-    public func savePendingLocalPairSecret(_ secret: String, pairCode: String) {
-        guard !secret.isEmpty else { return }
-        secureStore.setString(secret, forKey: pendingLocalPairSecretKey(pairCode: pairCode))
+    @discardableResult
+    public func savePendingLocalPairSecret(_ secret: String, pairCode: String) -> Bool {
+        guard !secret.isEmpty else { return false }
+        let key = pendingLocalPairSecretKey(pairCode: pairCode)
+        guard secureStore.setString(secret, forKey: key),
+              secureStore.string(forKey: key) == secret else {
+            secureStore.removeValue(forKey: key)
+            return false
+        }
+        return true
     }
 
     public func loadPendingLocalPairSecret(pairCode: String) -> String? {
@@ -151,9 +168,39 @@ public struct DeviceRelayStore: @unchecked Sendable {
         secureStore.removeValue(forKey: pendingLocalPairSecretKey(pairCode: pairCode))
     }
 
+    public func resetIdentity(
+        for type: DeviceRelayDeviceType,
+        knownPeerIDs: Set<String>,
+        pendingPairCode: String?
+    ) throws {
+        clearDeviceToken()
+        secureStore.removeValue(forKey: keychainDeviceIDKey(for: type))
+        secureStore.removeValue(forKey: deviceSecretKey(for: type))
+        defaults.removeObject(forKey: deviceIDKey(for: type))
+
+        for peerDeviceID in knownPeerIDs {
+            clearLocalPairSecret(peerDeviceID: peerDeviceID)
+        }
+        if let pendingPairCode {
+            clearPendingLocalPairSecret(pairCode: pendingPairCode)
+        }
+
+        guard secureStore.string(forKey: DevBarCoreConstants.Keychain.relayDeviceTokenKey) == nil,
+              secureStore.string(forKey: keychainDeviceIDKey(for: type)) == nil,
+              secureStore.string(forKey: deviceSecretKey(for: type)) == nil,
+              knownPeerIDs.allSatisfy({
+                  secureStore.string(forKey: localPairSecretKey(peerDeviceID: $0)) == nil
+              }),
+              pendingPairCode.map({
+                  secureStore.string(forKey: pendingLocalPairSecretKey(pairCode: $0)) == nil
+              }) ?? true else {
+            throw DeviceRelayError.secureStorageUnavailable
+        }
+    }
+
     private func resolveExistingDeviceID(
         for type: DeviceRelayDeviceType
-    ) -> DeviceRelayIdentityResolution? {
+    ) throws -> DeviceRelayIdentityResolution? {
         if let keychainID = normalizedDeviceID(
             secureStore.string(forKey: keychainDeviceIDKey(for: type)),
             for: type
@@ -163,7 +210,7 @@ public struct DeviceRelayStore: @unchecked Sendable {
         }
 
         if let defaultsID = normalizedDeviceID(defaults.string(forKey: deviceIDKey(for: type)), for: type) {
-            secureStore.setString(defaultsID, forKey: keychainDeviceIDKey(for: type))
+            try persistDeviceID(defaultsID, for: type)
             return DeviceRelayIdentityResolution(deviceID: defaultsID, source: .userDefaultsMigration)
         }
 
@@ -177,21 +224,32 @@ public struct DeviceRelayStore: @unchecked Sendable {
                   let recoveredID = normalizedDeviceID(claims.deviceId, for: type) else {
                 continue
             }
-            persistDeviceID(recoveredID, for: type)
+            try persistDeviceID(recoveredID, for: type)
             return DeviceRelayIdentityResolution(deviceID: recoveredID, source: .relayTokenRecovery)
         }
         return nil
     }
 
-    private func persistDeviceID(_ deviceID: String, for type: DeviceRelayDeviceType) {
-        secureStore.setString(deviceID, forKey: keychainDeviceIDKey(for: type))
+    private func persistDeviceID(_ deviceID: String, for type: DeviceRelayDeviceType) throws {
+        let key = keychainDeviceIDKey(for: type)
+        guard secureStore.setString(deviceID, forKey: key),
+              secureStore.string(forKey: key) == deviceID else {
+            secureStore.removeValue(forKey: key)
+            throw DeviceRelayError.secureStorageUnavailable
+        }
         defaults.set(deviceID, forKey: deviceIDKey(for: type))
     }
 
-    private func persistDeviceToken(_ token: String) {
-        secureStore.setString(token, forKey: DevBarCoreConstants.Keychain.relayDeviceTokenKey)
+    private func persistDeviceToken(_ token: String) -> Bool {
+        let key = DevBarCoreConstants.Keychain.relayDeviceTokenKey
+        guard secureStore.setString(token, forKey: key),
+              secureStore.string(forKey: key) == token else {
+            secureStore.removeValue(forKey: key)
+            return false
+        }
         defaults.set(token, forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
         sharedDefaults?.set(token, forKey: DevBarCoreConstants.Defaults.relayDeviceTokenKey)
+        return true
     }
 
     private func deviceTokenCandidates() -> [String] {

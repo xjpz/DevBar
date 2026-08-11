@@ -17,6 +17,9 @@ public final class DeviceRelayManager: ObservableObject {
     @Published public private(set) var agentTasks: [DeviceRelayAgentTask] = []
     @Published public private(set) var logLines: [DeviceRelayLogEntry] = []
     @Published public private(set) var lastErrorMessage: String?
+    @Published public private(set) var identityRecoveryRequirement: DeviceRelayIdentityRecoveryRequirement?
+    @Published public private(set) var identityRecoveryWarning: String?
+    @Published public private(set) var isRecoveringIdentity = false
 
     private let service: DeviceRelayService
     private let store: DeviceRelayStore
@@ -116,19 +119,28 @@ public final class DeviceRelayManager: ObservableObject {
         markPeerRemoteSeen(from: message)
         handle(message)
     }
+
+    func setPendingPairForTesting(
+        _ payload: DeviceRelayPairQRCodePayload,
+        deviceType: DeviceRelayDeviceType
+    ) {
+        pairQRCodePayload = payload
+        self.deviceType = deviceType
+    }
 #endif
 
     public func setup(deviceType: DeviceRelayDeviceType, deviceName: String?) async {
         self.deviceType = deviceType
         self.deviceName = deviceName
-        let identityResolution = store.resolveOrCreateDeviceID(for: deviceType)
-        let deviceID = identityResolution.deviceID
-        let secret = store.loadOrCreateDeviceSecret(for: deviceType)
-        localDeviceID = deviceID
-        recordIdentityResolution(identityResolution, type: deviceType)
-        appendLog(.info, "注册设备 \(deviceType.rawValue) \(deviceID)")
 
         do {
+            let identityResolution = try store.resolveOrCreateDeviceID(for: deviceType)
+            let deviceID = identityResolution.deviceID
+            let secret = try store.loadOrCreateDeviceSecret(for: deviceType)
+            localDeviceID = deviceID
+            recordIdentityResolution(identityResolution, type: deviceType)
+            appendLog(.info, "注册设备 \(deviceType.rawValue) \(deviceID)")
+
             let response = try await service.registerDevice(
                 DeviceRelayRegistration(
                     deviceId: deviceID,
@@ -139,16 +151,17 @@ public final class DeviceRelayManager: ObservableObject {
                 )
             )
             guard store.saveDeviceToken(response.deviceToken, for: deviceType, deviceID: deviceID) else {
-                throw DeviceRelayError.invalidRelayResponse
+                throw DeviceRelayError.secureStorageUnavailable
             }
             deviceToken = response.deviceToken
+            identityRecoveryRequirement = nil
             lastErrorMessage = nil
             appendLog(.success, "设备注册成功，开始刷新 peers")
             await refreshPeers()
             startLocalTransportIfPossible()
             connect()
         } catch {
-            fail(error)
+            handleRegistrationFailure(error)
         }
     }
 
@@ -156,6 +169,8 @@ public final class DeviceRelayManager: ObservableObject {
         if localDeviceID == nil || deviceToken == nil {
             await setup(deviceType: .mac, deviceName: deviceName)
         }
+
+        guard identityRecoveryRequirement == nil else { return }
 
         guard let macDeviceID = localDeviceID else {
             fail(DeviceRelayError.missingDeviceID)
@@ -174,7 +189,9 @@ public final class DeviceRelayManager: ObservableObject {
             appendLog(.info, "请求生成 iPhone 配对码")
             let pairCode = try await service.createPairCode(macDeviceId: macDeviceID, deviceToken: token)
             let localSecret = Self.randomLocalSecret()
-            store.savePendingLocalPairSecret(localSecret, pairCode: pairCode.pairCode)
+            guard store.savePendingLocalPairSecret(localSecret, pairCode: pairCode.pairCode) else {
+                throw DeviceRelayError.secureStorageUnavailable
+            }
             pairQRCodePayload = DeviceRelayPairQRCodePayload(
                 relay: URL(string: DevBarCoreConstants.DeviceRelay.baseURL)!,
                 pairCode: pairCode.pairCode,
@@ -198,14 +215,16 @@ public final class DeviceRelayManager: ObservableObject {
 
     public func confirmPairing(from rawQRCode: String, deviceName: String?) async throws {
         let payload = try DeviceRelayPairQRCodeCodec.decode(rawQRCode)
-        let identityResolution = store.resolveOrCreateDeviceID(for: .iPhone)
+        let identityResolution = try store.resolveOrCreateDeviceID(for: .iPhone)
         let deviceID = identityResolution.deviceID
-        let deviceSecret = store.loadOrCreateDeviceSecret(for: .iPhone)
+        let deviceSecret = try store.loadOrCreateDeviceSecret(for: .iPhone)
         localDeviceID = deviceID
         deviceType = .iPhone
         recordIdentityResolution(identityResolution, type: .iPhone)
         if let localSecret = payload.localSecret {
-            store.saveLocalPairSecret(localSecret, peerDeviceID: payload.macDeviceId)
+            guard store.saveLocalPairSecret(localSecret, peerDeviceID: payload.macDeviceId) else {
+                throw DeviceRelayError.secureStorageUnavailable
+            }
         }
         appendLog(.info, "确认 Mac 配对 \(payload.macDeviceId)")
 
@@ -220,7 +239,7 @@ public final class DeviceRelayManager: ObservableObject {
         )
 
         guard store.saveDeviceToken(response.deviceToken, for: .iPhone, deviceID: deviceID) else {
-            throw DeviceRelayError.invalidRelayResponse
+            throw DeviceRelayError.secureStorageUnavailable
         }
         deviceToken = response.deviceToken
         peers = [
@@ -250,7 +269,7 @@ public final class DeviceRelayManager: ObservableObject {
         guard let token = deviceToken else {
             throw DeviceRelayError.missingDeviceToken
         }
-        let secret = store.loadOrCreateDeviceSecret(for: .iPhone)
+        let secret = try store.loadOrCreateDeviceSecret(for: .iPhone)
         let bindingService = DeviceRelayService(baseURL: payload.baseUrl)
         let preview = try await bindingService.previewAccountBinding(
             challenge: payload.challenge,
@@ -264,7 +283,7 @@ public final class DeviceRelayManager: ObservableObject {
         guard let token = deviceToken else {
             throw DeviceRelayError.missingDeviceToken
         }
-        let secret = store.loadOrCreateDeviceSecret(for: .iPhone)
+        let secret = try store.loadOrCreateDeviceSecret(for: .iPhone)
         let bindingService = DeviceRelayService(baseURL: scan.payload.baseUrl)
         return try await bindingService.confirmAccountBinding(
             challenge: scan.payload.challenge,
@@ -286,6 +305,7 @@ public final class DeviceRelayManager: ObservableObject {
         self.deviceType = deviceType
         self.deviceName = deviceName
         await refreshRegistration(deviceType: deviceType, deviceName: deviceName)
+        guard identityRecoveryRequirement == nil else { return }
         startLocalTransportIfPossible()
         localTransport.restartDiscovery()
 
@@ -300,7 +320,6 @@ public final class DeviceRelayManager: ObservableObject {
         guard let token = deviceToken else { return }
         do {
             peers = try await service.fetchPeers(deviceToken: token)
-            promotePendingLocalSecretsIfNeeded()
             localTransport.updateTargetPeerIDs(Set(peers.map(\.deviceId)))
             lastErrorMessage = nil
             appendLog(.info, "已刷新 peers：\(peers.count) 台")
@@ -399,6 +418,76 @@ public final class DeviceRelayManager: ObservableObject {
         } catch {
             fail(error)
         }
+    }
+
+    public func recoverMacIdentityAndCreatePairQRCode(deviceName: String?) async {
+        guard identityRecoveryRequirement == .secretMismatch, !isRecoveringIdentity else { return }
+        isRecoveringIdentity = true
+        identityRecoveryWarning = nil
+        defer { isRecoveringIdentity = false }
+
+        let oldDeviceID = localDeviceID ?? store.loadDeviceID(for: .mac)
+        let oldToken = store.loadDeviceToken(for: .mac)
+        let pendingPairCode = pairQRCodePayload?.pairCode
+        var knownPeerIDs = Set(peers.filter { $0.deviceType == .iPhone }.map(\.deviceId))
+        var cleanupIncomplete = false
+
+        disconnect()
+        localTransport.stop()
+
+        if let oldDeviceID, let oldToken {
+            do {
+                let remotePeers = try await service.fetchPeers(deviceToken: oldToken)
+                let oldIPhonePeers = remotePeers.filter { $0.deviceType == .iPhone }
+                knownPeerIDs.formUnion(oldIPhonePeers.map(\.deviceId))
+                for peer in oldIPhonePeers {
+                    do {
+                        _ = try await service.revokePair(
+                            macDeviceId: oldDeviceID,
+                            iphoneDeviceId: peer.deviceId,
+                            deviceToken: oldToken
+                        )
+                        store.clearLocalPairSecret(peerDeviceID: peer.deviceId)
+                    } catch {
+                        cleanupIncomplete = true
+                        appendLog(.warning, "旧配对清理失败：\(error.localizedDescription)")
+                    }
+                }
+            } catch {
+                cleanupIncomplete = true
+                appendLog(.warning, "无法读取旧配对：\(error.localizedDescription)")
+            }
+        } else {
+            cleanupIncomplete = true
+            appendLog(.warning, "旧设备 token 不可用，无法自动清理服务端配对")
+        }
+
+        do {
+            try store.resetIdentity(
+                for: .mac,
+                knownPeerIDs: knownPeerIDs,
+                pendingPairCode: pendingPairCode
+            )
+        } catch {
+            fail(error)
+            return
+        }
+
+        localDeviceID = nil
+        deviceToken = nil
+        peers.removeAll()
+        pairQRCodePayload = nil
+        localConnectedPeerIDs.removeAll()
+        peerRuntimeStates.removeAll()
+        activeTransport = .none
+        identityRecoveryRequirement = nil
+        identityRecoveryWarning = cleanupIncomplete
+            ? "新身份可以继续使用，但旧服务端设备或配对可能未完全清理"
+            : nil
+
+        await setup(deviceType: .mac, deviceName: deviceName)
+        guard identityRecoveryRequirement == nil, deviceToken != nil else { return }
+        await createPairQRCode(deviceName: deviceName)
     }
 
     public func send(_ message: DeviceRelayMessage) async throws {
@@ -973,6 +1062,9 @@ public final class DeviceRelayManager: ObservableObject {
                 errorMessage: message.payload["message"] ?? message.payload["errorCode"]
             )
         case .relayPaired:
+            if let peerDeviceID = message.payload["iphoneDeviceId"] {
+                promotePendingLocalSecret(peerDeviceID: peerDeviceID)
+            }
             Task { await refreshPeers() }
             receivedMessages.append(message)
             appendLog(.success, "收到配对成功通知")
@@ -1044,24 +1136,24 @@ public final class DeviceRelayManager: ObservableObject {
         )
     }
 
-    private func promotePendingLocalSecretsIfNeeded() {
+    private func promotePendingLocalSecret(peerDeviceID: String) {
         guard deviceType == .mac,
               let pairQRCodePayload,
               let secret = store.loadPendingLocalPairSecret(pairCode: pairQRCodePayload.pairCode) else {
             return
         }
-        let iPhonePeers = peers.filter { $0.deviceType == .iPhone }
-        guard !iPhonePeers.isEmpty else { return }
-        for peer in iPhonePeers where store.loadLocalPairSecret(peerDeviceID: peer.deviceId) == nil {
-            store.saveLocalPairSecret(secret, peerDeviceID: peer.deviceId)
+        guard store.saveLocalPairSecret(secret, peerDeviceID: peerDeviceID) else {
+            identityRecoveryWarning = "配对已完成，但局域网连接密钥保存失败，请重新连接 iPhone"
+            appendLog(.warning, "局域网配对密钥保存失败")
+            return
         }
         store.clearPendingLocalPairSecret(pairCode: pairQRCodePayload.pairCode)
     }
 
     private func refreshRegistration(deviceType: DeviceRelayDeviceType, deviceName: String?) async {
         guard let deviceID = localDeviceID else { return }
-        let secret = store.loadOrCreateDeviceSecret(for: deviceType)
         do {
+            let secret = try store.loadOrCreateDeviceSecret(for: deviceType)
             let response = try await service.registerDevice(
                 DeviceRelayRegistration(
                     deviceId: deviceID,
@@ -1072,13 +1164,30 @@ public final class DeviceRelayManager: ObservableObject {
                 )
             )
             guard store.saveDeviceToken(response.deviceToken, for: deviceType, deviceID: deviceID) else {
-                throw DeviceRelayError.invalidRelayResponse
+                throw DeviceRelayError.secureStorageUnavailable
             }
             deviceToken = response.deviceToken
+            identityRecoveryRequirement = nil
             lastErrorMessage = nil
         } catch {
-            appendLog(.warning, "刷新设备注册失败：\(error.localizedDescription)")
+            handleRegistrationFailure(error)
         }
+    }
+
+    private func handleRegistrationFailure(_ error: Error) {
+        if let relayError = error as? DeviceRelayError,
+           case .serverError("invalid_device_secret") = relayError {
+            disconnect()
+            deviceToken = nil
+            identityRecoveryRequirement = .secretMismatch
+            let message = "本机中继凭据与服务端记录不一致，需要重置后重新连接 iPhone"
+            lastErrorMessage = message
+            connectionState = .failed(message)
+            activeTransport = .none
+            appendLog(.error, message)
+            return
+        }
+        fail(error)
     }
 
     private func markPeerRemoteSeen(from message: DeviceRelayMessage) {

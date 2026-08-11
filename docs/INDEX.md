@@ -4,6 +4,7 @@
 
 | 文档 | 状态 | 范围 | 审批 | 验证 | 提交/发布 | 待办 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `mac-relay-device-identity-recovery-design.md` | verified | macOS 中继 `invalid_device_secret` 安全恢复、旧配对清理与 Keychain 防复发 | 用户回复“开始实现”批准 | Core 292 测试；macOS/iOS Simulator Debug 构建通过；diff/本地化 JSON 校验通过 | 未提交、未发布 | 安装 Mac 构建后执行身份重置、真机扫码与远程/局域网双路径验收 |
 | `push-message-persistence-account-link-design.md` | verified | Apple 登录账号、iPhone 设备归属、Device Push Key 与普通 Push 业务消息持久化闭环 | 已批准实施 | Core 284 测试；服务端聚焦 38 测试；两仓库 build 通过 | 未提交、未发布 | 独立 MySQL evolution 验证、生产 migration/部署/真机 APNs 另行授权 |
 | `ios-apns-token-registration-recovery-design.md` | verified | iOS 普通 APNs token 当前进程所有权与串行注册恢复 | 用户回复“修复”批准 | Core 260 测试；macOS/iOS 编译通过 | 未提交、未发布 | 安装更新 Debug 包并做真机 APNs 验收 |
 | `push-notification-url-opening-design.md` | verified | Device Push Key 文本通知 URL 点击打开（DevBar iOS + playdev-server） | 已批准并实施 | 服务端 20 测试；Core 251 测试；macOS/iOS 编译通过 | 未提交、未发布 | 真机 APNs 点击验收 |

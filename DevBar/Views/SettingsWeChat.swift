@@ -14,6 +14,7 @@ struct SettingsWeChat: View {
     @State private var showAddAgent = false
     @State private var showPairQRCode = false
     @State private var isCreatingPairCode = false
+    @State private var showRelayIdentityResetConfirmation = false
     @State private var deletingRelayPeerID: String?
     @State private var cwdAccessError: String?
     @State private var selectedTab: RemoteSettingsTab = .wechat
@@ -104,6 +105,26 @@ struct SettingsWeChat: View {
                                 .foregroundStyle(.orange)
                         }
 
+                        if let warning = relayManager.identityRecoveryWarning {
+                            Label(warning, systemImage: "exclamationmark.circle")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+
+                        if relayManager.identityRecoveryRequirement == .secretMismatch {
+                            Button(role: .destructive) {
+                                showRelayIdentityResetConfirmation = true
+                            } label: {
+                                if relayManager.isRecoveringIdentity {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                } else {
+                                    Label("重置中继身份并重新连接…", systemImage: "arrow.trianglehead.2.clockwise.rotate.90")
+                                }
+                            }
+                            .disabled(relayManager.isRecoveringIdentity)
+                        }
+
                         HStack {
                             Button {
                                 createPairQRCode()
@@ -115,7 +136,7 @@ struct SettingsWeChat: View {
                                     Label("连接 iPhone", systemImage: "qrcode")
                                 }
                             }
-                            .disabled(isCreatingPairCode)
+                            .disabled(isCreatingPairCode || relayManager.isRecoveringIdentity)
 
                             Spacer()
 
@@ -124,6 +145,7 @@ struct SettingsWeChat: View {
                             } label: {
                                 Label("刷新", systemImage: "arrow.clockwise")
                             }
+                            .disabled(relayManager.isRecoveringIdentity)
                         }
                     } else {
                         Text("relay_disabled_hint")
@@ -568,6 +590,18 @@ struct SettingsWeChat: View {
                 DevicePairQRCodeSheet(payload: payload)
             }
         }
+        .confirmationDialog(
+            "重置中继身份？",
+            isPresented: $showRelayIdentityResetConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("重置并重新连接", role: .destructive) {
+                recoverRelayIdentity()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("将生成新的 Mac 中继身份，并需要重新用 iPhone 扫码。不会删除 iPhone 数据、账号数据或服务端历史记录；旧 token 失效时，旧设备条目可能需要后续清理。")
+        }
         .onChange(of: relayManager.localConnectedPeerIDs) { _, _ in
             Task { await relayManager.refreshPeers() }
         }
@@ -703,6 +737,17 @@ struct SettingsWeChat: View {
             defer { isCreatingPairCode = false }
             await relayManager.createPairQRCode(
                 deviceName: Host.current().localizedName ?? ProcessInfo.processInfo.hostName
+            )
+            if relayManager.pairQRCodePayload != nil {
+                showPairQRCode = true
+            }
+        }
+    }
+
+    private func recoverRelayIdentity() {
+        Task { @MainActor in
+            await relayManager.recoverMacIdentityAndCreatePairQRCode(
+                deviceName: Self.currentMacDeviceName
             )
             if relayManager.pairQRCodePayload != nil {
                 showPairQRCode = true
