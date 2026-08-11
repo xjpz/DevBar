@@ -71,6 +71,7 @@ public struct HomeAssistantConnectionSettings: Codable, Equatable, Sendable {
     public var externalURL: String
     public var internalURL: String
     public var internalSSIDs: [String]
+    public var lastKnownLocationName: String
     public var aiAnalysisEnabled: Bool
     public var showsDiagnosticEntities: Bool
 
@@ -78,12 +79,14 @@ public struct HomeAssistantConnectionSettings: Codable, Equatable, Sendable {
         externalURL: String = "",
         internalURL: String = "",
         internalSSIDs: [String] = [],
+        lastKnownLocationName: String = "",
         aiAnalysisEnabled: Bool = false,
         showsDiagnosticEntities: Bool = false
     ) {
         self.externalURL = externalURL
         self.internalURL = internalURL
         self.internalSSIDs = internalSSIDs
+        self.lastKnownLocationName = lastKnownLocationName
         self.aiAnalysisEnabled = aiAnalysisEnabled
         self.showsDiagnosticEntities = showsDiagnosticEntities
     }
@@ -97,6 +100,7 @@ public struct HomeAssistantConnectionSettings: Codable, Equatable, Sendable {
         case internalURL
         case internalSSID
         case internalSSIDs
+        case lastKnownLocationName
         case aiAnalysisEnabled
         case showsDiagnosticEntities
     }
@@ -112,6 +116,7 @@ public struct HomeAssistantConnectionSettings: Codable, Equatable, Sendable {
         } else {
             internalSSIDs = []
         }
+        lastKnownLocationName = try container.decodeIfPresent(String.self, forKey: .lastKnownLocationName) ?? ""
         aiAnalysisEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiAnalysisEnabled) ?? false
         showsDiagnosticEntities = try container.decodeIfPresent(Bool.self, forKey: .showsDiagnosticEntities) ?? false
     }
@@ -121,6 +126,7 @@ public struct HomeAssistantConnectionSettings: Codable, Equatable, Sendable {
         try container.encode(externalURL, forKey: .externalURL)
         try container.encode(internalURL, forKey: .internalURL)
         try container.encode(internalSSIDs, forKey: .internalSSIDs)
+        try container.encode(lastKnownLocationName, forKey: .lastKnownLocationName)
         try container.encode(aiAnalysisEnabled, forKey: .aiAnalysisEnabled)
         try container.encode(showsDiagnosticEntities, forKey: .showsDiagnosticEntities)
     }

@@ -28,7 +28,7 @@ struct IOSHomeAssistantDashboardView: View {
                 IOSHomeAssistantOnboardingView(model: model, isSettings: false)
             }
         }
-        .navigationTitle(selectedStatusCategory?.title ?? model.snapshot?.config.locationName ?? "我的家")
+        .navigationTitle(selectedStatusCategory?.title ?? model.homeDisplayName)
         .toolbarTitleDisplayMode(.inlineLarge)
         .toolbarBackground(pageBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)

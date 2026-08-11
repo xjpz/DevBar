@@ -43,6 +43,7 @@ struct IOSHomeAssistantRoomView: View {
         .background(pageBackground.ignoresSafeArea())
         .navigationTitle(room.name)
         .toolbarTitleDisplayMode(.inlineLarge)
+        .toolbar(.hidden, for: .tabBar)
         .fullScreenCover(item: $selectedAccessory) { accessory in
             IOSHomeAssistantAccessoryControlView(model: model, accessory: accessory)
                 .presentationBackground(.clear)

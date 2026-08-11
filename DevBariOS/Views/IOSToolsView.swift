@@ -417,6 +417,7 @@ struct IOSToolDestinationView: View {
             }
         }
         .environment(\.iosToolEntryContext, entryContext)
+        .toolbar(entryContext.tabBarVisibility, for: .tabBar)
         .toolbarTitleDisplayMode(entryContext.toolbarTitleDisplayMode)
         .toolbarBackground(toolNavigationBackground, for: .navigationBar)
         .toolbarBackground(theme.isGeek ? .visible : .hidden, for: .navigationBar)

@@ -163,6 +163,7 @@ func homeAssistantCloudSnapshotRestoresConnectionThenInstanceLayout() throws {
         externalURL: "https://ha.example.com",
         internalURL: "http://homeassistant.local:8123",
         internalSSIDs: ["Home Wi-Fi"],
+        lastKnownLocationName: "海边小屋",
         aiAnalysisEnabled: true,
         showsDiagnosticEntities: true
     )
@@ -184,6 +185,7 @@ func homeAssistantCloudSnapshotRestoresConnectionThenInstanceLayout() throws {
 
     #expect(restoredStore.applyCloudSyncState(sourceState))
     #expect(restoredStore.load() == normalizedConnection)
+    #expect(restoredStore.load().lastKnownLocationName == "海边小屋")
     #expect(restoredStore.loadDeviceVisibility(instanceFingerprint: fingerprint).hiddenCardIDs == ["device-secret-room"])
     #expect(
         restoredStore.loadDashboardLayout(instanceFingerprint: fingerprint).cardOrderByRoom["living"] == ["light.main"]

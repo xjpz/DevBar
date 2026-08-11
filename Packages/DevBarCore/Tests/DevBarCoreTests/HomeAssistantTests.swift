@@ -64,6 +64,17 @@ struct HomeAssistantTests {
         """)
 
         #expect(settings.internalSSIDs.isEmpty)
+        #expect(settings.lastKnownLocationName.isEmpty)
+    }
+
+    @Test("Endpoint normalization preserves the last known location name")
+    func normalizationPreservesLastKnownLocationName() throws {
+        let settings = try HomeAssistantEndpointSelector.normalizedSettings(.init(
+            externalURL: "https://ha.example.com",
+            lastKnownLocationName: "  海边小屋  "
+        ))
+
+        #expect(settings.lastKnownLocationName == "海边小屋")
     }
 
     @Test("Legacy single SSID migrates into the SSID list")

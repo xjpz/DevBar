@@ -43,6 +43,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
     private var stateProjectionTask: Task<Void, Never>?
     private var cacheSaveTask: Task<Void, Never>?
     private var translationTask: Task<Void, Never>?
+    private var observers = Set<AnyCancellable>()
     private var hasRestoredCache = false
     private var cacheWritesSuspended = false
     private var rawStatesByID: [String: HomeAssistantState] = [:]
@@ -111,6 +112,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         }
         rebuildAccessoryProjection()
         monitorNetwork()
+        observeICloudSettingsChanges()
     }
 
     deinit {
@@ -124,6 +126,12 @@ final class IOSHomeAssistantViewModel: ObservableObject {
 
     var token: String { settingsStore.loadToken() }
     var isConfigured: Bool { settings.isConfigured && !token.isEmpty }
+    var homeDisplayName: String {
+        let liveName = snapshot?.config.locationName.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !liveName.isEmpty { return liveName }
+        let savedName = settings.lastKnownLocationName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return savedName.isEmpty ? "我的家" : savedName
+    }
     var canControlDevices: Bool {
         snapshotPhase.allowsControl && connectedCandidate != nil
     }
@@ -351,6 +359,8 @@ final class IOSHomeAssistantViewModel: ObservableObject {
             externalURL: externalURL,
             internalURL: internalURL,
             internalSSIDs: internalSSIDs,
+            lastKnownLocationName: HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: externalURL)
+                == previousFingerprint ? self.settings.lastKnownLocationName : "",
             aiAnalysisEnabled: aiAnalysisEnabled,
             showsDiagnosticEntities: showsDiagnosticEntities
         )
@@ -909,6 +919,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
             throw HomeAssistantError.invalidResponse
         }
 
+        persistLastKnownLocationName(fetchedConfig.locationName)
         config = fetchedConfig
         rawStatesByID = Self.indexedStates(states)
         services = fetchedServices
@@ -918,6 +929,50 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         cacheWritesSuspended = false
         rebuildSnapshot(phase: .authoritative)
         refreshTranslationCatalog()
+    }
+
+    private func persistLastKnownLocationName(_ locationName: String) {
+        let normalizedName = locationName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedName.isEmpty, settings.lastKnownLocationName != normalizedName else { return }
+        var updatedSettings = settings
+        updatedSettings.lastKnownLocationName = normalizedName
+        do {
+            try settingsStore.save(updatedSettings, token: nil)
+        } catch {
+            return
+        }
+        settings = settingsStore.load()
+    }
+
+    private func observeICloudSettingsChanges() {
+        NotificationCenter.default.publisher(for: .iCloudSyncedPreferencesDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.reloadICloudSyncedSettings()
+                }
+            }
+            .store(in: &observers)
+    }
+
+    private func reloadICloudSyncedSettings() {
+        settings = settingsStore.load()
+        guard let fingerprint = instanceFingerprint else {
+            hiddenCardIDs = []
+            dashboardLayout = HomeAssistantDashboardLayoutSettings()
+            devicePresentations = [:]
+            accessoryPresentations = [:]
+            accessoryGrouping = HomeAssistantAccessoryGroupingSettings()
+            rebuildAccessoryProjection()
+            return
+        }
+        hiddenCardIDs = settingsStore.loadDeviceVisibility(instanceFingerprint: fingerprint).hiddenCardIDs
+        dashboardLayout = settingsStore.loadDashboardLayout(instanceFingerprint: fingerprint)
+        devicePresentations = settingsStore.loadDevicePresentations(instanceFingerprint: fingerprint).devices
+        accessoryPresentations = settingsStore.loadAccessoryPresentations(instanceFingerprint: fingerprint).accessories
+        accessoryGrouping = settingsStore.loadAccessoryGrouping(instanceFingerprint: fingerprint)
+        rebuildAccessoryProjection()
+        normalizeSelectedRoom()
     }
 
     private func startEventConsumption(_ stream: HomeAssistantWebSocketClient.EventStream) {

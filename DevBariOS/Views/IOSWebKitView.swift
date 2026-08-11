@@ -52,6 +52,7 @@ struct IOSWebKitView: View {
         }
         .navigationDestination(item: $apiClientRecord) { record in
             IOSAPIClientView(record: record)
+                .environment(\.iosToolEntryContext, .pushed)
         }
         .navigationDestination(isPresented: $isShowingTabsManager) {
             IOSTabsSheet(browser: browser)

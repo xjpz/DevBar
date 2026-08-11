@@ -392,6 +392,7 @@ public enum HomeAssistantEndpointSelector {
             externalURL: external.absoluteString,
             internalURL: internalURL?.absoluteString ?? "",
             internalSSIDs: normalizedSSIDs(settings.internalSSIDs),
+            lastKnownLocationName: settings.lastKnownLocationName.trimmingCharacters(in: .whitespacesAndNewlines),
             aiAnalysisEnabled: settings.aiAnalysisEnabled,
             showsDiagnosticEntities: settings.showsDiagnosticEntities
         )
