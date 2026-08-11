@@ -265,11 +265,7 @@ struct IOSProfileView: View {
             IOSAccountPrivacyView()
         } label: {
             HStack(spacing: 10) {
-                IOSProfileGlowIcon(
-                    systemName: "checkmark.shield.fill",
-                    colors: [Color(hex: "A977FF"), Color(hex: "6366F1")],
-                    size: 31
-                )
+                IOSProfileShieldIcon(size: 31)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("账户与隐私")
@@ -456,13 +452,13 @@ private struct IOSProfileMessageRow: View {
     var body: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(message.title)
+                IOSMessageMarkdownText(source: message.title, syntax: .inline)
                     .font(.system(size: 15))
                     .fontWeight(message.isRead ? .regular : .semibold)
                     .foregroundStyle(isDarkAppearance ? Color.white.opacity(0.95) : theme.textPrimary)
                     .lineLimit(1)
                 if let preview = message.preview {
-                    Text(preview)
+                    IOSMessageMarkdownText(source: preview, syntax: .inline)
                         .font(.system(size: 12))
                         .foregroundStyle(isDarkAppearance ? Color(hex: "9FB0C8") : theme.textSecondary)
                         .lineLimit(2)
@@ -540,9 +536,36 @@ private struct IOSProfileGlowIcon: View {
     }
 }
 
+private struct IOSProfileShieldIcon: View {
+    var size: CGFloat = 31
+
+    var body: some View {
+        ZStack {
+            Image(systemName: "shield.fill")
+                .font(.system(size: size * 0.76, weight: .bold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(hex: "8B7AD8"), Color(hex: "6259B8")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Image(systemName: "checkmark")
+                .font(.system(size: size * 0.27, weight: .black))
+                .foregroundStyle(Color.white)
+                .offset(y: -size * 0.015)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct IOSAccountPrivacyView: View {
     @EnvironmentObject private var accountViewModel: IOSAccountViewModel
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.themeTokens) private var theme
+    @State private var isShowingDeletionConfirmation = false
 
     var body: some View {
         List {
@@ -550,10 +573,17 @@ private struct IOSAccountPrivacyView: View {
                 HStack(spacing: 10) {
                     Text("Apple 登录")
                     Spacer()
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(theme.success)
+                    ZStack {
+                        Circle()
+                            .fill(Color(hex: "19A95B"))
+                            .frame(width: 20, height: 20)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    .accessibilityHidden(true)
                     Text("已登录")
-                        .foregroundStyle(theme.success)
+                        .foregroundStyle(Color(hex: "16894B"))
                 }
                 .frame(height: 50)
                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
@@ -570,12 +600,52 @@ private struct IOSAccountPrivacyView: View {
                     .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
                 }
             }
+
+            Section {
+                Button(role: .destructive) {
+                    isShowingDeletionConfirmation = true
+                } label: {
+                    HStack {
+                        Label("注销账户", systemImage: "person.crop.circle.badge.xmark")
+                        Spacer()
+                        if accountViewModel.isWorking {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+                    .frame(height: 50)
+                }
+                .disabled(accountViewModel.isWorking)
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+            } footer: {
+                Text("注销后，昵称、消息、Push Key 和设备账号关联将被永久删除，且无法恢复。")
+            }
         }
         .scrollContentBackground(.hidden)
         .iosGeekScreenBackground(theme)
         .navigationTitle("账户与隐私")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .alert("确认注销账户？", isPresented: $isShowingDeletionConfirmation) {
+            Button("取消", role: .cancel) {}
+            Button("永久注销", role: .destructive) {
+                Task {
+                    if await accountViewModel.deleteAccount() {
+                        dismiss()
+                    }
+                }
+            }
+        } message: {
+            Text("该操作会永久删除账户及相关数据。若以后再次使用 Apple 登录，将创建一个全新账户。")
+        }
+        .alert("注销失败", isPresented: Binding(
+            get: { accountViewModel.errorMessage != nil },
+            set: { if !$0 { accountViewModel.errorMessage = nil } }
+        )) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(accountViewModel.errorMessage ?? "")
+        }
     }
 }
 

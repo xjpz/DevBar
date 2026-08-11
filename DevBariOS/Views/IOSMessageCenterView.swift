@@ -161,11 +161,16 @@ struct IOSMessageCenterView: View {
                         .frame(width: 7, height: 7)
                         .accessibilityHidden(true)
                 }
-                Text(message.title)
+                IOSMessageMarkdownText(source: message.title, syntax: .inline)
                     .font(.body.weight(message.isRead ? .regular : .semibold))
                     .lineLimit(2)
             }
-            if let preview = message.preview { Text(preview).font(.subheadline).foregroundStyle(theme.textSecondary).lineLimit(2) }
+            if let preview = message.preview {
+                IOSMessageMarkdownText(source: preview, syntax: .inline)
+                    .font(.subheadline)
+                    .foregroundStyle(theme.textSecondary)
+                    .lineLimit(2)
+            }
             Text(Date(timeIntervalSince1970: TimeInterval(message.createdAt) / 1_000), style: .relative)
                 .font(.caption2).foregroundStyle(theme.textSecondary)
         }
@@ -180,11 +185,12 @@ struct IOSMessageDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text(message.title).font(.title2.bold())
+                IOSMessageMarkdownText(source: message.title, syntax: .inline)
+                    .font(.title2.bold())
                 Text(Date(timeIntervalSince1970: TimeInterval(message.createdAt) / 1_000).formatted(date: .long, time: .shortened))
                     .font(.caption).foregroundStyle(.secondary)
                 Divider()
-                Text(message.body ?? message.preview ?? "")
+                IOSMessageMarkdownText(source: message.body ?? message.preview ?? "")
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if let rawURL = message.targetURL,

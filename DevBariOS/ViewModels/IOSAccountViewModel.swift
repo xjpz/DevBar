@@ -121,6 +121,26 @@ final class IOSAccountViewModel: ObservableObject {
         clearLocalSession()
     }
 
+    func deleteAccount() async -> Bool {
+        guard let token = sessionToken, !isWorking else { return false }
+        isWorking = true
+        errorMessage = nil
+        defer { isWorking = false }
+        do {
+            try await api.deleteAccount(token: token)
+            profileCache.deleteActiveProfile()
+            clearLocalSession()
+            return true
+        } catch DevBarAccountAPIError.unauthorized(let message) {
+            clearLocalSession()
+            errorMessage = message
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     func refreshMessages(filter: DevBarMessageFilter = .all) async {
         guard let token = sessionToken else {
             messages = []

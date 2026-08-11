@@ -41,6 +41,10 @@ public final class DevBarAccountAPIClient: @unchecked Sendable {
         try await sendVoid(path: DevBarCoreConstants.Account.logoutPath, method: "POST", token: token)
     }
 
+    public func deleteAccount(token: String) async throws {
+        try await sendVoid(path: DevBarCoreConstants.Account.deleteAccountPath, method: "DELETE", token: token)
+    }
+
     public func linkCurrentDevice(
         appToken: String,
         deviceToken: String,

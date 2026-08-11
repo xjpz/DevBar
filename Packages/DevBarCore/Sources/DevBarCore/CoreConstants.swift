@@ -183,6 +183,7 @@ public enum DevBarCoreConstants {
         public static let appleLoginPath = "/api/devbar/auth/apple"
         public static let logoutPath = "/api/devbar/auth/logout"
         public static let mePath = "/api/devbar/me"
+        public static let deleteAccountPath = "/api/devbar/me"
         public static let profilePath = "/api/devbar/me/profile"
         public static let deviceBindingPath = "/api/devbar/me/device-binding"
         public static let messagesPath = "/api/devbar/messages"

@@ -123,6 +123,25 @@ func deviceBindingSendsBothAccountAndDeviceCredentials() async throws {
     #expect(result.claimedPushKeys == 3)
 }
 
+@Test
+func accountDeletionUsesAuthenticatedDeleteEndpoint() async throws {
+    let recorder = DevBarAccountRequestRecorder(responseBody: """
+    {"code":0,"msg":"账户已注销","data":null}
+    """)
+    let client = DevBarAccountAPIClient(
+        baseURL: URL(string: "https://unit.example.com")!,
+        session: recorder.session
+    )
+
+    try await client.deleteAccount(token: "app-session-unit")
+
+    let request = try #require(recorder.lastRequest)
+    #expect(request.url?.path == DevBarCoreConstants.Account.deleteAccountPath)
+    #expect(request.httpMethod == "DELETE")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer app-session-unit")
+    #expect(request.httpBody == nil)
+}
+
 private final class DevBarAccountRequestRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var capturedRequest: URLRequest?

@@ -44,6 +44,14 @@ public struct DevBarProfileCacheStore {
         defaults.removeObject(forKey: DevBarCoreConstants.Defaults.devBarActiveUserIDKey)
     }
 
+    public func deleteActiveProfile() {
+        let userId = (defaults.object(forKey: DevBarCoreConstants.Defaults.devBarActiveUserIDKey) as? NSNumber)?.int64Value ?? 0
+        if userId > 0 {
+            defaults.removeObject(forKey: cacheKey(userId))
+        }
+        clearActiveUser()
+    }
+
     private func cacheKey(_ userId: Int64) -> String {
         DevBarCoreConstants.Defaults.devBarProfileCachePrefix + String(userId)
     }
