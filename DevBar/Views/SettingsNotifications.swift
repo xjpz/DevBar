@@ -8,7 +8,6 @@ import DevBarCore
 struct SettingsNotifications: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @EnvironmentObject private var notificationService: NotificationService
-    @StateObject private var agentWatcherSettings = AgentWatcherSettings.shared
 
     @State private var isRequestingPermission = false
 
@@ -93,29 +92,6 @@ struct SettingsNotifications: View {
             } footer: {
                 Text("alerts_footer")
                     .font(.caption)
-            }
-
-            if DevBarCoreConstants.Features.agentWatcherEnabled {
-                Section {
-                    Toggle("启用 Agent Watcher", isOn: $agentWatcherSettings.isEnabled)
-
-                    Toggle("Claude Code", isOn: $agentWatcherSettings.claudeEnabled)
-                        .disabled(!agentWatcherSettings.isEnabled)
-
-                    Toggle("Claude hooks 通知", isOn: $agentWatcherSettings.claudeHookNotificationsEnabled)
-                        .disabled(!agentWatcherSettings.isEnabled || !agentWatcherSettings.claudeEnabled)
-
-                    Toggle("Codex CLI", isOn: $agentWatcherSettings.codexEnabled)
-                        .disabled(!agentWatcherSettings.isEnabled)
-
-                    Toggle("Codex hooks 通知", isOn: $agentWatcherSettings.codexHookNotificationsEnabled)
-                        .disabled(!agentWatcherSettings.isEnabled || !agentWatcherSettings.codexEnabled)
-                } header: {
-                    Text("Agent Watcher")
-                } footer: {
-                    Text("关闭 hooks 通知后仍会记录等待状态和更新状态中心，但不会发送 Mac 或 iPhone 通知。")
-                        .font(.caption)
-                }
             }
 
             Section {

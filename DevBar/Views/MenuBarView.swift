@@ -54,7 +54,6 @@ private struct LoggedInContentView: View {
     @EnvironmentObject private var mimoQuotaViewModel: MimoQuotaViewModel
     @EnvironmentObject private var updateViewModel: UpdateViewModel
     @State private var selectedAccountID: String?
-    @State private var showAgentWatcher = false
 
     private var enabledAccounts: [ProviderAccount] {
         appViewModel.enabledProviderAccounts
@@ -160,30 +159,6 @@ private struct LoggedInContentView: View {
             if isSelectedProviderLoading {
                 ProgressView()
                     .controlSize(.small)
-            }
-
-            if DevBarCoreConstants.Features.agentWatcherEnabled {
-                Button(action: {
-                    showAgentWatcher.toggle()
-                }) {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "dot.radiowaves.left.and.right")
-                        if appViewModel.agentWatcherService.waitingCount > 0 {
-                            Text("\(appViewModel.agentWatcherService.waitingCount)")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(2)
-                                .background(Color.red)
-                                .clipShape(Circle())
-                                .offset(x: 6, y: -6)
-                        }
-                    }
-                }
-                .buttonStyle(.borderless)
-                .help("Agent Watcher")
-                .popover(isPresented: $showAgentWatcher) {
-                    AgentWatcherView()
-                }
             }
 
             Button(action: {

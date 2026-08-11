@@ -6,7 +6,11 @@ public enum DevBarCoreConstants {
     }
 
     public enum Features {
+        #if os(macOS)
+        public static let agentWatcherEnabled = false
+        #else
         public static let agentWatcherEnabled = true
+        #endif
         public static let flipClockWidgetEnabled = true
         public static let iPhoneWidgetsEnabled = false
         public static let notificationRemindersEnabled = true

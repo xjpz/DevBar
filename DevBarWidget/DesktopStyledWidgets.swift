@@ -6,11 +6,7 @@ import WidgetKit
 private let desktopStyledFamilies: [WidgetFamily] = [.systemSmall, .systemMedium, .systemLarge]
 
 private let desktopStyledWidgetDescription: String = {
-    #if os(macOS)
-    "添加到桌面后，可编辑并选择 Provider 额度、Agent Watcher、Mac 主题或翻页时钟。"
-    #else
-    "添加到桌面后，可编辑并选择 Provider 额度、Mac 主题或翻页时钟。"
-    #endif
+    "添加到桌面后，可编辑并选择 Provider 额度、Mac 主题、翻页时钟或时间样式。"
 }()
 
 enum DesktopStyledWidgetContentSelection: String, AppEnum {
@@ -18,37 +14,28 @@ enum DesktopStyledWidgetContentSelection: String, AppEnum {
     case openAIQuota
     case mimoQuota
     case deepSeekQuota
-    #if os(macOS)
-    case agentWatcher
-    #endif
     case macTheme
     case flipClock
+    case compactTimeA
+    case compactTimeB
+    case compactTimeC
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation {
         TypeDisplayRepresentation(name: "小组件内容")
     }
 
     static var caseDisplayRepresentations: [DesktopStyledWidgetContentSelection: DisplayRepresentation] {
-        #if os(macOS)
-        [
-            .glmQuota: DisplayRepresentation(title: "GLM 额度"),
-            .openAIQuota: DisplayRepresentation(title: "OpenAI 额度"),
-            .mimoQuota: DisplayRepresentation(title: "MiMo 额度"),
-            .deepSeekQuota: DisplayRepresentation(title: "DeepSeek 额度"),
-            .agentWatcher: DisplayRepresentation(title: "Agent Watcher"),
-            .macTheme: DisplayRepresentation(title: "Mac 主题"),
-            .flipClock: DisplayRepresentation(title: "翻页时钟")
-        ]
-        #else
         [
             .glmQuota: DisplayRepresentation(title: "GLM 额度"),
             .openAIQuota: DisplayRepresentation(title: "OpenAI 额度"),
             .mimoQuota: DisplayRepresentation(title: "MiMo 额度"),
             .deepSeekQuota: DisplayRepresentation(title: "DeepSeek 额度"),
             .macTheme: DisplayRepresentation(title: "Mac 主题"),
-            .flipClock: DisplayRepresentation(title: "翻页时钟")
+            .flipClock: DisplayRepresentation(title: "翻页时钟"),
+            .compactTimeA: DisplayRepresentation(title: "时间A"),
+            .compactTimeB: DisplayRepresentation(title: "时间B"),
+            .compactTimeC: DisplayRepresentation(title: "时间C")
         ]
-        #endif
     }
 }
 
@@ -58,6 +45,26 @@ struct DesktopStyledWidgetConfigurationIntent: WidgetConfigurationIntent {
 
     @Parameter(title: "小组件内容", default: .glmQuota)
     var content: DesktopStyledWidgetContentSelection
+
+    @Parameter(title: "文字颜色", default: .automatic)
+    var compactTimeTextColor: CompactTimeTextColorSelection?
+
+    @Parameter(title: "强调色", default: .automatic)
+    var compactTimeAccentColor: CompactTimeAccentColorSelection?
+
+    static var parameterSummary: some ParameterSummary {
+        Switch(\.$content) {
+            Case([.compactTimeA, .compactTimeB, .compactTimeC]) {
+                Summary("显示 \(\.$content)") {
+                    \.$compactTimeTextColor
+                    \.$compactTimeAccentColor
+                }
+            }
+            DefaultCase {
+                Summary("显示 \(\.$content)")
+            }
+        }
+    }
 }
 
 struct DesktopStyledWidgetEntry: TimelineEntry {
@@ -66,11 +73,13 @@ struct DesktopStyledWidgetEntry: TimelineEntry {
 
     enum Content {
         case quota(QuotaEntry, dataByProvider: [WidgetProviderSelection: WidgetSharedData])
-        #if os(macOS)
-        case agentWatcher(AgentWatcherEntry)
-        #endif
         case macTheme(MacThemeWidgetEntry)
         case flipClock(FlipClockEntry)
+        case compactTime(
+            CompactTimeEntry,
+            variant: CompactTimeWidgetVariant,
+            appearance: CompactTimeAppearance
+        )
     }
 }
 
@@ -88,7 +97,7 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
             if let provider = content.quotaProvider {
                 return previewQuotaEntry(date: Date(), provider: provider)
             }
-            return entry(date: Date(), content: content)
+            return entry(for: configuration, date: Date())
         }
         return entry(for: configuration, date: Date())
     }
@@ -105,9 +114,12 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
                 makeEntry: { DesktopStyledWidgetEntry(date: $0, content: .flipClock(FlipClockEntry(date: $0))) }
             )
         }
+        if content.compactTimeVariant != nil {
+            return compactTimeTimeline(for: configuration, from: now)
+        }
         let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: now)
             ?? now.addingTimeInterval(300)
-        let currentEntry = entry(date: now, content: content)
+        let currentEntry = entry(for: configuration, date: now)
         let limits: [WidgetQuotaLimit]
         switch currentEntry.content {
         case let .quota(_, dataByProvider):
@@ -122,8 +134,34 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
             through: nextUpdate,
             limits: limits
         )
-        let entries = dates.map { entry(date: $0, content: content) }
+        let entries = dates.map { entry(for: configuration, date: $0) }
         return Timeline(entries: entries, policy: .after(nextUpdate))
+    }
+
+    private func compactTimeTimeline(
+        for configuration: DesktopStyledWidgetConfigurationIntent,
+        from now: Date
+    ) -> Timeline<DesktopStyledWidgetEntry> {
+        let calendar = Calendar.current
+        let startOfMinute = calendar.dateInterval(of: .minute, for: now)?.start ?? now
+        let refreshDate = calendar.date(byAdding: .hour, value: 1, to: startOfMinute)
+            ?? startOfMinute.addingTimeInterval(60 * 60)
+        let endDate = calendar.date(byAdding: .hour, value: 2, to: startOfMinute)
+            ?? startOfMinute.addingTimeInterval(2 * 60 * 60)
+        var dates = [now]
+        var nextDate = calendar.date(byAdding: .minute, value: 1, to: startOfMinute)
+            ?? now.addingTimeInterval(60)
+
+        while nextDate <= endDate {
+            dates.append(nextDate)
+            nextDate = calendar.date(byAdding: .minute, value: 1, to: nextDate)
+                ?? nextDate.addingTimeInterval(60)
+        }
+
+        return Timeline(
+            entries: dates.map { entry(for: configuration, date: $0) },
+            policy: .after(refreshDate)
+        )
     }
 
     private func entry(
@@ -132,13 +170,18 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
     ) -> DesktopStyledWidgetEntry {
         entry(
             date: date,
-            content: configuration.content.enabledContent
+            content: configuration.content.enabledContent,
+            compactTimeAppearance: CompactTimeAppearance(
+                textColorSelection: configuration.compactTimeTextColor ?? .automatic,
+                accentColorSelection: configuration.compactTimeAccentColor ?? .automatic
+            )
         )
     }
 
     private func entry(
         date: Date,
-        content: DesktopStyledWidgetContentSelection
+        content: DesktopStyledWidgetContentSelection,
+        compactTimeAppearance: CompactTimeAppearance = .automatic
     ) -> DesktopStyledWidgetEntry {
         switch content {
         case .glmQuota, .openAIQuota, .mimoQuota, .deepSeekQuota:
@@ -156,12 +199,6 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
                 date: date
             )
             return DesktopStyledWidgetEntry(date: date, content: .quota(quota, dataByProvider: dataByProvider))
-        #if os(macOS)
-        case .agentWatcher:
-            let agentWatcher = AgentWatcherTimelineProvider().loadEntry(content: .waiting)
-                ?? .placeholder
-            return DesktopStyledWidgetEntry(date: date, content: .agentWatcher(agentWatcher))
-        #endif
         case .macTheme:
             let provider = WidgetProviderSelection.glm
             let configuration = MacThemeWidgetConfigurationIntent()
@@ -171,6 +208,16 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
             return DesktopStyledWidgetEntry(date: date, content: .macTheme(macTheme))
         case .flipClock:
             return DesktopStyledWidgetEntry(date: date, content: .flipClock(FlipClockEntry(date: date)))
+        case .compactTimeA, .compactTimeB, .compactTimeC:
+            let variant = content.compactTimeVariant ?? .timeA
+            return DesktopStyledWidgetEntry(
+                date: date,
+                content: .compactTime(
+                    CompactTimeEntry(date: date),
+                    variant: variant,
+                    appearance: compactTimeAppearance
+                )
+            )
         }
     }
 
@@ -275,10 +322,6 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
 private extension DesktopStyledWidgetContentSelection {
     var enabledContent: DesktopStyledWidgetContentSelection {
         switch self {
-        #if os(macOS)
-        case .agentWatcher where !DevBarCoreConstants.Features.agentWatcherEnabled:
-            return .glmQuota
-        #endif
         case .flipClock where !DevBarCoreConstants.Features.flipClockWidgetEnabled:
             return .glmQuota
         default:
@@ -292,10 +335,16 @@ private extension DesktopStyledWidgetContentSelection {
         case .openAIQuota: return .openai
         case .mimoQuota: return .mimo
         case .deepSeekQuota: return .deepseek
-        #if os(macOS)
-        case .agentWatcher: return nil
-        #endif
-        case .macTheme, .flipClock: return nil
+        case .macTheme, .flipClock, .compactTimeA, .compactTimeB, .compactTimeC: return nil
+        }
+    }
+
+    var compactTimeVariant: CompactTimeWidgetVariant? {
+        switch self {
+        case .compactTimeA: return .timeA
+        case .compactTimeB: return .timeB
+        case .compactTimeC: return .timeC
+        default: return nil
         }
     }
 }
@@ -318,14 +367,17 @@ struct DesktopStyledWidgetEntryView: View {
             } else {
                 DevBarWidgetEntryView(entry: quota, visualStyle: visualStyle)
             }
-        #if os(macOS)
-        case let .agentWatcher(agentWatcher):
-            AgentWatcherWidgetView(entry: agentWatcher, visualStyle: visualStyle)
-        #endif
         case let .macTheme(macTheme):
             MacThemeWidgetEntryView(entry: macTheme, visualStyle: visualStyle)
         case let .flipClock(flipClock):
             FlipClockWidgetView(entry: flipClock)
+        case let .compactTime(compactTime, variant, appearance):
+            CompactTimeWidgetView(
+                entry: compactTime,
+                variant: variant,
+                visualStyle: visualStyle,
+                appearance: appearance
+            )
         }
     }
 }

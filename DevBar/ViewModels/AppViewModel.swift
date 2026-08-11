@@ -65,7 +65,6 @@ final class AppViewModel: ObservableObject {
     let weChatViewModel = WeChatViewModel()
     let deviceRelayManager = DeviceRelayManager()
     let antiSleepService = AntiSleepService()
-    let agentWatcherService = AgentWatcherService.shared
     private let providerPingSettingsStore = UserDefaultsProviderPingSettingsStore()
     private let providerPingAPIClient = BigModelAPIClient()
     private let providerPingScheduler = ProviderPingScheduler()
@@ -496,26 +495,6 @@ final class AppViewModel: ObservableObject {
                 }
             }
             .store(in: &childObservers)
-
-        if DevBarCoreConstants.Features.agentWatcherEnabled {
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.agentWatcherService.relayManager = self.deviceRelayManager
-                if self.agentWatcherService.isEnabled {
-                    self.agentWatcherService.startServer()
-                }
-            }
-
-            NotificationCenter.default.addObserver(
-                forName: .agentWatcherStatusChanged,
-                object: nil,
-                queue: .main
-            ) { [weak self] notification in
-                Task { @MainActor [weak self] in
-                    self?.updateMenuBarBadge(from: notification)
-                }
-            }
-        }
 
         rescheduleProviderPing(checkMissed: true)
     }

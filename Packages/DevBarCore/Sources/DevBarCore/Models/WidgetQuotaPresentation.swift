@@ -99,7 +99,7 @@ public enum WidgetQuotaPresentation {
             return "5小时额度"
         }
         if isWeeklyLimit(limit) {
-            return "周额度"
+            return "每周使用限额"
         }
         if provider == .deepseek, isCostLimit(limit) {
             return "费用额度"

@@ -12,6 +12,7 @@ func widgetQuotaPresentationSortsGLMByFiveHourWeeklyThenMonthly() {
     let sorted = WidgetQuotaPresentation.sortedLimits(limits, provider: .glm)
 
     #expect(sorted.map(\.displayName) == ["5小时额度", "周额度", "月度额度"])
+    #expect(WidgetQuotaPresentation.shortLabel(for: sorted[1], provider: .glm) == "每周使用限额")
 }
 
 @Test

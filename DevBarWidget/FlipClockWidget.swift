@@ -47,12 +47,17 @@ struct FlipClockWidgetView: View {
             VStack(spacing: layout.verticalSpacing) {
                 Spacer(minLength: 0)
 
-                HStack(spacing: layout.cardSpacing) {
-                    flipCard(text: hourText, layout: layout)
-                    flipCard(text: minuteText, layout: layout)
-                }
+                ZStack {
+                    HStack(spacing: layout.cardSpacing) {
+                        flipCard(text: hourText, layout: layout)
+                        flipCard(text: minuteText, layout: layout)
+                    }
 
-                datePill(date: entry.date, layout: layout)
+                    blinkingSeparator(layout: layout)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+
+                dateRow(date: entry.date, layout: layout)
 
                 Spacer(minLength: 0)
             }
@@ -70,46 +75,140 @@ struct FlipClockWidgetView: View {
 
     private func flipCard(text: String, layout: FlipClockLayout) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
-                .fill(.white.opacity(0.14))
-                .overlay {
-                    RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
-                        .strokeBorder(.white.opacity(0.24), lineWidth: 0.8)
-                }
-
-            Rectangle()
-                .fill(.white.opacity(0.12))
-                .frame(height: 1)
+            flipCardSurface(layout: layout)
 
             Text(text)
-                .font(.system(size: layout.digitSize, weight: .semibold, design: .rounded))
+                .font(.system(size: layout.digitSize, weight: .medium, design: .rounded))
                 .monospacedDigit()
                 .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.16), radius: 3, y: 2)
+                .shadow(color: .black.opacity(0.5), radius: 2, y: 2)
+
+            flipSeam(layout: layout)
         }
         .frame(width: layout.cardWidth, height: layout.cardHeight)
+        .shadow(color: .black.opacity(0.22), radius: layout.cardShadowRadius, y: layout.cardShadowOffset)
     }
 
-    private func datePill(date: Date, layout: FlipClockLayout) -> some View {
-        Text(formattedDate(date))
-            .font(.system(size: layout.dateSize, weight: .medium, design: .rounded))
-            .foregroundStyle(.white.opacity(0.76))
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-            .padding(.horizontal, layout.dateHorizontalPadding)
-            .padding(.vertical, layout.dateVerticalPadding)
-            .background(.white.opacity(0.08), in: Capsule())
+    private func flipCardSurface(layout: FlipClockLayout) -> some View {
+        let shape = RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
+
+        return shape
+            .fill(.ultraThinMaterial)
             .overlay {
-                Capsule()
-                    .strokeBorder(.white.opacity(0.12), lineWidth: 0.7)
+                shape.fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.10, green: 0.16, blue: 0.25).opacity(0.76),
+                            Color(red: 0.04, green: 0.08, blue: 0.14).opacity(0.84)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            }
+            .overlay {
+                VStack(spacing: 0) {
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .white.opacity(0.16),
+                                    Color.cyan.opacity(0.035),
+                                    .clear
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .black.opacity(0.08),
+                                    .black.opacity(0.26)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                }
+                .clipShape(shape)
+            }
+            .overlay {
+                shape.strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.38),
+                            Color.blue.opacity(0.14),
+                            .black.opacity(0.32)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.8
+                )
             }
     }
 
-    private func formattedDate(_ date: Date) -> String {
-        if family == .systemSmall {
-            return Self.smallDateFormatter.string(from: date)
+    private func flipSeam(layout: FlipClockLayout) -> some View {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(.black.opacity(0.62))
+                .frame(height: layout.seamWidth)
+            Rectangle()
+                .fill(.white.opacity(0.05))
+                .frame(height: 0.35)
         }
-        return date.formatted(.dateTime.month().day().weekday(.wide))
+        .shadow(color: .black.opacity(0.25), radius: 0.5, y: 0.5)
+    }
+
+    private func blinkingSeparator(layout: FlipClockLayout) -> some View {
+        TimelineView(.periodic(from: entry.date, by: 1)) { context in
+            let isVisible = Calendar.current.component(.second, from: context.date).isMultiple(of: 2)
+
+            Text(":")
+                .font(.system(size: layout.digitSize * 0.58, weight: .medium, design: .rounded))
+                .foregroundStyle(.white)
+                .opacity(isVisible ? 1 : 0.22)
+                .offset(y: -1)
+                .shadow(color: .black.opacity(0.42), radius: 1, y: 1)
+        }
+    }
+
+    private func dateRow(date: Date, layout: FlipClockLayout) -> some View {
+        HStack(spacing: layout.dateLineSpacing) {
+            dateLine(reversed: false)
+
+            Text(formattedDate(date))
+                .font(.system(size: layout.dateSize, weight: .regular, design: .rounded))
+                .foregroundStyle(.white.opacity(0.88))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .layoutPriority(1)
+                .shadow(color: .black.opacity(0.34), radius: 1, y: 1)
+
+            dateLine(reversed: true)
+        }
+        .frame(maxWidth: layout.dateMaxWidth)
+    }
+
+    private func dateLine(reversed: Bool) -> some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: reversed
+                        ? [.orange.opacity(0.9), .orange.opacity(0.42), .clear]
+                        : [.clear, .orange.opacity(0.42), .orange.opacity(0.9)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(maxWidth: .infinity)
+            .frame(height: 1)
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        Self.chineseDateFormatter.string(from: date)
     }
 
     private var largeDecoration: some View {
@@ -133,7 +232,7 @@ struct FlipClockWidgetView: View {
         String(format: "%02d", Calendar.current.component(.minute, from: entry.date))
     }
 
-    private static let smallDateFormatter: DateFormatter = {
+    private static let chineseDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.calendar = Calendar(identifier: .gregorian)
@@ -148,47 +247,58 @@ private struct FlipClockLayout {
     let cardSpacing: CGFloat
     let digitSize: CGFloat
     let cornerRadius: CGFloat
+    let cardShadowRadius: CGFloat
+    let cardShadowOffset: CGFloat
+    let seamWidth: CGFloat
     let verticalSpacing: CGFloat
     let dateSize: CGFloat
-    let dateHorizontalPadding: CGFloat
-    let dateVerticalPadding: CGFloat
+    let dateLineSpacing: CGFloat
     let dateMaxWidth: CGFloat
 
     init(family: WidgetFamily, size: CGSize) {
         switch family {
         case .systemLarge:
-            cardWidth = min(124, (size.width - 52) / 2)
-            cardHeight = 132
-            cardSpacing = 16
-            digitSize = 78
-            cornerRadius = 22
-            verticalSpacing = 18
-            dateSize = 16
-            dateHorizontalPadding = 18
-            dateVerticalPadding = 7
-            dateMaxWidth = size.width - 36
+            let largeCardWidth = min(132, (size.width - 44) / 2)
+            cardWidth = largeCardWidth
+            cardHeight = min(184, size.height * 0.56)
+            cardSpacing = 22
+            digitSize = min(92, largeCardWidth * 0.7)
+            cornerRadius = 23
+            cardShadowRadius = 5
+            cardShadowOffset = 4
+            seamWidth = 1
+            verticalSpacing = 24
+            dateSize = 18
+            dateLineSpacing = 12
+            dateMaxWidth = size.width - 24
         case .systemMedium:
-            cardWidth = min(96, (size.width - 42) / 2)
-            cardHeight = 82
-            cardSpacing = 14
-            digitSize = 54
-            cornerRadius = 16
-            verticalSpacing = 7
-            dateSize = 12
-            dateHorizontalPadding = 12
-            dateVerticalPadding = 3
-            dateMaxWidth = size.width - 80
-        default:
-            cardWidth = min(58, (size.width - 18) / 2)
-            cardHeight = 68
-            cardSpacing = 8
-            digitSize = 38
-            cornerRadius = 13
+            let mediumCardWidth = min(104, (size.width - 32) / 2)
+            cardWidth = mediumCardWidth
+            cardHeight = min(102, size.height * 0.66)
+            cardSpacing = 16
+            digitSize = min(62, mediumCardWidth * 0.64)
+            cornerRadius = 17
+            cardShadowRadius = 3
+            cardShadowOffset = 2
+            seamWidth = 0.8
             verticalSpacing = 10
-            dateSize = 10
-            dateHorizontalPadding = 10
-            dateVerticalPadding = 4
-            dateMaxWidth = size.width - 14
+            dateSize = 14
+            dateLineSpacing = 8
+            dateMaxWidth = size.width - 52
+        default:
+            let smallCardWidth = min(66, (size.width - 6) / 2)
+            cardWidth = smallCardWidth
+            cardHeight = min(88, size.height * 0.62)
+            cardSpacing = 6
+            digitSize = min(48, smallCardWidth * 0.72)
+            cornerRadius = 15
+            cardShadowRadius = 3
+            cardShadowOffset = 2
+            seamWidth = 0.7
+            verticalSpacing = 11
+            dateSize = 12.5
+            dateLineSpacing = 5
+            dateMaxWidth = size.width - 2
         }
     }
 }
