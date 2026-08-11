@@ -11,6 +11,9 @@
         }
       }
     },
+    ":" : {
+
+    },
     "." : {
 
     },
@@ -13922,6 +13925,7 @@
       }
     },
     "关闭 hooks 通知后仍会记录等待状态和更新状态中心，但不会发送 Mac 或 iPhone 通知。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14420,6 +14424,16 @@
     "将此 iPhone 关联到账号" : {
 
     },
+    "将生成新的 Mac 中继身份，并需要重新用 iPhone 扫码。不会删除 iPhone 数据、账号数据或服务端历史记录；旧 token 失效时，旧设备条目可能需要后续清理。" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A new Mac relay identity will be created, and you will need to scan the code again with your iPhone. This will not delete iPhone data, account data, or server history. If the old token is no longer valid, the old device record may require later cleanup."
+          }
+        }
+      }
+    },
     "小组件内容" : {
       "localizations" : {
         "en" : {
@@ -14610,6 +14624,9 @@
 
     },
     "开启后，Mac 会通过 Relay 把此账号的 token/cookie 同步到 iPhone。请只用于自己的可信设备。" : {
+
+    },
+    "强调色" : {
 
     },
     "当前 %@°" : {
@@ -14892,6 +14909,9 @@
         }
       }
     },
+    "文字颜色" : {
+
+    },
     "断开并清除配置" : {
 
     },
@@ -14908,10 +14928,28 @@
         }
       }
     },
+    "时间A" : {
+
+    },
+    "时间B" : {
+
+    },
+    "时间C" : {
+
+    },
+    "时间强调色" : {
+
+    },
+    "时间文字颜色" : {
+
+    },
     "昵称" : {
 
     },
     "显示" : {
+
+    },
+    "显示 ${content}" : {
 
     },
     "显示与 AI" : {
@@ -14993,6 +15031,9 @@
       }
     },
     "暂无消息" : {
+
+    },
+    "暖白" : {
 
     },
     "更多工具操作" : {
@@ -15123,6 +15164,9 @@
     "模式 · %@" : {
 
     },
+    "橙色" : {
+
+    },
     "正在关联…" : {
 
     },
@@ -15174,6 +15218,9 @@
     "此操作可能触发门锁、场景、脚本或自动化。确定继续吗？" : {
 
     },
+    "永久注销" : {
+
+    },
     "沙盒" : {
       "localizations" : {
         "en" : {
@@ -15213,6 +15260,15 @@
 
     },
     "没有隐藏的设备" : {
+
+    },
+    "注销后，昵称、消息、Push Key 和设备账号关联将被永久删除，且无法恢复。" : {
+
+    },
+    "注销失败" : {
+
+    },
+    "注销账户" : {
 
     },
     "消息" : {
@@ -15258,6 +15314,7 @@
       }
     },
     "添加到桌面后，可编辑并选择 Provider 额度、Agent Watcher、Mac 主题或翻页时钟。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15415,6 +15472,9 @@
     "登录方式" : {
 
     },
+    "白色" : {
+
+    },
     "监控 AI 任务状态，查看是否有任务等待处理" : {
       "localizations" : {
         "en" : {
@@ -15465,6 +15525,9 @@
 
     },
     "确认操作" : {
+
+    },
+    "确认注销账户？" : {
 
     },
     "离线" : {
@@ -15701,7 +15764,13 @@
     "聊天记录" : {
 
     },
+    "自动" : {
+
+    },
     "自动读取区域、设备和实体，生成适合 iPhone 的家庭控制台。" : {
+
+    },
+    "蓝色" : {
 
     },
     "解锁" : {
@@ -15754,6 +15823,9 @@
 
     },
     "设置 %lld 个友好别名" : {
+
+    },
+    "该操作会永久删除账户及相关数据。若以后再次使用 Apple 登录，将创建一个全新账户。" : {
 
     },
     "请检查 Home Assistant 的区域和实体配置" : {
@@ -15834,6 +15906,9 @@
 
     },
     "账户与隐私" : {
+
+    },
+    "跟随文字" : {
 
     },
     "转发短信提醒" : {
@@ -16237,6 +16312,36 @@
     "重点展示 %lld 个实体" : {
 
     },
+    "重置中继身份？" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Relay Identity?"
+          }
+        }
+      }
+    },
+    "重置中继身份并重新连接…" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset Relay Identity and Reconnect…"
+          }
+        }
+      }
+    },
+    "重置并重新连接" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset and Reconnect"
+          }
+        }
+      }
+    },
     "重要事件同步 iPhone" : {
       "localizations" : {
         "en" : {
@@ -16268,6 +16373,9 @@
           }
         }
       }
+    },
+    "银色" : {
+
     },
     "锁定" : {
       "localizations" : {
@@ -16372,6 +16480,9 @@
         }
       }
     },
+    "青色" : {
+
+    },
     "静音" : {
       "localizations" : {
         "en" : {
@@ -16403,6 +16514,9 @@
         }
       }
     },
+    "香槟金" : {
+
+    },
     "高频事件摘要" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16423,6 +16537,9 @@
           }
         }
       }
+    },
+    "黑色" : {
+
     },
     "默认安全目录: %@" : {
       "localizations" : {
