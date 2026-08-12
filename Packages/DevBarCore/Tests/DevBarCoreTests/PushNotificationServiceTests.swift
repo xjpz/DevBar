@@ -25,16 +25,44 @@ import Testing
 
 @Test func pushPreferencesDecodeNestedEnvelope() async throws {
     let recorder = PushRequestRecorder(responseBody: """
-    {"success":true,"code":20000,"data":{"relayDeviceId":"iphone-unit","pushEnabled":true,"agentWatcherEnabled":false,"summaryEnabled":true,"iconUrl":"https://cdn.example.com/icon.png"}}
+    {"success":true,"code":20000,"data":{"relayDeviceId":"iphone-unit","pushEnabled":true,"badgeEnabled":false,"agentWatcherEnabled":false,"summaryEnabled":true,"iconUrl":"https://cdn.example.com/icon.png"}}
     """)
     let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
 
     let preferences = try await service.fetchPreferences(deviceToken: "relay-token")
 
     #expect(preferences.relayDeviceId == "iphone-unit")
+    #expect(!preferences.badgeEnabled)
     #expect(!preferences.agentWatcherEnabled)
     #expect(preferences.iconUrl == "https://cdn.example.com/icon.png")
     #expect(await recorder.lastRequest?.httpMethod == "GET")
+}
+
+@Test func legacyPushPreferencesDefaultBadgeToEnabled() throws {
+    let data = Data("""
+    {"relayDeviceId":"iphone-unit","pushEnabled":true,"agentWatcherEnabled":false,"summaryEnabled":true,"iconUrl":null}
+    """.utf8)
+
+    let preferences = try JSONDecoder().decode(PushNotificationPreferences.self, from: data)
+
+    #expect(preferences.badgeEnabled)
+}
+
+@Test func pushPreferenceUpdateIncludesBadgeSetting() async throws {
+    let recorder = PushRequestRecorder(responseBody: """
+    {"success":true,"code":20000,"data":{"relayDeviceId":"iphone-unit","pushEnabled":true,"badgeEnabled":false,"agentWatcherEnabled":false,"summaryEnabled":true,"iconUrl":null}}
+    """)
+    let service = PushNotificationService(baseURL: URL(string: "https://relay.example")!, session: recorder.session)
+
+    let saved = try await service.updatePreferences(
+        PushNotificationPreferences(pushEnabled: true, badgeEnabled: false, agentWatcherEnabled: false),
+        deviceToken: "relay-token"
+    )
+
+    #expect(!saved.badgeEnabled)
+    let body = try #require(await recorder.lastRequestBody)
+    let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+    #expect(json["badgeEnabled"] as? Bool == false)
 }
 
 @Test func pushOpenKeyCreateReturnsOneTimeSecret() async throws {

@@ -142,6 +142,25 @@ func accountDeletionUsesAuthenticatedDeleteEndpoint() async throws {
     #expect(request.httpBody == nil)
 }
 
+@Test
+func messageMutationReturnsAuthoritativeUnreadCount() async throws {
+    let recorder = DevBarAccountRequestRecorder(responseBody: """
+    {"code":0,"msg":"已标记为已读","data":{"affected":1,"unreadCount":4}}
+    """)
+    let client = DevBarAccountAPIClient(
+        baseURL: URL(string: "https://unit.example.com")!,
+        session: recorder.session
+    )
+
+    let result = try await client.setMessageRead(42, isRead: true, token: "app-session-unit")
+
+    #expect(result.affected == 1)
+    #expect(result.unreadCount == 4)
+    let request = try #require(recorder.lastRequest)
+    #expect(request.url?.path == "\(DevBarCoreConstants.Account.messagesPath)/42/read")
+    #expect(request.httpMethod == "PUT")
+}
+
 private final class DevBarAccountRequestRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private var capturedRequest: URLRequest?

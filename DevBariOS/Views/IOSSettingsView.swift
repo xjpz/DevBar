@@ -248,7 +248,7 @@ struct IOSSettingsView: View {
     private var pushNotificationSummary: String {
         let enabledCount = [
             appViewModel.pushNotificationPreferences.pushEnabled,
-            DevBarCoreConstants.Features.agentWatcherEnabled && appViewModel.pushNotificationPreferences.agentWatcherEnabled,
+            appViewModel.pushNotificationPreferences.badgeEnabled,
             appViewModel.pushNotificationPreferences.summaryEnabled,
         ].filter { $0 }.count
         return enabledCount == 0
@@ -924,12 +924,17 @@ private struct IOSDeviceWidgetSettingsView: View {
 
 private struct IOSPushSettingsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
+    @EnvironmentObject private var accountViewModel: IOSAccountViewModel
     @EnvironmentObject private var languageManager: IOSLanguageManager
     @Environment(\.themeTokens) private var theme
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var openKeyViewModel = IOSPushOpenKeyViewModel()
     @State private var pushKeySheet: IOSPushKeySheetDestination?
     @State private var pendingRevokeKey: PushOpenKeySummary?
     @State private var hasAPNsToken = false
+    @State private var systemBadgeSetting: UNNotificationSetting = .notSupported
+    @State private var isUpdatingBadgePreference = false
+    @State private var badgePreferenceError: String?
 
     var body: some View {
         Form {
@@ -938,9 +943,18 @@ private struct IOSPushSettingsView: View {
                     Label("ios_settings_push_allow_offline", systemImage: "bell.badge")
                 }
 
-                if DevBarCoreConstants.Features.agentWatcherEnabled {
-                    Toggle(isOn: $appViewModel.pushNotificationPreferences.agentWatcherEnabled) {
-                        Label("ios_settings_agent_watcher_notifications", systemImage: "terminal")
+                Toggle(isOn: badgeEnabledBinding) {
+                    Label("ios_settings_push_app_badge", systemImage: "app.badge")
+                }
+                .disabled(isUpdatingBadgePreference)
+
+                if appViewModel.pushNotificationPreferences.badgeEnabled,
+                   systemBadgeSetting == .disabled {
+                    Button {
+                        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else { return }
+                        UIApplication.shared.open(url)
+                    } label: {
+                        Label("ios_settings_push_badge_system_disabled", systemImage: "gear")
                     }
                 }
 
@@ -1009,10 +1023,28 @@ private struct IOSPushSettingsView: View {
         .accessibilityIdentifier("ios.settings.push.screen")
         .task(id: relayDeviceToken) {
             hasAPNsToken = IOSPushNotificationCoordinator.shared.debugSnapshot().hasCurrentProcessAPNsToken
+            await refreshSystemBadgeSetting()
             await openKeyViewModel.load(deviceToken: relayDeviceToken)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await refreshSystemBadgeSetting() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .iosAPNsTokenChanged)) { _ in
             hasAPNsToken = IOSPushNotificationCoordinator.shared.debugSnapshot().hasCurrentProcessAPNsToken
+        }
+        .alert(
+            "ios_settings_push_badge_error_title",
+            isPresented: Binding(
+                get: { badgePreferenceError != nil },
+                set: { if !$0 { badgePreferenceError = nil } }
+            )
+        ) {
+            Button("ios_settings_push_key_acknowledge", role: .cancel) {
+                badgePreferenceError = nil
+            }
+        } message: {
+            Text(badgePreferenceError ?? "")
         }
         .sheet(item: $pushKeySheet, onDismiss: openKeyViewModel.clearCreatedKey) { destination in
             switch destination {
@@ -1060,6 +1092,35 @@ private struct IOSPushSettingsView: View {
         } message: {
             Text(openKeyViewModel.errorMessage ?? "")
         }
+    }
+
+    private var badgeEnabledBinding: Binding<Bool> {
+        Binding(
+            get: { appViewModel.pushNotificationPreferences.badgeEnabled },
+            set: updateBadgeEnabled
+        )
+    }
+
+    private func updateBadgeEnabled(_ enabled: Bool) {
+        guard !isUpdatingBadgePreference else { return }
+        isUpdatingBadgePreference = true
+        Task {
+            defer { isUpdatingBadgePreference = false }
+            do {
+                try await appViewModel.updateBadgeEnabled(enabled)
+                if enabled {
+                    await accountViewModel.refreshUnreadCount(showError: false)
+                }
+                await refreshSystemBadgeSetting()
+            } catch {
+                badgePreferenceError = error.localizedDescription
+            }
+        }
+    }
+
+    private func refreshSystemBadgeSetting() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        systemBadgeSetting = settings.badgeSetting
     }
 
     private var relayDeviceToken: String? {

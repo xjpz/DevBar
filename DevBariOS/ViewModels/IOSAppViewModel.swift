@@ -26,6 +26,7 @@ enum IOSDebugLogger {
 
 @MainActor
 final class IOSAppViewModel: ObservableObject {
+    private var isApplyingSyncedPushPreferences = false
     enum RefreshTrigger {
         case launch
         case foreground
@@ -139,6 +140,7 @@ final class IOSAppViewModel: ObservableObject {
     @Published private(set) var pinnedToolTabIDs: [String]
     @Published var pushNotificationPreferences: PushNotificationPreferences {
         didSet {
+            guard !isApplyingSyncedPushPreferences else { return }
             if !DevBarCoreConstants.Features.agentWatcherEnabled,
                pushNotificationPreferences.agentWatcherEnabled {
                 pushNotificationPreferences.agentWatcherEnabled = false
@@ -151,6 +153,18 @@ final class IOSAppViewModel: ObservableObject {
                 )
             }
         }
+    }
+
+    func updateBadgeEnabled(_ enabled: Bool) async throws {
+        var candidate = pushNotificationPreferences
+        candidate.badgeEnabled = enabled
+        let saved = try await IOSPushNotificationCoordinator.shared.updatePreferences(
+            candidate,
+            relayDeviceToken: deviceRelayManager.deviceToken
+        )
+        isApplyingSyncedPushPreferences = true
+        pushNotificationPreferences = saved
+        isApplyingSyncedPushPreferences = false
     }
     @Published var relayDeviceName: String {
         didSet {

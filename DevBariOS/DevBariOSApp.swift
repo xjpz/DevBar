@@ -43,6 +43,9 @@ struct DevBariOSApp: App {
                     }
                     await appViewModel.startDeferredLaunchWork()
                     await accountViewModel.restoreSession()
+                    if scenePhase == .active {
+                        accountViewModel.startUnreadCountRefresh()
+                    }
                 }
                 .onChange(of: scenePhase) { _, newPhase in
                     switch newPhase {
@@ -50,19 +53,24 @@ struct DevBariOSApp: App {
                         IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: false)
                         IOSAppIconController.shared.synchronizePreferredIcon()
                         appViewModel.startAutoRefreshIfNeeded()
+                        accountViewModel.startUnreadCountRefresh()
                         Task {
                             appViewModel.flushDiagnosticsInBackground()
                             await appViewModel.refreshOnForeground()
+                            await accountViewModel.refreshUnreadCount()
                         }
                     case .background:
                         IOSTerminalSessionRegistry.shared.updateBackgroundState(isBackgrounded: true)
                         appViewModel.stopAutoRefresh()
+                        accountViewModel.stopUnreadCountRefresh()
                         DiagnosticLogger.shared.record(
                             level: .info,
                             category: "app.lifecycle",
                             name: "ios_scene_background",
                             message: "iOS scene entered background"
                         )
+                    case .inactive:
+                        accountViewModel.stopUnreadCountRefresh()
                     default:
                         break
                     }

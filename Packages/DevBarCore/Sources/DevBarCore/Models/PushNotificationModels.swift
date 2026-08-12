@@ -60,6 +60,7 @@ public struct PushDeviceRegistrationResponse: Codable, Sendable, Equatable {
 public struct PushNotificationPreferences: Codable, Sendable, Equatable {
     public let relayDeviceId: String?
     public var pushEnabled: Bool
+    public var badgeEnabled: Bool
     public var agentWatcherEnabled: Bool
     public var summaryEnabled: Bool
     public var iconUrl: String?
@@ -67,15 +68,42 @@ public struct PushNotificationPreferences: Codable, Sendable, Equatable {
     public init(
         relayDeviceId: String? = nil,
         pushEnabled: Bool = true,
+        badgeEnabled: Bool = true,
         agentWatcherEnabled: Bool = DevBarCoreConstants.Features.agentWatcherEnabled,
         summaryEnabled: Bool = true,
         iconUrl: String? = nil
     ) {
         self.relayDeviceId = relayDeviceId
         self.pushEnabled = pushEnabled
+        self.badgeEnabled = badgeEnabled
         self.agentWatcherEnabled = DevBarCoreConstants.Features.agentWatcherEnabled && agentWatcherEnabled
         self.summaryEnabled = summaryEnabled
         self.iconUrl = iconUrl
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case relayDeviceId, pushEnabled, badgeEnabled, agentWatcherEnabled, summaryEnabled, iconUrl
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        relayDeviceId = try container.decodeIfPresent(String.self, forKey: .relayDeviceId)
+        pushEnabled = try container.decodeIfPresent(Bool.self, forKey: .pushEnabled) ?? true
+        badgeEnabled = try container.decodeIfPresent(Bool.self, forKey: .badgeEnabled) ?? true
+        let decodedAgentWatcher = try container.decodeIfPresent(Bool.self, forKey: .agentWatcherEnabled) ?? true
+        agentWatcherEnabled = DevBarCoreConstants.Features.agentWatcherEnabled && decodedAgentWatcher
+        summaryEnabled = try container.decodeIfPresent(Bool.self, forKey: .summaryEnabled) ?? true
+        iconUrl = try container.decodeIfPresent(String.self, forKey: .iconUrl)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(relayDeviceId, forKey: .relayDeviceId)
+        try container.encode(pushEnabled, forKey: .pushEnabled)
+        try container.encode(badgeEnabled, forKey: .badgeEnabled)
+        try container.encode(agentWatcherEnabled, forKey: .agentWatcherEnabled)
+        try container.encode(summaryEnabled, forKey: .summaryEnabled)
+        try container.encodeIfPresent(iconUrl, forKey: .iconUrl)
     }
 }
 

@@ -26,6 +26,8 @@ final class IOSAccountViewModel: ObservableObject {
     private let relayStore: DeviceRelayStore
     private var sessionToken: String?
     private var didRestore = false
+    private var unreadRefreshTask: Task<Int, Error>?
+    private var unreadPollingTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
     init(
@@ -48,6 +50,13 @@ final class IOSAccountViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .iosDevBarMessageNotificationReceived)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    await self?.refreshUnreadCount()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     var isAuthenticated: Bool { sessionToken != nil }
@@ -61,6 +70,7 @@ final class IOSAccountViewModel: ObservableObject {
             applyProfile(latest)
             await linkCurrentDevice()
             await refreshMessages()
+            startUnreadCountRefresh()
         } catch DevBarAccountAPIError.unauthorized(_) {
             clearLocalSession()
         } catch {
@@ -86,6 +96,7 @@ final class IOSAccountViewModel: ObservableObject {
             applyProfile(result.profile)
             await linkCurrentDevice()
             await refreshMessages()
+            startUnreadCountRefresh()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -144,20 +155,56 @@ final class IOSAccountViewModel: ObservableObject {
     func refreshMessages(filter: DevBarMessageFilter = .all) async {
         guard let token = sessionToken else {
             messages = []
-            unreadCount = 0
+            applyUnreadCount(0)
             return
         }
         do {
             async let pageRequest = api.messages(filter: filter, token: token)
-            async let count = api.unreadCount(token: token)
+            let count = try await fetchAuthoritativeUnreadCount(token: token)
             let page = try await pageRequest
+            guard sessionToken == token else { return }
             messages = page.items
-            unreadCount = try await count
+            applyUnreadCount(count)
         } catch DevBarAccountAPIError.unauthorized(_) {
             clearLocalSession()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func refreshUnreadCount(showError: Bool = false) async {
+        guard let token = sessionToken else {
+            applyUnreadCount(0)
+            return
+        }
+        do {
+            let count = try await fetchAuthoritativeUnreadCount(token: token)
+            guard sessionToken == token else { return }
+            applyUnreadCount(count)
+        } catch DevBarAccountAPIError.unauthorized(_) {
+            clearLocalSession()
+        } catch {
+            if showError { errorMessage = error.localizedDescription }
+        }
+    }
+
+    func startUnreadCountRefresh() {
+        guard isAuthenticated, unreadPollingTask == nil else { return }
+        unreadPollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await Task.sleep(for: .seconds(60))
+                } catch {
+                    return
+                }
+                await self?.refreshUnreadCount()
+            }
+        }
+    }
+
+    func stopUnreadCountRefresh() {
+        unreadPollingTask?.cancel()
+        unreadPollingTask = nil
     }
 
     func retryDeviceLink() async {
@@ -171,11 +218,11 @@ final class IOSAccountViewModel: ObservableObject {
     func setRead(_ message: DevBarMessage, isRead: Bool) async {
         guard let token = sessionToken else { return }
         do {
-            try await api.setMessageRead(message.id, isRead: isRead, token: token)
+            let result = try await api.setMessageRead(message.id, isRead: isRead, token: token)
             if let index = messages.firstIndex(where: { $0.id == message.id }) {
                 messages[index].isRead = isRead
             }
-            unreadCount = max(0, unreadCount + (isRead ? -1 : 1))
+            applyUnreadCount(result.unreadCount)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -184,13 +231,13 @@ final class IOSAccountViewModel: ObservableObject {
     func markAllRead() async {
         guard let token = sessionToken else { return }
         do {
-            try await api.markAllRead(token: token)
+            let result = try await api.markAllRead(token: token)
             messages = messages.map { item in
                 var updated = item
                 updated.isRead = true
                 return updated
             }
-            unreadCount = 0
+            applyUnreadCount(result.unreadCount)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -199,9 +246,9 @@ final class IOSAccountViewModel: ObservableObject {
     func delete(_ message: DevBarMessage) async {
         guard let token = sessionToken else { return }
         do {
-            try await api.deleteMessage(message.id, token: token)
+            let result = try await api.deleteMessage(message.id, token: token)
             messages.removeAll { $0.id == message.id }
-            if !message.isRead { unreadCount = max(0, unreadCount - 1) }
+            applyUnreadCount(result.unreadCount)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -213,12 +260,15 @@ final class IOSAccountViewModel: ObservableObject {
     }
 
     private func clearLocalSession() {
+        stopUnreadCountRefresh()
+        unreadRefreshTask?.cancel()
+        unreadRefreshTask = nil
         sessionStore.clearToken()
         profileCache.clearActiveUser()
         sessionToken = nil
         profile = nil
         messages = []
-        unreadCount = 0
+        applyUnreadCount(0)
         deviceLinkState = .notRequired
         deviceLinkMessage = nil
     }
@@ -257,18 +307,34 @@ final class IOSAccountViewModel: ObservableObject {
     private func markNotificationMessageRead(messageId: String) async {
         guard let token = sessionToken else { return }
         do {
-            try await api.markMessageRead(messageId: messageId, token: token)
+            let result = try await api.markMessageRead(messageId: messageId, token: token)
             if let index = messages.firstIndex(where: { $0.messageId == messageId }) {
-                let wasUnread = !messages[index].isRead
                 messages[index].isRead = true
-                if wasUnread { unreadCount = max(0, unreadCount - 1) }
-            } else {
-                await refreshMessages()
             }
+            applyUnreadCount(result.unreadCount)
         } catch DevBarAccountAPIError.unauthorized(_) {
             clearLocalSession()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func fetchAuthoritativeUnreadCount(token: String) async throws -> Int {
+        if let unreadRefreshTask {
+            return try await unreadRefreshTask.value
+        }
+        let api = api
+        let task = Task { try await api.unreadCount(token: token) }
+        unreadRefreshTask = task
+        defer { unreadRefreshTask = nil }
+        return try await task.value
+    }
+
+    private func applyUnreadCount(_ value: Int) {
+        unreadCount = max(0, value)
+        IOSPushNotificationCoordinator.shared.applyApplicationBadge(
+            unreadCount: unreadCount,
+            isAuthenticated: isAuthenticated
+        )
     }
 }

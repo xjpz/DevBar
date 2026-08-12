@@ -77,24 +77,40 @@ public final class DevBarAccountAPIClient: @unchecked Sendable {
         return value.count
     }
 
-    public func setMessageRead(_ messageId: Int64, isRead: Bool, token: String) async throws {
-        try await sendVoid(path: "\(DevBarCoreConstants.Account.messagesPath)/\(messageId)/read", method: isRead ? "PUT" : "DELETE", token: token)
-    }
-
-    public func markMessageRead(messageId: String, token: String) async throws {
-        try await sendVoid(
-            path: DevBarCoreConstants.Account.messageReadPath(messageId: messageId),
-            method: "PUT",
-            token: token
+    public func setMessageRead(_ messageId: Int64, isRead: Bool, token: String) async throws -> DevBarMessageMutationResult {
+        try await send(
+            path: "\(DevBarCoreConstants.Account.messagesPath)/\(messageId)/read",
+            method: isRead ? "PUT" : "DELETE",
+            token: token,
+            as: DevBarMessageMutationResult.self
         )
     }
 
-    public func markAllRead(token: String) async throws {
-        let _: AffectedData = try await send(path: DevBarCoreConstants.Account.markAllReadPath, method: "PUT", token: token, as: AffectedData.self)
+    public func markMessageRead(messageId: String, token: String) async throws -> DevBarMessageMutationResult {
+        try await send(
+            path: DevBarCoreConstants.Account.messageReadPath(messageId: messageId),
+            method: "PUT",
+            token: token,
+            as: DevBarMessageMutationResult.self
+        )
     }
 
-    public func deleteMessage(_ messageId: Int64, token: String) async throws {
-        try await sendVoid(path: "\(DevBarCoreConstants.Account.messagesPath)/\(messageId)", method: "DELETE", token: token)
+    public func markAllRead(token: String) async throws -> DevBarMessageMutationResult {
+        try await send(
+            path: DevBarCoreConstants.Account.markAllReadPath,
+            method: "PUT",
+            token: token,
+            as: DevBarMessageMutationResult.self
+        )
+    }
+
+    public func deleteMessage(_ messageId: Int64, token: String) async throws -> DevBarMessageMutationResult {
+        try await send(
+            path: "\(DevBarCoreConstants.Account.messagesPath)/\(messageId)",
+            method: "DELETE",
+            token: token,
+            as: DevBarMessageMutationResult.self
+        )
     }
 
     private func send<Response: Decodable>(path: String, method: String, token: String?, as: Response.Type) async throws -> Response {
@@ -181,7 +197,6 @@ public final class DevBarAccountAPIClient: @unchecked Sendable {
 
 private struct SuccessEnvelope<Value: Decodable>: Decodable { let data: Value }
 private struct ErrorEnvelope: Decodable { let msg: String }
-private struct AffectedData: Decodable { let affected: Int }
 private struct AppleLoginBody: Encodable { let identityToken: String; let nonce: String; let displayNameCandidate: String? }
 private struct UpdateProfileBody: Encodable { let displayName: String; let profileVersion: Int64 }
 

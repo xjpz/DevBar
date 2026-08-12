@@ -127,6 +127,16 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
         }
     }
 
+    func applyApplicationBadge(unreadCount: Int, isAuthenticated: Bool) {
+        let preferences = loadPreferences()
+        let value = isAuthenticated && preferences.badgeEnabled ? max(0, unreadCount) : 0
+        UNUserNotificationCenter.current().setBadgeCount(value) { error in
+            if let error {
+                print("[DevBar:iOSPush] Update badge failed: \(error)")
+            }
+        }
+    }
+
     func syncRegistration(relayDeviceToken: String?, force: Bool = false) async {
         latestRelayDeviceToken = relayDeviceToken
         apnsRegistrationState.updateRegistrationContext(
@@ -164,6 +174,21 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
         } catch {
             print("[DevBar:iOSPush] Push preferences sync failed: \(error)")
         }
+    }
+
+    func updatePreferences(
+        _ preferences: PushNotificationPreferences,
+        relayDeviceToken: String?
+    ) async throws -> PushNotificationPreferences {
+        guard let relayDeviceToken, !relayDeviceToken.isEmpty else {
+            throw IOSPushPreferenceUpdateError.deviceUnavailable
+        }
+        let saved = try await service.updatePreferences(preferences, deviceToken: relayDeviceToken)
+        savePreferences(saved)
+        if !saved.badgeEnabled {
+            clearApplicationBadge()
+        }
+        return saved
     }
 
     func loadPreferences() -> PushNotificationPreferences {
@@ -450,8 +475,16 @@ final class IOSPushNotificationCoordinator: NSObject, UNUserNotificationCenterDe
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        let userInfo = NotificationUserInfo(notification.request.content.userInfo)
         DispatchQueue.main.async {
-            completionHandler([.banner, .list, .sound])
+            if let messageId = userInfo.value["messageId"] as? String, !messageId.isEmpty {
+                NotificationCenter.default.post(
+                    name: .iosDevBarMessageNotificationReceived,
+                    object: nil,
+                    userInfo: ["messageId": messageId]
+                )
+            }
+            completionHandler([.banner, .list, .sound, .badge])
         }
     }
 
@@ -510,7 +543,19 @@ extension Notification.Name {
     static let iosAPNsTokenChanged = Notification.Name("iosAPNsTokenChanged")
     static let iosAgentWatcherNotificationOpened = Notification.Name("iosAgentWatcherNotificationOpened")
     static let iosDevBarMessageNotificationOpened = Notification.Name("iosDevBarMessageNotificationOpened")
+    static let iosDevBarMessageNotificationReceived = Notification.Name("iosDevBarMessageNotificationReceived")
     static let iosLiveActivityPushToStartTokenChanged = Notification.Name("iosLiveActivityPushToStartTokenChanged")
+}
+
+private enum IOSPushPreferenceUpdateError: LocalizedError {
+    case deviceUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .deviceUnavailable:
+            String(localized: "ios_settings_push_badge_device_unavailable")
+        }
+    }
 }
 
 private extension Data {

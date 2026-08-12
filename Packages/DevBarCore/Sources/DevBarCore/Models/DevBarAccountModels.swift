@@ -157,6 +157,16 @@ public struct DevBarUnreadCount: Codable, Sendable, Equatable {
     public let count: Int
 }
 
+public struct DevBarMessageMutationResult: Codable, Sendable, Equatable {
+    public let affected: Int
+    public let unreadCount: Int
+
+    public init(affected: Int, unreadCount: Int) {
+        self.affected = affected
+        self.unreadCount = unreadCount
+    }
+}
+
 public enum DevBarMessageFilter: String, Sendable {
     case all
     case unread

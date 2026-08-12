@@ -6902,6 +6902,70 @@
         }
       }
     },
+    "ios_settings_push_app_badge" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App Icon Badge"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App 图标角标"
+          }
+        }
+      }
+    },
+    "ios_settings_push_badge_device_unavailable" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This iPhone has not finished device registration, so the badge setting cannot be synced yet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前 iPhone 尚未完成设备注册，暂时无法同步角标设置。"
+          }
+        }
+      }
+    },
+    "ios_settings_push_badge_error_title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to Update Badge Setting"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法更新角标设置"
+          }
+        }
+      }
+    },
+    "ios_settings_push_badge_system_disabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Badges are disabled in System Settings. Open Settings"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统已关闭 App 角标，前往系统设置开启"
+          }
+        }
+      }
+    },
     "ios_settings_push_footer" : {
       "localizations" : {
         "en" : {
