@@ -382,6 +382,28 @@ struct DesktopStyledWidgetEntryView: View {
     }
 }
 
+private struct DesktopStyledWidgetRootView: View {
+    let entry: DesktopStyledWidgetEntry
+    let visualStyle: WidgetVisualStyle
+
+    @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetContentMargins) private var systemContentMargins
+
+    var body: some View {
+        DesktopStyledWidgetEntryView(entry: entry, visualStyle: visualStyle)
+            .padding(contentMargins)
+            .styledWidgetBackground(visualStyle)
+    }
+
+    private var contentMargins: EdgeInsets {
+        guard family == .systemSmall else {
+            return systemContentMargins
+        }
+
+        return EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8)
+    }
+}
+
 private struct DesktopStyledQuotaLargeView: View {
     let dataByProvider: [WidgetProviderSelection: WidgetSharedData]
     let visualStyle: WidgetVisualStyle
@@ -842,12 +864,12 @@ struct TransparentDesktopWidget: Widget {
             intent: DesktopStyledWidgetConfigurationIntent.self,
             provider: DesktopStyledWidgetTimelineProvider()
         ) { entry in
-            DesktopStyledWidgetEntryView(entry: entry, visualStyle: .transparent)
-                .styledWidgetBackground(.transparent)
+            DesktopStyledWidgetRootView(entry: entry, visualStyle: .transparent)
         }
         .configurationDisplayName("透明小组件")
         .description(desktopStyledWidgetDescription)
         .supportedFamilies(desktopStyledFamilies)
+        .contentMarginsDisabled()
     }
 }
 
@@ -873,10 +895,10 @@ private func desktopStyledConfiguration(kind: String, style: WidgetVisualStyle) 
         intent: DesktopStyledWidgetConfigurationIntent.self,
         provider: DesktopStyledWidgetTimelineProvider()
     ) { entry in
-        DesktopStyledWidgetEntryView(entry: entry, visualStyle: style)
-            .styledWidgetBackground(style)
+        DesktopStyledWidgetRootView(entry: entry, visualStyle: style)
     }
     .configurationDisplayName(style.widgetDisplayName)
     .description(desktopStyledWidgetDescription)
     .supportedFamilies(desktopStyledFamilies)
+    .contentMarginsDisabled()
 }
