@@ -196,6 +196,11 @@ struct IOSProfileView: View {
                         Text("消息")
                             .font(.system(size: 18, weight: .bold, design: .rounded))
                             .foregroundStyle(profilePrimaryText)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(profileTertiaryText)
+                            .accessibilityHidden(true)
                     }
                     .contentShape(Rectangle())
                 }
