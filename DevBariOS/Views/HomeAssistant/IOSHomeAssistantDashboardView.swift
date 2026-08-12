@@ -30,7 +30,7 @@ struct IOSHomeAssistantDashboardView: View {
         }
         .navigationTitle(selectedStatusCategory?.title ?? model.homeDisplayName)
         .toolbarTitleDisplayMode(.inlineLarge)
-        .toolbarBackground(pageBackground, for: .navigationBar)
+        .toolbarBackground(toolbarBackgroundColor, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbar {
             if model.isConfigured {
@@ -253,7 +253,10 @@ struct IOSHomeAssistantDashboardView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 28)
         }
-        .background(pageBackground.ignoresSafeArea())
+        .background {
+            IOSHomeAssistantPageBackground(theme: theme)
+                .ignoresSafeArea()
+        }
         .refreshable { await model.refresh() }
     }
 
@@ -484,7 +487,9 @@ struct IOSHomeAssistantDashboardView: View {
         }
     }
 
-    private var pageBackground: Color { theme.isGeek ? .black : theme.backgroundSecondary }
+    private var toolbarBackgroundColor: Color {
+        theme.isGeek ? .black : theme.backgroundPrimary.opacity(0.92)
+    }
 
     private var connectionText: String {
         switch model.connectionState {

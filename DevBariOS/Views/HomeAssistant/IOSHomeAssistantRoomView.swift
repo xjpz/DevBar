@@ -40,7 +40,10 @@ struct IOSHomeAssistantRoomView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 28)
         }
-        .background(pageBackground.ignoresSafeArea())
+        .background {
+            IOSHomeAssistantPageBackground(theme: theme)
+                .ignoresSafeArea()
+        }
         .navigationTitle(room.name)
         .toolbarTitleDisplayMode(.inlineLarge)
         .toolbar(.hidden, for: .tabBar)
@@ -144,9 +147,6 @@ struct IOSHomeAssistantRoomView: View {
         }
     }
 
-    private var pageBackground: Color {
-        theme.isGeek ? .black : theme.backgroundSecondary
-    }
 }
 
 private struct RoomEnvironmentItem: Identifiable {
