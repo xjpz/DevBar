@@ -8,11 +8,13 @@ struct IOSToolsView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @Environment(\.themeTokens) private var theme
     @State private var toolOrder = IOSToolOrderStore().load()
+    @State private var hiddenToolIDs = IOSToolVisibilityStore().load()
     @State private var draggedToolID: String?
     @State private var editMode: IOSToolsEditMode?
     @State private var toastMessage: String?
 
     private let orderStore = IOSToolOrderStore()
+    private let visibilityStore = IOSToolVisibilityStore()
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -22,12 +24,7 @@ struct IOSToolsView: View {
     var body: some View {
         ZStack {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(orderedTools) { tool in
-                        toolGridItem(tool)
-                    }
-                }
-                .padding(16)
+                toolsContent
             }
             .background(toolsPageBackground.ignoresSafeArea())
 
@@ -45,7 +42,7 @@ struct IOSToolsView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if editMode != nil {
-                    Button("完成") {
+                    Button("ios_common_done") {
                         endEditing()
                     }
                 } else {
@@ -60,6 +57,12 @@ struct IOSToolsView: View {
                             beginEditing(.pinTabs)
                         } label: {
                             Label("固定", systemImage: "pin")
+                        }
+
+                        Button {
+                            beginEditing(.visibility)
+                        } label: {
+                            Label("ios_tools_visibility_manage", systemImage: "eye")
                         }
                     } label: {
                         Image(systemName: "ellipsis")
@@ -80,6 +83,34 @@ struct IOSToolsView: View {
         theme.isGeek ? .black : .clear
     }
 
+    @ViewBuilder
+    private var toolsContent: some View {
+        if isManagingVisibility {
+            visibilityManagementContent
+        } else if visibleTools.isEmpty {
+            ContentUnavailableView {
+                Label("ios_tools_visibility_empty_title", systemImage: "eye.slash")
+            } description: {
+                Text("ios_tools_visibility_empty_detail")
+            } actions: {
+                Button("ios_tools_visibility_manage") {
+                    beginEditing(.visibility)
+                }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("ios.tools.visibility.manageEmptyState")
+            }
+            .frame(maxWidth: .infinity, minHeight: 420)
+            .padding(16)
+        } else {
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(visibleTools) { tool in
+                    toolGridItem(tool)
+                }
+            }
+            .padding(16)
+        }
+    }
+
     private var orderedTools: [IOSToolDefinition] {
         let tools = IOSToolCatalog.availableTools()
         let toolByID = Dictionary(uniqueKeysWithValues: tools.map { ($0.id, $0) })
@@ -91,6 +122,23 @@ struct IOSToolsView: View {
         return orderedIDs.compactMap { toolByID[$0] }
     }
 
+    private var resolvedHiddenToolIDs: [String] {
+        IOSToolVisibility.resolvedHiddenIDs(
+            savedHiddenIDs: hiddenToolIDs,
+            availableIDs: orderedTools.map(\.id)
+        )
+    }
+
+    private var visibleTools: [IOSToolDefinition] {
+        let hiddenIDSet = Set(resolvedHiddenToolIDs)
+        return orderedTools.filter { !hiddenIDSet.contains($0.id) }
+    }
+
+    private var hiddenTools: [IOSToolDefinition] {
+        let hiddenIDSet = Set(resolvedHiddenToolIDs)
+        return orderedTools.filter { hiddenIDSet.contains($0.id) }
+    }
+
     private var pinnableToolIDs: [String] {
         IOSToolCatalog.availableTools()
             .filter(\.isPinnedTabEligible)
@@ -99,6 +147,17 @@ struct IOSToolsView: View {
 
     @ViewBuilder
     private func toolGridItem(_ tool: IOSToolDefinition) -> some View {
+        if editMode == nil || isReordering {
+            reorderableToolGridItem(tool)
+        } else {
+            toolGridItemContent(tool)
+                .buttonStyle(.plain)
+                .animation(.spring(response: 0.28, dampingFraction: 0.86), value: visibleTools.map(\.id))
+        }
+    }
+
+    @ViewBuilder
+    private func toolGridItemContent(_ tool: IOSToolDefinition) -> some View {
         Group {
             if isReordering {
                 toolCard(tool)
@@ -124,6 +183,10 @@ struct IOSToolsView: View {
                 )
             }
         }
+    }
+
+    private func reorderableToolGridItem(_ tool: IOSToolDefinition) -> some View {
+        toolGridItemContent(tool)
         .buttonStyle(.plain)
         .scaleEffect(draggedToolID == tool.id ? 0.96 : 1)
         .opacity(draggedToolID == tool.id ? 0.72 : 1)
@@ -147,18 +210,97 @@ struct IOSToolsView: View {
                 move: moveTool
             )
         )
-        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: orderedTools.map(\.id))
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: visibleTools.map(\.id))
     }
 
-    private func toolCard(_ tool: IOSToolDefinition) -> some View {
+    private func toolCard(_ tool: IOSToolDefinition, statusText: String? = nil) -> some View {
         IOSToolCard(
             title: tool.title,
             subtitle: tool.subtitle,
             systemImage: tool.systemImage,
             iconColor: tool.iconColor,
             theme: theme,
-            isReordering: isReordering
+            isReordering: isReordering,
+            statusText: statusText
         )
+    }
+
+    private var visibilityManagementContent: some View {
+        LazyVStack(alignment: .leading, spacing: 20) {
+            visibilitySectionHeader(
+                title: String(localized: "ios_tools_visibility_visible_section"),
+                count: visibleTools.count
+            )
+
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(visibleTools) { tool in
+                    visibilityGridItem(tool, isHidden: false)
+                }
+            }
+
+            visibilitySectionHeader(
+                title: String(localized: "ios_tools_visibility_hidden_section"),
+                count: hiddenTools.count
+            )
+
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(hiddenTools) { tool in
+                    visibilityGridItem(tool, isHidden: true)
+                }
+            }
+        }
+        .padding(16)
+        .accessibilityIdentifier("ios.tools.visibility.sections")
+    }
+
+    private func visibilitySectionHeader(title: String, count: Int) -> some View {
+        Text(verbatim: "\(title) \(count)")
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(theme.textPrimary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    private func visibilityGridItem(_ tool: IOSToolDefinition, isHidden: Bool) -> some View {
+        let isPinned = appViewModel.isToolPinnedToTab(tool.id, availableToolIDs: pinnableToolIDs)
+        let statusText = isHidden && isPinned
+            ? String(localized: "ios_tools_visibility_pinned")
+            : nil
+
+        return ZStack(alignment: .topTrailing) {
+            toolCard(tool, statusText: statusText)
+                .opacity(isHidden ? 0.62 : 1)
+
+            visibilityButton(for: tool, isHidden: isHidden)
+                .padding(2)
+        }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: resolvedHiddenToolIDs)
+    }
+
+    private func visibilityButton(for tool: IOSToolDefinition, isHidden: Bool) -> some View {
+        let labelFormat = isHidden
+            ? String(localized: "ios_tools_visibility_show_on_page")
+            : String(localized: "ios_tools_visibility_hide_from_page")
+
+        return Button {
+            if isHidden {
+                showTool(tool.id)
+            } else {
+                hideTool(tool.id)
+            }
+        } label: {
+            Image(systemName: isHidden ? "eye" : "eye.slash")
+                .font(.system(size: 16, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(isHidden ? theme.brandPrimary : theme.textSecondary)
+                .frame(width: 32, height: 32)
+                .background(theme.surfaceSecondary.opacity(0.88), in: Circle())
+                .frame(width: 44, height: 44)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(String(format: labelFormat, tool.title)))
+        .accessibilityIdentifier("ios.tools.visibility.\(isHidden ? "show" : "hide").\(tool.id)")
     }
 
     private var isReordering: Bool {
@@ -167,6 +309,10 @@ struct IOSToolsView: View {
 
     private var isPinningTabs: Bool {
         editMode == .pinTabs
+    }
+
+    private var isManagingVisibility: Bool {
+        editMode == .visibility
     }
 
     private var isReorderingBinding: Binding<Bool> {
@@ -207,13 +353,33 @@ struct IOSToolsView: View {
     }
 
     private func moveTool(_ sourceID: String, _ targetID: String) {
-        let currentOrder = orderedTools.map(\.id)
-        let updatedOrder = IOSToolOrder.moving(sourceID, before: targetID, in: currentOrder)
+        let fullOrder = orderedTools.map(\.id)
+        let currentVisibleOrder = visibleTools.map(\.id)
+        let updatedVisibleOrder = IOSToolOrder.moving(sourceID, before: targetID, in: currentVisibleOrder)
 
-        guard updatedOrder != currentOrder else { return }
+        guard updatedVisibleOrder != currentVisibleOrder else { return }
 
-        toolOrder = updatedOrder
-        orderStore.save(updatedOrder)
+        let updatedFullOrder = IOSToolVisibility.mergingVisibleOrder(
+            updatedVisibleOrder,
+            into: fullOrder,
+            hiddenIDs: resolvedHiddenToolIDs
+        )
+        toolOrder = updatedFullOrder
+        orderStore.save(updatedFullOrder)
+    }
+
+    private func hideTool(_ id: String) {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            hiddenToolIDs = IOSToolVisibility.hiding(id, in: hiddenToolIDs)
+            visibilityStore.save(hiddenToolIDs)
+        }
+    }
+
+    private func showTool(_ id: String) {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            hiddenToolIDs = IOSToolVisibility.showing(id, in: hiddenToolIDs)
+            visibilityStore.save(hiddenToolIDs)
+        }
     }
 
     private func beginEditing(_ mode: IOSToolsEditMode) {
@@ -254,6 +420,7 @@ struct IOSToolsView: View {
 private enum IOSToolsEditMode {
     case sort
     case pinTabs
+    case visibility
 }
 
 struct IOSToolCard: View {
@@ -263,6 +430,7 @@ struct IOSToolCard: View {
     let iconColor: Color
     let theme: IOSThemeTokens
     var isReordering = false
+    var statusText: String? = nil
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
@@ -286,6 +454,13 @@ struct IOSToolCard: View {
                     .foregroundStyle(theme.textSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+
+                if let statusText {
+                    Text(statusText)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(theme.textTertiary)
+                        .lineLimit(1)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
