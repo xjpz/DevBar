@@ -297,31 +297,42 @@ private enum CardPresentationState: Equatable {
 }
 
 struct IOSHomeAssistantPageBackground: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(IOSHomeAssistantWallpaper.storageKey) private var selectedWallpaperRawValue =
+        IOSHomeAssistantWallpaper.blueMist.rawValue
+
     let theme: IOSThemeTokens
+    var wallpaper: IOSHomeAssistantWallpaper? = nil
+
+    private var resolvedWallpaper: IOSHomeAssistantWallpaper {
+        wallpaper ?? IOSHomeAssistantWallpaper(rawValue: selectedWallpaperRawValue) ?? .blueMist
+    }
 
     var body: some View {
-        ZStack {
+        Group {
+            if theme.isGeek {
+                ZStack {
+                    Color.black
+                    theme.heroGradient.opacity(0.72)
+                }
+            } else {
+                GeometryReader { proxy in
+                    Image(resolvedWallpaper.assetName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                        .overlay {
+                            Color.black.opacity(resolvedWallpaper.overlayOpacity(for: colorScheme))
+                        }
+                }
+            }
+        }
+        .background {
             if theme.isGeek {
                 Color.black
-                theme.heroGradient.opacity(0.72)
             } else {
-                LinearGradient(
-                    colors: [theme.backgroundPrimary, theme.backgroundSecondary],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                RadialGradient(
-                    colors: [theme.info.opacity(0.10), .clear],
-                    center: .topTrailing,
-                    startRadius: 12,
-                    endRadius: 360
-                )
-                RadialGradient(
-                    colors: [theme.brandPrimary.opacity(0.08), .clear],
-                    center: .bottomLeading,
-                    startRadius: 20,
-                    endRadius: 420
-                )
+                Color(red: 0.39, green: 0.50, blue: 0.67)
             }
         }
     }

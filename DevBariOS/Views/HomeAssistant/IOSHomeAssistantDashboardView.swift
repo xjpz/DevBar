@@ -17,8 +17,10 @@ struct IOSHomeAssistantDashboardView: View {
     @State private var roomOrderRequest: HomeAssistantRoomOrderRequest?
     @State private var hiddenDevicesRequest: HomeAssistantHiddenDevicesRequest?
     @State private var pendingOrganizationRequest: HomeAssistantPendingOrganizationRequest?
+    @State private var wallpaperPickerRequest: HomeAssistantWallpaperPickerRequest?
     @State private var isEditingHomeView = false
     @State private var draggedAccessoryID: String?
+    @State private var titleCollapseProgress: CGFloat = 0
 
     var body: some View {
         Group {
@@ -28,12 +30,23 @@ struct IOSHomeAssistantDashboardView: View {
                 IOSHomeAssistantOnboardingView(model: model, isSettings: false)
             }
         }
-        .navigationTitle(selectedStatusCategory?.title ?? model.homeDisplayName)
-        .toolbarTitleDisplayMode(.inlineLarge)
-        .toolbarBackground(toolbarBackgroundColor, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .navigationTitle(model.isConfigured ? "" : "Home Assistant")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             if model.isConfigured {
+                if #available(iOS 26.0, *) {
+                    ToolbarItem(placement: .topBarLeading) {
+                        collapsedDashboardTitle
+                    }
+                    .sharedBackgroundVisibility(.hidden)
+                } else {
+                    ToolbarItem(placement: .topBarLeading) {
+                        collapsedDashboardTitle
+                    }
+                }
+
                 if isEditingHomeView {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
@@ -43,7 +56,7 @@ struct IOSHomeAssistantDashboardView: View {
                             }
                         } label: {
                             Image(systemName: "checkmark")
-                                .iosToolToolbarIcon(theme)
+                                .homeAssistantToolbarIcon(theme)
                         }
                         .accessibilityLabel("完成编辑家庭视图")
                     }
@@ -66,6 +79,11 @@ struct IOSHomeAssistantDashboardView: View {
                                 showsSettings = true
                             } label: {
                                 Label("设置", systemImage: "gearshape")
+                            }
+                            Button {
+                                wallpaperPickerRequest = HomeAssistantWallpaperPickerRequest()
+                            } label: {
+                                Label("家庭墙纸", systemImage: "photo.on.rectangle.angled")
                             }
                             Button {
                                 roomOrderRequest = HomeAssistantRoomOrderRequest()
@@ -111,7 +129,7 @@ struct IOSHomeAssistantDashboardView: View {
                             }
                         } label: {
                             Image(systemName: "ellipsis")
-                                .iosToolToolbarIcon(theme)
+                                .homeAssistantToolbarIcon(theme)
                         }
                     }
                 }
@@ -140,6 +158,13 @@ struct IOSHomeAssistantDashboardView: View {
             NavigationStack {
                 IOSHomeAssistantOnboardingView(model: model, isSettings: true)
             }
+        }
+        .sheet(item: $wallpaperPickerRequest) { _ in
+            NavigationStack {
+                IOSHomeAssistantWallpaperPickerView()
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.hidden)
         }
         .sheet(item: $roomOrderRequest) { _ in
             NavigationStack {
@@ -209,6 +234,22 @@ struct IOSHomeAssistantDashboardView: View {
     private var dashboard: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 22) {
+                Text(dashboardTitle)
+                    .font(theme.appFont.font(.largeTitle, weight: .bold))
+                    .foregroundStyle(theme.isGeek ? theme.textPrimary : Color.white)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .scaleEffect(1 - titleCollapseProgress * 0.16, anchor: .leading)
+                    .opacity(1 - titleCollapseProgress)
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear.preference(
+                                key: HomeAssistantTitleOffsetPreferenceKey.self,
+                                value: geometry.frame(in: .named("homeAssistantDashboardScroll")).minY
+                            )
+                        }
+                    }
+                    .accessibilityAddTraits(.isHeader)
+
                 if showsConnectionStatus { connectionRow }
                 IOSHomeAssistantStatusStrip(
                     items: statusItems,
@@ -237,12 +278,21 @@ struct IOSHomeAssistantDashboardView: View {
                         }
                     }
                     .frame(minHeight: 220)
+                } else if selectedStatusCategory == nil, !hasDefaultDashboardAccessories {
+                    ContentUnavailableView(
+                        "首页没有可控制设备",
+                        systemImage: "switch.2",
+                        description: Text("传感器仍可通过上方状态或房间详情查看")
+                    )
+                    .foregroundStyle(.white)
+                    .frame(minHeight: 220)
                 } else if selectedStatusCategory != nil, !hasFilteredAccessories {
                     ContentUnavailableView(
                         "没有相关设备",
                         systemImage: selectedStatusCategory == .lights ? "lightbulb.slash" : "line.3.horizontal.decrease.circle",
                         description: Text("再次点击已选胶囊可返回全部房间")
                     )
+                    .foregroundStyle(.white)
                     .frame(minHeight: 220)
                 } else {
                     ForEach(model.rooms) { room in
@@ -253,11 +303,27 @@ struct IOSHomeAssistantDashboardView: View {
             .padding(.horizontal, 16)
             .padding(.bottom, 28)
         }
+        .coordinateSpace(name: "homeAssistantDashboardScroll")
+        .modifier(HomeAssistantTitleCollapseModifier(progress: $titleCollapseProgress))
         .background {
             IOSHomeAssistantPageBackground(theme: theme)
                 .ignoresSafeArea()
         }
         .refreshable { await model.refresh() }
+    }
+
+    private var dashboardTitle: String {
+        selectedStatusCategory?.title ?? model.homeDisplayName
+    }
+
+    private var collapsedDashboardTitle: some View {
+        Text(dashboardTitle)
+            .font(theme.appFont.font(.headline, weight: .semibold))
+            .foregroundStyle(theme.isGeek ? theme.textPrimary : Color.white)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .opacity(titleCollapseProgress)
+            .accessibilityHidden(titleCollapseProgress < 0.9)
     }
 
     private var connectionRow: some View {
@@ -267,7 +333,7 @@ struct IOSHomeAssistantDashboardView: View {
                 .frame(width: 8, height: 8)
             Text(connectionText)
                 .font(theme.captionWeightFont)
-                .foregroundStyle(theme.textSecondary)
+                .foregroundStyle(theme.isGeek ? theme.textSecondary : Color.white.opacity(0.78))
             Spacer()
         }
         .padding(.top, 4)
@@ -285,10 +351,10 @@ struct IOSHomeAssistantDashboardView: View {
                         HStack(spacing: 7) {
                             Text(room.name)
                                 .font(theme.appFont.font(.title2, weight: .bold))
-                                .foregroundStyle(theme.textPrimary)
+                                .foregroundStyle(theme.isGeek ? theme.textPrimary : Color.white)
                             Image(systemName: "chevron.right")
                                 .font(.headline.weight(.bold))
-                                .foregroundStyle(theme.textTertiary)
+                                .foregroundStyle(theme.isGeek ? theme.textTertiary : Color.white.opacity(0.72))
                         }
                         .contentShape(Rectangle())
                     }
@@ -298,7 +364,7 @@ struct IOSHomeAssistantDashboardView: View {
                     if isEditingHomeView {
                         Text("拖动卡片调整位置")
                             .font(theme.captionFont)
-                            .foregroundStyle(theme.textTertiary)
+                            .foregroundStyle(theme.isGeek ? theme.textTertiary : Color.white.opacity(0.66))
                     }
                 }
 
@@ -402,9 +468,21 @@ struct IOSHomeAssistantDashboardView: View {
         model.rooms.contains { !displayedAccessories(in: $0).isEmpty }
     }
 
+    private var hasDefaultDashboardAccessories: Bool {
+        model.rooms.contains { room in
+            model.accessories(inRoom: room.id).contains {
+                HomeAssistantDashboardPresentationPolicy.isShownByDefault($0.kind)
+            }
+        }
+    }
+
     private func displayedAccessories(in room: HomeAssistantRoom) -> [HomeAssistantAccessory] {
         let accessories = model.accessories(inRoom: room.id)
-        guard let selectedStatusCategory else { return accessories }
+        guard let selectedStatusCategory else {
+            return accessories.filter {
+                HomeAssistantDashboardPresentationPolicy.isShownByDefault($0.kind)
+            }
+        }
         return accessories.filter { matches($0, category: selectedStatusCategory) }
     }
 
@@ -487,10 +565,6 @@ struct IOSHomeAssistantDashboardView: View {
         }
     }
 
-    private var toolbarBackgroundColor: Color {
-        theme.isGeek ? .black : theme.backgroundPrimary.opacity(0.92)
-    }
-
     private var connectionText: String {
         switch model.connectionState {
         case .connected(.internalNetwork): "Home Assistant · 内网"
@@ -522,6 +596,43 @@ struct IOSHomeAssistantDashboardView: View {
 
 }
 
+private extension View {
+    func homeAssistantToolbarIcon(_ theme: IOSThemeTokens) -> some View {
+        font(.system(size: 13, weight: .semibold))
+            .symbolRenderingMode(.hierarchical)
+            .foregroundStyle(theme.isGeek ? theme.textSecondary : Color.white.opacity(0.92))
+            .frame(width: 32, height: 32)
+            .contentShape(Circle())
+    }
+}
+
+private struct HomeAssistantTitleOffsetPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct HomeAssistantTitleCollapseModifier: ViewModifier {
+    @Binding var progress: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.onScrollGeometryChange(for: CGFloat.self) { geometry in
+                max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
+            } action: { _, offset in
+                progress = min(offset / 52, 1)
+            }
+        } else {
+            content.onPreferenceChange(HomeAssistantTitleOffsetPreferenceKey.self) { offset in
+                progress = min(max(-offset / 52, 0), 1)
+            }
+        }
+    }
+}
+
 private struct HomeAssistantConfirmation: Identifiable {
     let id = UUID()
     let call: HomeAssistantServiceCall
@@ -541,6 +652,10 @@ private struct HomeAssistantHiddenDevicesRequest: Identifiable {
 }
 
 private struct HomeAssistantPendingOrganizationRequest: Identifiable {
+    let id = UUID()
+}
+
+private struct HomeAssistantWallpaperPickerRequest: Identifiable {
     let id = UUID()
 }
 

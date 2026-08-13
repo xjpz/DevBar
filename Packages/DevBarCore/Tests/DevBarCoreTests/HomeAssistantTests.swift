@@ -4,6 +4,16 @@ import Testing
 
 @Suite("Home Assistant")
 struct HomeAssistantTests {
+    @Test("Dashboard hides sensor cards by default but keeps controllable devices")
+    func dashboardDefaultPresentationHidesSensors() {
+        #expect(!HomeAssistantDashboardPresentationPolicy.isShownByDefault(.sensorGroup))
+        #expect(HomeAssistantDashboardPresentationPolicy.isShownByDefault(.switchDevice))
+        #expect(HomeAssistantDashboardPresentationPolicy.isShownByDefault(.light))
+        #expect(HomeAssistantDashboardPresentationPolicy.isShownByDefault(.airConditioner))
+        #expect(HomeAssistantDashboardPresentationPolicy.defaultCardSize(for: .light) == .standard)
+        #expect(HomeAssistantDashboardPresentationPolicy.defaultCardSize(for: .switchDevice) == .compact)
+    }
+
     @Test("Cellular never returns an internal endpoint")
     func cellularSkipsInternalEndpoint() throws {
         let settings = try HomeAssistantEndpointSelector.normalizedSettings(.init(

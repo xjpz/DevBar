@@ -51,10 +51,10 @@ struct IOSHomeAssistantStatusStrip: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(item.title)
                                     .font(theme.appFont.font(.subheadline, weight: .semibold))
-                                    .foregroundStyle(theme.textPrimary)
+                                    .foregroundStyle(primaryTextColor)
                                 Text(item.detail)
                                     .font(theme.captionFont)
-                                    .foregroundStyle(theme.textSecondary)
+                                    .foregroundStyle(secondaryTextColor)
                                     .lineLimit(1)
                             }
                         }
@@ -64,14 +64,14 @@ struct IOSHomeAssistantStatusStrip: View {
                             ZStack {
                                 Capsule().fill(.ultraThinMaterial)
                                 if selection == item.category {
-                                    Capsule().fill(theme.surfacePrimary.opacity(theme.isGeek ? 0.88 : 0.96))
+                                    Capsule().fill(selectedFillColor)
                                 }
                             }
                         }
                         .overlay(Capsule().stroke(
                             selection == item.category
                                 ? item.accent.opacity(0.72)
-                                : theme.borderSubtle.opacity(0.7),
+                                : borderColor,
                             lineWidth: selection == item.category ? 1.5 : 1
                         ))
                         .contentShape(Capsule())
@@ -83,5 +83,21 @@ struct IOSHomeAssistantStatusStrip: View {
             }
         }
         .contentMargins(.horizontal, 0, for: .scrollContent)
+    }
+
+    private var primaryTextColor: Color {
+        theme.isGeek ? theme.textPrimary : .white
+    }
+
+    private var secondaryTextColor: Color {
+        theme.isGeek ? theme.textSecondary : Color.white.opacity(0.70)
+    }
+
+    private var selectedFillColor: Color {
+        theme.isGeek ? theme.surfacePrimary.opacity(0.88) : Color.white.opacity(0.18)
+    }
+
+    private var borderColor: Color {
+        theme.isGeek ? theme.borderSubtle.opacity(0.7) : Color.white.opacity(0.24)
     }
 }

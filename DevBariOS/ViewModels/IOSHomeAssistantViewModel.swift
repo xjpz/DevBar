@@ -1210,10 +1210,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
     }
 
     private func defaultCardSize(for accessory: HomeAssistantAccessory) -> HomeAssistantCardSize {
-        switch accessory.kind {
-        case .airConditioner, .sensorGroup: .standard
-        default: .compact
-        }
+        HomeAssistantDashboardPresentationPolicy.defaultCardSize(for: accessory.kind)
     }
 
     private func defaultAccessoryOrder(
