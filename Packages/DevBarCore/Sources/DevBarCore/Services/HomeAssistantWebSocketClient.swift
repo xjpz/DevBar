@@ -200,12 +200,10 @@ public actor HomeAssistantWebSocketClient {
 
     @discardableResult
     public func callService(_ call: HomeAssistantServiceCall) async throws -> HomeAssistantJSONValue {
-        try await command(type: "call_service", payload: [
-            "domain": .string(call.domain),
-            "service": .string(call.service),
-            "target": .object(["entity_id": .string(call.targetEntityID)]),
-            "service_data": .object(call.data),
-        ])
+        try await command(
+            type: "call_service",
+            payload: HomeAssistantWebSocketCommandAdapter.serviceCallPayload(call)
+        )
     }
 
     private func command(
@@ -320,17 +318,26 @@ public actor HomeAssistantWebSocketClient {
             if envelope["success"]?.boolValue == true {
                 command.continuation.resume(returning: envelope["result"] ?? .null)
             } else {
+                let commandError = HomeAssistantWebSocketCommandAdapter.commandError(
+                    from: envelope["error"]
+                )
                 let responseData = try? JSONEncoder().encode(envelope["error"] ?? .null)
+                var details = ["stage": "result"]
+                if let errorCode = HomeAssistantWebSocketCommandAdapter.errorCode(
+                    from: envelope["error"]
+                ) {
+                    details["errorCode"] = errorCode
+                }
                 diagnostics.record(
                     category: "home_assistant.websocket",
                     name: "websocket_command_failed",
                     operation: command.operation,
                     endpoint: endpointURL,
-                    error: HomeAssistantError.invalidResponse,
+                    error: commandError,
                     responseData: responseData,
-                    details: ["stage": "result"]
+                    details: details
                 )
-                command.continuation.resume(throwing: HomeAssistantError.invalidResponse)
+                command.continuation.resume(throwing: commandError)
             }
         case "event":
             publishStateEvent(envelope["event"])
@@ -457,6 +464,43 @@ public actor HomeAssistantWebSocketClient {
             error: error,
             responseData: try? JSONEncoder().encode(value)
         )
+    }
+}
+
+enum HomeAssistantWebSocketCommandAdapter {
+    static func serviceCallPayload(
+        _ call: HomeAssistantServiceCall
+    ) -> [String: HomeAssistantJSONValue] {
+        var serviceData = call.data
+        serviceData["entity_id"] = .string(call.targetEntityID)
+        return [
+            "domain": .string(call.domain),
+            "service": .string(call.service),
+            "service_data": .object(serviceData),
+        ]
+    }
+
+    static func commandError(from value: HomeAssistantJSONValue?) -> HomeAssistantError {
+        let object = value?.objectValue
+        let message = normalized(object?["message"]?.stringValue)
+        let code = normalized(object?["code"]?.stringValue)
+
+        if let message, let code, !message.localizedCaseInsensitiveContains(code) {
+            return .commandFailed("\(message)（\(code)）")
+        }
+        if let message { return .commandFailed(message) }
+        if let code { return .commandFailed(code) }
+        return .commandFailed("Home Assistant 未提供失败原因")
+    }
+
+    static func errorCode(from value: HomeAssistantJSONValue?) -> String? {
+        normalized(value?.objectValue?["code"]?.stringValue)
+    }
+
+    private static func normalized(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else { return nil }
+        return value
     }
 }
 

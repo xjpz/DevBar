@@ -339,6 +339,7 @@ public enum HomeAssistantError: LocalizedError, Equatable, Sendable {
     case credentialSaveFailed
     case unauthorized
     case invalidResponse
+    case commandFailed(String)
     case disconnected
     case serviceUnavailable
     case unsupportedControl
@@ -352,6 +353,7 @@ public enum HomeAssistantError: LocalizedError, Equatable, Sendable {
         case .credentialSaveFailed: "Token 无法保存到 Keychain"
         case .unauthorized: "Home Assistant Token 无效或已失效"
         case .invalidResponse: "Home Assistant 返回了无法识别的数据"
+        case .commandFailed(let message): "Home Assistant 操作失败：\(message)"
         case .disconnected: "Home Assistant 连接已断开"
         case .serviceUnavailable: "当前实例不支持此操作"
         case .unsupportedControl: "该实体暂不支持控制"
