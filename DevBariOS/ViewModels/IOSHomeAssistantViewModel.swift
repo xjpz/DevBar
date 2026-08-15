@@ -674,6 +674,11 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         bindings: [HomeAssistantRoleBinding]
     ) {
         guard let accessory = allAccessories.first(where: { $0.id == accessoryID }) else { return }
+        let explicitlyBoundRoles = Set(bindings.map(\.role))
+        let explicitlyUnboundRoles = HomeAssistantAccessorySchemaRegistry
+            .schema(for: kind)
+            .supportedRoles
+            .subtracting(explicitlyBoundRoles)
         let selectedEntityIDs = Set(bindings.flatMap(\.entityIDs))
         let boundEntities = (snapshot?.entities ?? accessory.entities).filter {
             selectedEntityIDs.contains($0.entityID)
@@ -688,6 +693,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
             sourceDeviceIDs: sourceDeviceIDs,
             kind: kind,
             bindings: bindings,
+            explicitlyUnboundRoles: explicitlyUnboundRoles,
             autoClassification: .init(
                 confidence: 1,
                 source: .user,

@@ -20,7 +20,8 @@ public enum HomeAssistantAccessoryClassifier {
     public static func classify(
         card: HomeAssistantDeviceCard,
         preferredKind: HomeAssistantAccessoryKind? = nil,
-        explicitBindings: [HomeAssistantRoleBinding] = []
+        explicitBindings: [HomeAssistantRoleBinding] = [],
+        explicitlyUnboundRoles: Set<HomeAssistantAccessoryRole> = []
     ) -> HomeAssistantAccessoryClassification {
         let kind = preferredKind ?? inferredKind(for: card)
         let schema = HomeAssistantAccessorySchemaRegistry.schema(for: kind)
@@ -39,7 +40,10 @@ public enum HomeAssistantAccessoryClassifier {
             return ids.isEmpty ? nil : HomeAssistantRoleBinding(role: binding.role, entityIDs: ids)
         }
 
-        if !validExplicitBindings.isEmpty {
+        let explicitlyBoundRoles = Set(validExplicitBindings.map(\.role))
+        let suppressedRoles = explicitlyUnboundRoles.subtracting(explicitlyBoundRoles)
+
+        if !validExplicitBindings.isEmpty || !suppressedRoles.isEmpty {
             let hasPrimary = validExplicitBindings.contains { [.primaryControl, .power].contains($0.role) }
             return HomeAssistantAccessoryClassification(
                 kind: kind,
@@ -47,7 +51,8 @@ public enum HomeAssistantAccessoryClassifier {
                     validExplicitBindings,
                     card: card,
                     kind: kind,
-                    preservesControlRoles: true
+                    preservesControlRoles: true,
+                    suppressedRoles: suppressedRoles
                 ),
                 metadata: .init(
                     confidence: hasPrimary ? 1 : 0.65,
@@ -137,7 +142,8 @@ public enum HomeAssistantAccessoryClassifier {
         _ initial: [HomeAssistantRoleBinding],
         card: HomeAssistantDeviceCard,
         kind: HomeAssistantAccessoryKind,
-        preservesControlRoles: Bool
+        preservesControlRoles: Bool,
+        suppressedRoles: Set<HomeAssistantAccessoryRole> = []
     ) -> [HomeAssistantRoleBinding] {
         var roleEntityIDs = initial.reduce(into: [HomeAssistantAccessoryRole: [String]]()) { result, binding in
             for entityID in binding.entityIDs where !result[binding.role, default: []].contains(entityID) {
@@ -149,6 +155,7 @@ public enum HomeAssistantAccessoryClassifier {
 
         for entity in card.entities where !alreadyBound.contains(entity.entityID) {
             guard let role = inferredRole(for: entity, kind: kind), supportedRoles.contains(role) else { continue }
+            guard !suppressedRoles.contains(role) else { continue }
             if preservesControlRoles && [.primaryControl, .power].contains(role) { continue }
             roleEntityIDs[role, default: []].append(entity.entityID)
         }

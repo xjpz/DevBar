@@ -38,7 +38,8 @@ public enum HomeAssistantAccessoryReconciler {
             let classification = HomeAssistantAccessoryClassifier.classify(
                 card: classificationCard,
                 preferredKind: preferredKind,
-                explicitBindings: storedBindings
+                explicitBindings: storedBindings,
+                explicitlyUnboundRoles: stored?.explicitlyUnboundRoles ?? []
             )
             let requestedBindingPairs = Set(storedBindings.flatMap { binding in
                 binding.entityIDs.map { "\(binding.role.rawValue)=\($0)" }

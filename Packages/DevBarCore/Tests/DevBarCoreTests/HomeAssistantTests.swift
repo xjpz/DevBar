@@ -752,6 +752,55 @@ struct HomeAssistantTests {
         #expect(missing.classification.reasons.contains { $0.contains(temperature.entityID) })
     }
 
+    @Test("Explicitly unbound auxiliary roles remain unbound after reconciliation and persistence")
+    func explicitlyUnboundAuxiliaryRolesRemainUnbound() throws {
+        let power = try entity(
+            #"{"entity_id":"switch.purifier","state":"on","attributes":{"friendly_name":"净化器"}}"#,
+            deviceID: "purifier-device"
+        )
+        let temperature = try entity(
+            #"{"entity_id":"sensor.purifier_temperature","state":"25.5","attributes":{"friendly_name":"温度","device_class":"temperature","unit_of_measurement":"°C"}}"#,
+            deviceID: "purifier-device"
+        )
+        let card = HomeAssistantDeviceCard(
+            id: "purifier-device",
+            name: "净化器",
+            areaID: "living",
+            primaryEntityID: power.entityID,
+            entities: [power, temperature],
+            hasMultiplePrimaryControls: false
+        )
+        let presentation = HomeAssistantAccessoryPresentation(
+            id: card.id,
+            sourceDeviceIDs: ["purifier-device"],
+            kind: .airPurifier,
+            bindings: [.init(role: .primaryControl, entityIDs: [power.entityID])],
+            explicitlyUnboundRoles: [.temperature]
+        )
+
+        let suite = "HomeAssistantExplicitlyUnboundTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = HomeAssistantSettingsStore(defaults: defaults)
+        store.saveAccessoryPresentations(
+            .init(accessories: [presentation.id: presentation]),
+            instanceFingerprint: "instance-a"
+        )
+        let restored = try #require(
+            store.loadAccessoryPresentations(instanceFingerprint: "instance-a")
+                .accessories[presentation.id]
+        )
+        let accessory = try #require(HomeAssistantAccessoryReconciler.accessories(
+            from: [card],
+            entities: [power, temperature],
+            presentations: [card.id: restored]
+        ).first)
+
+        #expect(restored.explicitlyUnboundRoles == [.temperature])
+        #expect(accessory.entityIDs(for: .temperature).isEmpty)
+        #expect(accessory.entityIDs(for: .primaryControl) == [power.entityID])
+    }
+
     @Test("Sensor accessory preserves a manually selected contact entity as primary")
     func sensorAccessoryPreservesSelectedContactPrimary() throws {
         let battery = try entity(

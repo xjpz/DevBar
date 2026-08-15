@@ -158,6 +158,7 @@ public struct HomeAssistantAccessoryPresentation: Codable, Equatable, Identifiab
     public let sourceDeviceIDs: [String]
     public let kind: HomeAssistantAccessoryKind
     public let bindings: [HomeAssistantRoleBinding]
+    public let explicitlyUnboundRoles: Set<HomeAssistantAccessoryRole>?
     public let autoClassification: HomeAssistantClassificationMetadata?
     public let customName: String?
     public let customAreaID: String?
@@ -168,6 +169,7 @@ public struct HomeAssistantAccessoryPresentation: Codable, Equatable, Identifiab
         sourceDeviceIDs: [String] = [],
         kind: HomeAssistantAccessoryKind,
         bindings: [HomeAssistantRoleBinding] = [],
+        explicitlyUnboundRoles: Set<HomeAssistantAccessoryRole> = [],
         autoClassification: HomeAssistantClassificationMetadata? = nil,
         customName: String? = nil,
         customAreaID: String? = nil,
@@ -181,6 +183,9 @@ public struct HomeAssistantAccessoryPresentation: Codable, Equatable, Identifiab
         }
         self.kind = kind
         self.bindings = bindings
+        self.explicitlyUnboundRoles = explicitlyUnboundRoles.isEmpty
+            ? nil
+            : explicitlyUnboundRoles
         self.autoClassification = autoClassification
         self.customName = Self.normalizedText(customName, maximumLength: 40)
         self.customAreaID = Self.normalizedText(customAreaID, maximumLength: 128)
