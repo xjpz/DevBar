@@ -338,6 +338,14 @@ struct IOSHomeAssistantPageBackground: View {
     }
 }
 
+extension View {
+    func homeAssistantTransparentNavigationBar() -> some View {
+        toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(Color.clear, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+    }
+}
+
 enum IOSHomeAssistantCardMetrics {
     static let spacing: CGFloat = 10
 }

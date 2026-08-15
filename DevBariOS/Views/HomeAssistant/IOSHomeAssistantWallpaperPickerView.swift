@@ -76,8 +76,7 @@ struct IOSHomeAssistantWallpaperPickerView: View {
         }
         .navigationTitle("家庭墙纸")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .homeAssistantTransparentNavigationBar()
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("完成") { dismiss() }

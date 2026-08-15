@@ -32,8 +32,7 @@ struct IOSHomeAssistantDashboardView: View {
         }
         .navigationTitle(model.isConfigured ? "" : "Home Assistant")
         .toolbarTitleDisplayMode(.inline)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .homeAssistantTransparentNavigationBar()
         .toolbar {
             if model.isConfigured {
                 if #available(iOS 26.0, *) {
@@ -62,75 +61,15 @@ struct IOSHomeAssistantDashboardView: View {
                     }
                 } else {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button {
-                                Task { await model.refresh() }
-                            } label: {
-                                Label("刷新", systemImage: "arrow.clockwise")
-                            }
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    isEditingHomeView = true
-                                }
-                            } label: {
-                                Label("编辑家庭视图", systemImage: "square.grid.2x2")
-                            }
-                            Button {
-                                showsSettings = true
-                            } label: {
-                                Label("设置", systemImage: "gearshape")
-                            }
-                            Button {
-                                wallpaperPickerRequest = HomeAssistantWallpaperPickerRequest()
-                            } label: {
-                                Label("家庭墙纸", systemImage: "photo.on.rectangle.angled")
-                            }
-                            Button {
-                                roomOrderRequest = HomeAssistantRoomOrderRequest()
-                            } label: {
-                                Label("重新排序区块", systemImage: "line.3.horizontal")
-                            }
-                            .disabled(model.rooms.count < 2)
-                            Button {
-                                hiddenDevicesRequest = HomeAssistantHiddenDevicesRequest()
-                            } label: {
-                                Label(
-                                    model.hiddenAccessories.isEmpty
-                                        ? "隐藏的设备"
-                                        : "隐藏的设备（\(model.hiddenAccessories.count)）",
-                                    systemImage: "eye.slash"
-                                )
-                            }
-                            if !model.pendingAccessories.isEmpty {
-                                Button {
-                                    pendingOrganizationRequest = HomeAssistantPendingOrganizationRequest()
-                                } label: {
-                                    Label("待整理的设备（\(model.pendingAccessories.count)）", systemImage: "exclamationmark.circle")
-                                }
-                            }
-                            if model.settings.aiAnalysisEnabled {
-                                Button {
-                                    showsAIPrivacyConfirmation = true
-                                } label: {
-                                    Label(model.isAnalyzing ? "分析中…" : "AI 整理", systemImage: "sparkles")
-                                }
-                                .disabled(model.isAnalyzing)
-                            }
-                            Divider()
-                            Button {
-                                model.resetDashboardLayout()
-                            } label: {
-                                Label("恢复默认卡片布局", systemImage: "rectangle.2.swap")
-                            }
-                            Button {
-                                model.resetLayoutSuggestion()
-                            } label: {
-                                Label("恢复默认区块顺序", systemImage: "arrow.counterclockwise")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .homeAssistantToolbarIcon(theme)
-                        }
+                        HomeAssistantDashboardMenu(
+                            canReorderRooms: model.rooms.count >= 2,
+                            hiddenAccessoryCount: model.hiddenAccessories.count,
+                            pendingAccessoryCount: model.pendingAccessories.count,
+                            aiAnalysisEnabled: model.settings.aiAnalysisEnabled,
+                            isAnalyzing: model.isAnalyzing,
+                            perform: performDashboardMenuAction
+                        )
+                        .equatable()
                     }
                 }
             }
@@ -565,6 +504,33 @@ struct IOSHomeAssistantDashboardView: View {
         }
     }
 
+    private func performDashboardMenuAction(_ action: HomeAssistantDashboardMenuAction) {
+        switch action {
+        case .refresh:
+            Task { await model.refresh() }
+        case .beginEditing:
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isEditingHomeView = true
+            }
+        case .settings:
+            showsSettings = true
+        case .wallpaper:
+            wallpaperPickerRequest = HomeAssistantWallpaperPickerRequest()
+        case .roomOrder:
+            roomOrderRequest = HomeAssistantRoomOrderRequest()
+        case .hiddenDevices:
+            hiddenDevicesRequest = HomeAssistantHiddenDevicesRequest()
+        case .pendingOrganization:
+            pendingOrganizationRequest = HomeAssistantPendingOrganizationRequest()
+        case .aiAnalysis:
+            showsAIPrivacyConfirmation = true
+        case .resetDashboardLayout:
+            model.resetDashboardLayout()
+        case .resetLayoutSuggestion:
+            model.resetLayoutSuggestion()
+        }
+    }
+
     private var connectionText: String {
         switch model.connectionState {
         case .connected(.internalNetwork): "Home Assistant · 内网"
@@ -594,6 +560,94 @@ struct IOSHomeAssistantDashboardView: View {
         return true
     }
 
+}
+
+private enum HomeAssistantDashboardMenuAction {
+    case refresh
+    case beginEditing
+    case settings
+    case wallpaper
+    case roomOrder
+    case hiddenDevices
+    case pendingOrganization
+    case aiAnalysis
+    case resetDashboardLayout
+    case resetLayoutSuggestion
+}
+
+private struct HomeAssistantDashboardMenu: View, Equatable {
+    @Environment(\.themeTokens) private var theme
+
+    let canReorderRooms: Bool
+    let hiddenAccessoryCount: Int
+    let pendingAccessoryCount: Int
+    let aiAnalysisEnabled: Bool
+    let isAnalyzing: Bool
+    let perform: (HomeAssistantDashboardMenuAction) -> Void
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.canReorderRooms == rhs.canReorderRooms
+            && lhs.hiddenAccessoryCount == rhs.hiddenAccessoryCount
+            && lhs.pendingAccessoryCount == rhs.pendingAccessoryCount
+            && lhs.aiAnalysisEnabled == rhs.aiAnalysisEnabled
+            && lhs.isAnalyzing == rhs.isAnalyzing
+    }
+
+    var body: some View {
+        Menu {
+            Button { perform(.refresh) } label: {
+                Label("刷新", systemImage: "arrow.clockwise")
+            }
+            Button { perform(.beginEditing) } label: {
+                Label("编辑家庭视图", systemImage: "square.grid.2x2")
+            }
+            Button { perform(.settings) } label: {
+                Label("设置", systemImage: "gearshape")
+            }
+            Button { perform(.wallpaper) } label: {
+                Label("家庭墙纸", systemImage: "photo.on.rectangle.angled")
+            }
+            Button { perform(.roomOrder) } label: {
+                Label("重新排序区块", systemImage: "line.3.horizontal")
+            }
+            .disabled(!canReorderRooms)
+            Button { perform(.hiddenDevices) } label: {
+                Label(
+                    hiddenAccessoryCount == 0
+                        ? "隐藏的设备"
+                        : "隐藏的设备（\(hiddenAccessoryCount)）",
+                    systemImage: "eye.slash"
+                )
+            }
+            if pendingAccessoryCount > 0 {
+                Button { perform(.pendingOrganization) } label: {
+                    Label(
+                        "待整理的设备（\(pendingAccessoryCount)）",
+                        systemImage: "exclamationmark.circle"
+                    )
+                }
+            }
+            if aiAnalysisEnabled {
+                Button { perform(.aiAnalysis) } label: {
+                    Label(isAnalyzing ? "分析中…" : "AI 整理", systemImage: "sparkles")
+                }
+                .disabled(isAnalyzing)
+            }
+            Divider()
+            Button { perform(.resetDashboardLayout) } label: {
+                Label("恢复默认卡片布局", systemImage: "rectangle.2.swap")
+            }
+            Button { perform(.resetLayoutSuggestion) } label: {
+                Label("恢复默认区块顺序", systemImage: "arrow.counterclockwise")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .homeAssistantToolbarIcon(theme)
+        }
+        .transaction { transaction in
+            transaction.animation = nil
+        }
+    }
 }
 
 private extension View {
