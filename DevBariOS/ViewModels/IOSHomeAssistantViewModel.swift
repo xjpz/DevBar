@@ -674,6 +674,10 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         bindings: [HomeAssistantRoleBinding]
     ) {
         guard let accessory = allAccessories.first(where: { $0.id == accessoryID }) else { return }
+        if accessory.kind != kind {
+            dashboardLayout.preserveResolvedSize(cardSize(for: accessory), forCard: accessoryID)
+            saveDashboardLayout()
+        }
         let explicitlyBoundRoles = Set(bindings.map(\.role))
         let explicitlyUnboundRoles = HomeAssistantAccessorySchemaRegistry
             .schema(for: kind)

@@ -1,4 +1,5 @@
 import DevBarCore
+import Foundation
 import SwiftUI
 
 struct IOSHomeAssistantDeviceCard: View {
@@ -38,27 +39,17 @@ struct IOSHomeAssistantDeviceCard: View {
         .onTapGesture {
             if !isEditing { open() }
         }
-        .contextMenu {
-            if !isEditing {
-                Button(action: edit) {
-                    Label("配件设置", systemImage: "gearshape")
-                }
-                Button(role: .destructive, action: hide) {
-                    Label("从家庭视图中移除", systemImage: "minus.circle")
-                }
-                if let beginLayoutEditing {
-                    Divider()
-                    Button(action: beginLayoutEditing) {
-                        Label("编辑家庭视图", systemImage: "square.grid.2x2")
-                    }
-                }
-            }
-        }
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: "编辑设备", edit)
-        .accessibilityValue([state.primaryText, state.secondaryText].compactMap { $0 }.joined(separator: "，"))
+        .accessibilityValue(accessibilityStateText)
         .animation(.easeInOut(duration: 0.24), value: presentationState)
         .animation(.easeInOut(duration: 0.2), value: isPending)
+        .contextMenu {
+            deviceContextMenu
+                .transaction { transaction in
+                    transaction.animation = nil
+                }
+        }
     }
 
     private var compactContent: some View {
@@ -83,6 +74,12 @@ struct IOSHomeAssistantDeviceCard: View {
             HStack(alignment: .top) {
                 iconButton(diameter: 42, symbolSize: 19)
                 Spacer(minLength: isEditing ? 52 : 0)
+                if !isEditing, let currentIndoorTemperatureText {
+                    Text(currentIndoorTemperatureText)
+                        .font(theme.appFont.font(.title2, weight: .bold).monospacedDigit())
+                        .foregroundStyle(titleColor)
+                        .lineLimit(1)
+                }
                 if accessory.needsReview, !isEditing {
                     Image(systemName: "exclamationmark.circle.fill")
                         .foregroundStyle(theme.warning)
@@ -143,6 +140,24 @@ struct IOSHomeAssistantDeviceCard: View {
         .background(.regularMaterial, in: Capsule())
     }
 
+    @ViewBuilder
+    private var deviceContextMenu: some View {
+        if !isEditing {
+            Button(action: edit) {
+                Label("配件设置", systemImage: "gearshape")
+            }
+            Button(role: .destructive, action: hide) {
+                Label("从家庭视图中移除", systemImage: "minus.circle")
+            }
+            if let beginLayoutEditing {
+                Divider()
+                Button(action: beginLayoutEditing) {
+                    Label("编辑家庭视图", systemImage: "square.grid.2x2")
+                }
+            }
+        }
+    }
+
     private var cardShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: size == .compact ? 18 : 22, style: .continuous)
     }
@@ -164,7 +179,6 @@ struct IOSHomeAssistantDeviceCard: View {
     private var cardFillColor: Color {
         switch presentationState {
         case .on:
-            if theme.isGeek { return theme.surfacePrimary.opacity(0.88) }
             return Color.white.opacity(colorScheme == .dark ? 0.90 : 0.96)
         case .off:
             if theme.isGeek { return theme.surfacePrimary.opacity(0.74) }
@@ -183,7 +197,7 @@ struct IOSHomeAssistantDeviceCard: View {
     private var cardHighlightColors: [Color] {
         switch presentationState {
         case .on:
-            return [Color.white.opacity(theme.isGeek ? 0.08 : 0.22), accentColor.opacity(0.07), .clear]
+            return [Color.white.opacity(0.22), accentColor.opacity(0.07), .clear]
         case .off:
             return [Color.white.opacity(0.08), .clear, Color.black.opacity(0.08)]
         case .warning:
@@ -195,7 +209,7 @@ struct IOSHomeAssistantDeviceCard: View {
 
     private var cardBorderColor: Color {
         switch presentationState {
-        case .on: Color.white.opacity(theme.isGeek ? 0.14 : 0.52)
+        case .on: Color.white.opacity(0.52)
         case .off: Color.white.opacity(0.13)
         case .warning: theme.warning.opacity(0.32)
         case .unavailable, .neutral: theme.borderSubtle.opacity(0.55)
@@ -222,6 +236,20 @@ struct IOSHomeAssistantDeviceCard: View {
     private var hasQuickAction: Bool {
         guard let entity = accessory.quickControlEntity else { return false }
         return entity.isAvailable && HomeAssistantControlPolicy.quickAction(for: entity) != nil
+    }
+
+    private var currentIndoorTemperatureText: String? {
+        guard accessory.kind == .airConditioner, let temperature = state.currentTemperature else {
+            return nil
+        }
+        return "\(temperature.formatted(.number.precision(.fractionLength(0...1))))°"
+    }
+
+    private var accessibilityStateText: String {
+        let temperatureText = currentIndoorTemperatureText.map { "室内温度 \($0)" }
+        return [temperatureText, state.primaryText, state.secondaryText]
+            .compactMap { $0 }
+            .joined(separator: "，")
     }
 
     private func iconAction() {
@@ -270,7 +298,7 @@ struct IOSHomeAssistantDeviceCard: View {
 
     private var titleColor: Color {
         switch presentationState {
-        case .on: theme.isGeek ? theme.textPrimary : Color.black.opacity(0.90)
+        case .on: Color.black.opacity(0.90)
         case .off: Color.white.opacity(0.96)
         case .warning, .neutral: theme.textPrimary
         case .unavailable: theme.textTertiary
@@ -279,7 +307,7 @@ struct IOSHomeAssistantDeviceCard: View {
 
     private var statusColor: Color {
         switch presentationState {
-        case .on: theme.isGeek ? accentColor : Color.black.opacity(0.55)
+        case .on: Color.black.opacity(0.55)
         case .off: Color.white.opacity(0.68)
         case .warning: theme.warning
         case .unavailable: theme.textTertiary

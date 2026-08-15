@@ -3,14 +3,7 @@ import Foundation
 public enum HomeAssistantSnapshotProjection {
     public static func cacheSnapshot(from snapshot: HomeAssistantSnapshot) -> HomeAssistantSnapshot {
         let cards = snapshot.cards.map { card in
-            HomeAssistantDeviceCard(
-                id: card.id,
-                name: card.name,
-                areaID: card.areaID,
-                primaryEntityID: card.primaryEntityID,
-                entities: card.entities.map(sanitizedEntity),
-                hasMultiplePrimaryControls: card.hasMultiplePrimaryControls
-            )
+            replacingEntities(in: card, with: card.entities.map(sanitizedEntity))
         }
         let entitiesByID = cards
             .flatMap(\.entities)
@@ -48,14 +41,7 @@ public enum HomeAssistantSnapshotProjection {
             rooms: snapshot.rooms,
             entities: snapshot.entities.map(update),
             cards: snapshot.cards.map { card in
-                HomeAssistantDeviceCard(
-                    id: card.id,
-                    name: card.name,
-                    areaID: card.areaID,
-                    primaryEntityID: card.primaryEntityID,
-                    entities: card.entities.map(update),
-                    hasMultiplePrimaryControls: card.hasMultiplePrimaryControls
-                )
+                replacingEntities(in: card, with: card.entities.map(update))
             },
             services: snapshot.services,
             refreshedAt: refreshedAt
@@ -85,14 +71,7 @@ public enum HomeAssistantSnapshotProjection {
             rooms: snapshot.rooms,
             entities: snapshot.entities.map(update),
             cards: snapshot.cards.map { card in
-                HomeAssistantDeviceCard(
-                    id: card.id,
-                    name: card.name,
-                    areaID: card.areaID,
-                    primaryEntityID: card.primaryEntityID,
-                    entities: card.entities.map(update),
-                    hasMultiplePrimaryControls: card.hasMultiplePrimaryControls
-                )
+                replacingEntities(in: card, with: card.entities.map(update))
             },
             services: snapshot.services,
             refreshedAt: refreshedAt
@@ -141,6 +120,31 @@ public enum HomeAssistantSnapshotProjection {
             lastUpdated: entity.state.lastUpdated
         )
         return replacingState(of: entity, with: state)
+    }
+
+    private static func replacingEntities(
+        in card: HomeAssistantDeviceCard,
+        with entities: [HomeAssistantEntity]
+    ) -> HomeAssistantDeviceCard {
+        let ranked = HomeAssistantPrimaryEntityPolicy.rankedCandidates(
+            entities,
+            preferredEntityID: card.primaryEntityID,
+            rank: HomeAssistantPrimaryEntityPolicy.topologyRank
+        )
+        let primaryEntityID = ranked.first?.entityID ?? card.primaryEntityID
+        let equivalentPrimaryCount = HomeAssistantPrimaryEntityPolicy.equivalentTopCandidates(
+            ranked,
+            rank: HomeAssistantPrimaryEntityPolicy.topologyRank
+        ).count
+        let primaryRank = ranked.first.map(HomeAssistantPrimaryEntityPolicy.topologyRank) ?? Int.max
+        return HomeAssistantDeviceCard(
+            id: card.id,
+            name: card.name,
+            areaID: card.areaID,
+            primaryEntityID: primaryEntityID,
+            entities: entities,
+            hasMultiplePrimaryControls: equivalentPrimaryCount > 1 && primaryRank < 3
+        )
     }
 
     private static func replacingState(

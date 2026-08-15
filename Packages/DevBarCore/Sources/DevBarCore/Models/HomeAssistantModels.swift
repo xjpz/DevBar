@@ -517,6 +517,11 @@ public struct HomeAssistantDashboardLayoutSettings: Codable, Equatable, Sendable
         }
     }
 
+    public mutating func preserveResolvedSize(_ size: HomeAssistantCardSize, forCard cardID: String) {
+        guard cardSizes[cardID] == nil else { return }
+        cardSizes[cardID] = size
+    }
+
     private static func uniqueNonEmptyValues(_ values: [String]) -> [String] {
         var seen = Set<String>()
         return values.filter { !$0.isEmpty && seen.insert($0).inserted }

@@ -68,12 +68,11 @@ public enum HomeAssistantAccessoryClassifier {
             guard let role = inferredRole(for: entity, kind: kind) else { return true }
             return ![.diagnostic, .indicator].contains(role)
         }
-        let rankedCandidates = candidates.sorted { lhs, rhs in
-            let left = primaryRank(lhs, kind: kind)
-            let right = primaryRank(rhs, kind: kind)
-            if left != right { return left < right }
-            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
-        }
+        let rankedCandidates = HomeAssistantPrimaryEntityPolicy.rankedCandidates(
+            candidates,
+            preferredEntityID: card.primaryEntityID,
+            rank: { primaryRank($0, kind: kind) }
+        )
         let primary = rankedCandidates.first ?? fallbackPrimary(in: card)
         let explicitPower = card.entities.first { entity in
             entity.entityID != primary?.entityID && isPowerEntity(entity)
@@ -88,10 +87,10 @@ public enum HomeAssistantAccessoryClassifier {
         }
         bindings = supplementedBindings(bindings, card: card, kind: kind, preservesControlRoles: false)
 
-        let topRank = rankedCandidates.first.map { primaryRank($0, kind: kind) }
-        let equivalentPrimaryCount = topRank.map { rank in
-            rankedCandidates.filter { primaryRank($0, kind: kind) == rank }.count
-        } ?? 0
+        let equivalentPrimaryCount = HomeAssistantPrimaryEntityPolicy.equivalentTopCandidates(
+            rankedCandidates,
+            rank: { primaryRank($0, kind: kind) }
+        ).count
         let unresolvedMultipleControls = equivalentPrimaryCount > 1 && explicitPower == nil
         let hasPrimary = primary != nil
         let nameOnlyKind = preferredKind == nil && kindWasInferredFromName(card: card, kind: kind)
@@ -217,8 +216,11 @@ public enum HomeAssistantAccessoryClassifier {
     }
 
     private static func fallbackPrimary(in card: HomeAssistantDeviceCard) -> HomeAssistantEntity? {
-        card.entities.first { HomeAssistantDeviceCard.controllableDomains.contains($0.domain) }
-            ?? card.primaryEntity
+        HomeAssistantPrimaryEntityPolicy.preferred(
+            from: card.entities.filter { HomeAssistantDeviceCard.controllableDomains.contains($0.domain) },
+            preferredEntityID: card.primaryEntityID,
+            rank: { _ in 0 }
+        ) ?? card.primaryEntity
     }
 
     private static func primaryRank(

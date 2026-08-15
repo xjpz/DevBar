@@ -144,12 +144,11 @@ public enum HomeAssistantAccessoryReconciler {
         var result: [AccessoryProjection] = []
 
         if !remainingControls.isEmpty {
-            let primaryEntityID: String
-            if remainingEntities.contains(where: { $0.entityID == card.primaryEntityID }) {
-                primaryEntityID = card.primaryEntityID
-            } else {
-                primaryEntityID = remainingControls[0].entityID
-            }
+            let primaryEntityID = HomeAssistantPrimaryEntityPolicy.preferred(
+                from: remainingControls,
+                preferredEntityID: card.primaryEntityID,
+                rank: { _ in 0 }
+            )?.entityID ?? remainingControls[0].entityID
             result.append(.init(
                 card: HomeAssistantDeviceCard(
                     id: card.id,
@@ -228,9 +227,9 @@ public enum HomeAssistantAccessoryReconciler {
 
     /// Refreshes entity states while preserving the already resolved accessory schema.
     ///
-    /// State-change events cannot alter device membership, user bindings, names, rooms, or
-    /// classification. Updating only the embedded entities avoids repeating classification for
-    /// every live event while keeping accessory identity stable for SwiftUI.
+    /// State-change events cannot alter device membership, user bindings, names, rooms, or kind.
+    /// Automatic bindings may follow an available equivalent control when the previous primary
+    /// becomes unavailable; explicit user bindings remain authoritative.
     public static func applying(
         states: [HomeAssistantState],
         to accessories: [HomeAssistantAccessory]
@@ -245,17 +244,37 @@ public enum HomeAssistantAccessoryReconciler {
                 return accessory
             }
             let sourceCard = accessory.sourceCard
+            let updatedEntities = sourceCard.entities.map { entity in
+                guard let state = statesByID[entity.entityID] else { return entity }
+                return replacingState(of: entity, with: state)
+            }
+            let ranked = HomeAssistantPrimaryEntityPolicy.rankedCandidates(
+                updatedEntities,
+                preferredEntityID: sourceCard.primaryEntityID,
+                rank: HomeAssistantPrimaryEntityPolicy.topologyRank
+            )
+            let primaryEntityID = ranked.first?.entityID ?? sourceCard.primaryEntityID
+            let equivalentPrimaryCount = HomeAssistantPrimaryEntityPolicy.equivalentTopCandidates(
+                ranked,
+                rank: HomeAssistantPrimaryEntityPolicy.topologyRank
+            ).count
+            let primaryRank = ranked.first.map(HomeAssistantPrimaryEntityPolicy.topologyRank) ?? Int.max
             let updatedCard = HomeAssistantDeviceCard(
                 id: sourceCard.id,
                 name: sourceCard.name,
                 areaID: sourceCard.areaID,
-                primaryEntityID: sourceCard.primaryEntityID,
-                entities: sourceCard.entities.map { entity in
-                    guard let state = statesByID[entity.entityID] else { return entity }
-                    return replacingState(of: entity, with: state)
-                },
-                hasMultiplePrimaryControls: sourceCard.hasMultiplePrimaryControls
+                primaryEntityID: primaryEntityID,
+                entities: updatedEntities,
+                hasMultiplePrimaryControls: equivalentPrimaryCount > 1 && primaryRank < 3
             )
+            let primarySelectionChanged = primaryEntityID != sourceCard.primaryEntityID
+                || updatedCard.hasMultiplePrimaryControls != sourceCard.hasMultiplePrimaryControls
+            let updatedClassification = !accessory.isUserConfigured && primarySelectionChanged
+                ? HomeAssistantAccessoryClassifier.classify(
+                    card: updatedCard,
+                    preferredKind: accessory.kind
+                )
+                : nil
             return HomeAssistantAccessory(
                 id: accessory.id,
                 sourceCard: updatedCard,
@@ -265,8 +284,8 @@ public enum HomeAssistantAccessoryReconciler {
                 name: accessory.name,
                 areaID: accessory.areaID,
                 systemImage: accessory.systemImage,
-                bindings: accessory.bindings,
-                classification: accessory.classification,
+                bindings: updatedClassification?.bindings ?? accessory.bindings,
+                classification: updatedClassification?.metadata ?? accessory.classification,
                 isUserConfigured: accessory.isUserConfigured
             )
         }

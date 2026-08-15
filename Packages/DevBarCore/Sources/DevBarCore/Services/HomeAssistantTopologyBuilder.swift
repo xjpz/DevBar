@@ -54,15 +54,22 @@ public enum HomeAssistantTopologyBuilder {
                 return nil
             }
             let presented = presentedEntities(from: values, isPhysicalDevice: isPhysicalDevice)
-            let sorted = presented.sorted { rank($0.domain) < rank($1.domain) }
-            let bestRank = sorted.first.map { rank($0.domain) } ?? Int.max
-            let best = sorted.filter { rank($0.domain) == bestRank }
+            let ranked = HomeAssistantPrimaryEntityPolicy.rankedCandidates(
+                presented,
+                rank: HomeAssistantPrimaryEntityPolicy.topologyRank
+            )
+            let best = HomeAssistantPrimaryEntityPolicy.equivalentTopCandidates(
+                ranked,
+                rank: HomeAssistantPrimaryEntityPolicy.topologyRank
+            )
+            let primary = ranked.first
+            let bestRank = primary.map(HomeAssistantPrimaryEntityPolicy.topologyRank) ?? Int.max
             let device = values.first?.deviceID.flatMap { deviceByID[$0] }
             return HomeAssistantDeviceCard(
                 id: groupID,
-                name: device?.displayName ?? best.first?.name ?? groupID,
+                name: device?.displayName ?? primary?.name ?? groupID,
                 areaID: values.compactMap(\.areaID).first,
-                primaryEntityID: best.first?.entityID ?? presented[0].entityID,
+                primaryEntityID: primary?.entityID ?? presented[0].entityID,
                 entities: presented.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending },
                 hasMultiplePrimaryControls: best.count > 1 && bestRank < 3
             )
@@ -123,16 +130,6 @@ public enum HomeAssistantTopologyBuilder {
         )
     }
 
-    private static func rank(_ domain: String) -> Int {
-        switch domain {
-        case "light", "lock", "climate", "cover", "fan", "switch", "input_boolean": 0
-        case "scene", "script", "automation", "button": 1
-        case "binary_sensor": 2
-        case "sensor": 3
-        default: 4
-        }
-    }
-
     private static func presentedEntities(
         from entities: [HomeAssistantEntity],
         isPhysicalDevice: Bool
@@ -153,7 +150,10 @@ public enum HomeAssistantTopologyBuilder {
         let actions = entities.filter { ["scene", "script", "automation", "button"].contains($0.domain) }
         if !actions.isEmpty { return actions }
 
-        return entities.sorted { rank($0.domain) < rank($1.domain) }.prefix(1).map { $0 }
+        return entities.sorted {
+            HomeAssistantPrimaryEntityPolicy.topologyRank($0)
+                < HomeAssistantPrimaryEntityPolicy.topologyRank($1)
+        }.prefix(1).map { $0 }
     }
 
     private static func isLikelyConfigurationHelper(_ entity: HomeAssistantEntity) -> Bool {

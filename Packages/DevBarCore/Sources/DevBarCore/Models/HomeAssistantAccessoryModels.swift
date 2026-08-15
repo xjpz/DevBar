@@ -443,6 +443,7 @@ public struct HomeAssistantAccessorySemanticState: Equatable, Sendable {
     public let alerts: [HomeAssistantAccessoryAlert]
     public let primaryText: String
     public let secondaryText: String?
+    public let currentTemperature: Double?
     public let tone: HomeAssistantAccessoryTone
     public let isCountedAsOn: Bool
 
@@ -453,6 +454,7 @@ public struct HomeAssistantAccessorySemanticState: Equatable, Sendable {
         alerts: [HomeAssistantAccessoryAlert],
         primaryText: String,
         secondaryText: String?,
+        currentTemperature: Double? = nil,
         tone: HomeAssistantAccessoryTone,
         isCountedAsOn: Bool
     ) {
@@ -462,6 +464,7 @@ public struct HomeAssistantAccessorySemanticState: Equatable, Sendable {
         self.alerts = alerts
         self.primaryText = primaryText
         self.secondaryText = secondaryText
+        self.currentTemperature = currentTemperature
         self.tone = tone
         self.isCountedAsOn = isCountedAsOn
     }

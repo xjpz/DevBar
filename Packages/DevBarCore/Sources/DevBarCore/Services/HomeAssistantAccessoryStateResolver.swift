@@ -7,6 +7,7 @@ public enum HomeAssistantAccessoryStateResolver {
         locale: Locale = .current
     ) -> HomeAssistantAccessorySemanticState {
         let statusOwner = accessory.powerEntity ?? accessory.primaryControlEntity
+        let currentTemperature = resolvedCurrentTemperature(accessory)
         let aggregateControls = aggregateControlEntities(in: accessory)
         let usesAggregateState = accessory.needsReview
             && accessory.powerEntity == nil
@@ -40,6 +41,7 @@ public enum HomeAssistantAccessoryStateResolver {
                     translations: translations,
                     locale: locale
                 ),
+                currentTemperature: currentTemperature,
                 tone: .unavailable,
                 isCountedAsOn: false
             )
@@ -63,6 +65,7 @@ public enum HomeAssistantAccessoryStateResolver {
                 alerts: alerts,
                 primaryText: primaryText,
                 secondaryText: "\(aggregateControls.count) 个控制，可在设置中拆分",
+                currentTemperature: currentTemperature,
                 tone: !alerts.isEmpty ? .warning : (activeCount > 0 ? .active : .neutral),
                 isCountedAsOn: activeCount > 0
             )
@@ -89,6 +92,7 @@ public enum HomeAssistantAccessoryStateResolver {
                 translations: translations,
                 locale: locale
             ),
+            currentTemperature: currentTemperature,
             tone: !alerts.isEmpty ? .warning : (power == .on ? .active : .neutral),
             isCountedAsOn: power == .on
         )
@@ -241,6 +245,27 @@ public enum HomeAssistantAccessoryStateResolver {
         case "idle", "off": return .idle
         default: return .unknown
         }
+    }
+
+    private static func resolvedCurrentTemperature(_ accessory: HomeAssistantAccessory) -> Double? {
+        if let climate = accessory.entities.first(where: { $0.domain == "climate" && $0.isAvailable }),
+           let value = climate.state.attributes["current_temperature"]?.doubleValue,
+           value.isFinite {
+            return value
+        }
+
+        let boundTemperatureEntities = accessory.entities(for: .temperature)
+        let boundTemperatureEntityIDs = Set(boundTemperatureEntities.map(\.entityID))
+        let fallbackEntities = boundTemperatureEntities + accessory.entities.filter {
+            $0.deviceClass == "temperature"
+                && !boundTemperatureEntityIDs.contains($0.entityID)
+        }
+        return fallbackEntities.lazy.compactMap { entity -> Double? in
+            guard entity.isAvailable, let value = Double(entity.state.state), value.isFinite else {
+                return nil
+            }
+            return value
+        }.first
     }
 
     private static func auxiliaryText(

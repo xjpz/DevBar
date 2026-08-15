@@ -263,6 +263,25 @@ struct HomeAssistantTests {
         #expect(store.loadDashboardLayout(instanceFingerprint: "instance-b").cardOrderByRoom.isEmpty)
     }
 
+    @Test("Changing an accessory type preserves its resolved dashboard card size")
+    func accessoryTypeChangePreservesResolvedCardSize() {
+        var layout = HomeAssistantDashboardLayoutSettings()
+        let cardID = "switch-device"
+        let currentSize = layout.cardSizes[cardID]
+            ?? HomeAssistantDashboardPresentationPolicy.defaultCardSize(for: .switchDevice)
+
+        layout.preserveResolvedSize(currentSize, forCard: cardID)
+
+        let sizeAfterChangingToLight = layout.cardSizes[cardID]
+            ?? HomeAssistantDashboardPresentationPolicy.defaultCardSize(for: .light)
+        #expect(currentSize == .compact)
+        #expect(sizeAfterChangingToLight == .compact)
+
+        layout.setSize(.standard, forCard: cardID)
+        layout.preserveResolvedSize(.compact, forCard: cardID)
+        #expect(layout.cardSizes[cardID] == .standard)
+    }
+
     @Test("Device display types use the approved SF Symbols")
     func deviceDisplayTypesUseSFSymbols() {
         #expect(HomeAssistantDeviceDisplayType.allCases.map(\.rawValue) == [
@@ -444,6 +463,38 @@ struct HomeAssistantTests {
         #expect(semanticState.primaryText == "已关闭")
         #expect(semanticState.secondaryText?.contains("运行中") == true)
         #expect(!semanticState.isCountedAsOn)
+    }
+
+    @Test("Air conditioner semantic state exposes the current indoor temperature")
+    func airConditionerSemanticStateExposesCurrentTemperature() throws {
+        let climate = try entity(
+            #"{"entity_id":"climate.bedroom","state":"cool","attributes":{"friendly_name":"主卧空调","current_temperature":26.5,"temperature":23}}"#,
+            deviceID: "bedroom-ac"
+        )
+        let card = HomeAssistantDeviceCard(
+            id: "bedroom-ac",
+            name: "主卧空调",
+            areaID: "bedroom",
+            primaryEntityID: climate.entityID,
+            entities: [climate],
+            hasMultiplePrimaryControls: false
+        )
+        let presentation = HomeAssistantAccessoryPresentation(
+            id: card.id,
+            sourceDeviceIDs: ["bedroom-ac"],
+            kind: .airConditioner,
+            bindings: [.init(role: .primaryControl, entityIDs: [climate.entityID])]
+        )
+        let accessory = try #require(HomeAssistantAccessoryReconciler.accessories(
+            from: [card],
+            entities: [climate],
+            presentations: [card.id: presentation]
+        ).first)
+
+        let semanticState = HomeAssistantAccessoryStateResolver.resolve(accessory)
+
+        #expect(semanticState.currentTemperature == 26.5)
+        #expect(HomeAssistantDashboardPresentationPolicy.defaultCardSize(for: .airConditioner) == .standard)
     }
 
     @Test("Multiple controls remain one physical accessory by default")
@@ -898,6 +949,95 @@ struct HomeAssistantTests {
         )
         #expect(suggestion.featuredEntityIDs == ["light.yeelight_strip"])
         #expect(suggestion.aliases == ["light.yeelight_strip": "灯带"])
+    }
+
+    @Test("Available equivalent light becomes the primary device control")
+    func availableEquivalentLightBecomesPrimary() throws {
+        let unavailableID = "light.lemesh_cn_1099659273_wy0c14_s_2"
+        let availableID = "light.lemesh_cn_1099659273_wy0c14_s_2_light"
+        let config = try decode(HomeAssistantConfig.self, #"{"location_name":"Home"}"#)
+        let states = try decode([HomeAssistantState].self, """
+        [
+          {"entity_id":"\(unavailableID)","state":"unavailable","attributes":{"friendly_name":"灯光"}},
+          {"entity_id":"\(availableID)","state":"off","attributes":{"friendly_name":"灯光"}}
+        ]
+        """)
+        let device = try decode(
+            HomeAssistantDevice.self,
+            #"{"id":"ed9c5d00b022144776abbb6a44754001","name":"主灯","area_id":"zhu_wo"}"#
+        )
+        let registry = states.map {
+            HomeAssistantEntityRegistryEntry(entityID: $0.entityID, deviceID: device.id)
+        }
+        let snapshot = HomeAssistantTopologyBuilder.build(
+            config: config,
+            states: states,
+            registryEntries: registry,
+            areas: [try decode(HomeAssistantArea.self, #"{"area_id":"zhu_wo","name":"主卧"}"#)],
+            devices: [device],
+            services: []
+        )
+
+        let card = try #require(snapshot.cards.first)
+        #expect(card.primaryEntityID == availableID)
+        #expect(card.hasMultiplePrimaryControls == false)
+
+        let accessory = try #require(
+            HomeAssistantAccessoryReconciler.accessories(
+                from: snapshot.cards,
+                entities: snapshot.entities
+            ).first
+        )
+        #expect(accessory.primaryControlEntity?.entityID == availableID)
+        #expect(accessory.needsReview == false)
+        #expect(HomeAssistantAccessoryStateResolver.resolve(accessory).availability == .partiallyAvailable)
+    }
+
+    @Test("Automatic primary control follows equivalent light availability changes")
+    func automaticPrimaryControlFollowsAvailability() throws {
+        let firstID = "light.bedroom_main"
+        let secondID = "light.bedroom_main_light"
+        let config = try decode(HomeAssistantConfig.self, #"{"location_name":"Home"}"#)
+        let initialStates = try decode([HomeAssistantState].self, """
+        [
+          {"entity_id":"\(firstID)","state":"on","attributes":{"friendly_name":"主灯"}},
+          {"entity_id":"\(secondID)","state":"unavailable","attributes":{"friendly_name":"主灯"}}
+        ]
+        """)
+        let device = try decode(HomeAssistantDevice.self, #"{"id":"bedroom-main","name":"主灯"}"#)
+        let registry = initialStates.map {
+            HomeAssistantEntityRegistryEntry(entityID: $0.entityID, deviceID: device.id)
+        }
+        let snapshot = HomeAssistantTopologyBuilder.build(
+            config: config,
+            states: initialStates,
+            registryEntries: registry,
+            areas: [],
+            devices: [device],
+            services: []
+        )
+        let accessory = try #require(
+            HomeAssistantAccessoryReconciler.accessories(
+                from: snapshot.cards,
+                entities: snapshot.entities
+            ).first
+        )
+        let changedStates = try decode([HomeAssistantState].self, """
+        [
+          {"entity_id":"\(firstID)","state":"unavailable","attributes":{"friendly_name":"主灯"}},
+          {"entity_id":"\(secondID)","state":"off","attributes":{"friendly_name":"主灯"}}
+        ]
+        """)
+
+        let projected = HomeAssistantSnapshotProjection.applying(states: changedStates, to: snapshot)
+        let refreshed = try #require(
+            HomeAssistantAccessoryReconciler.applying(states: changedStates, to: [accessory]).first
+        )
+
+        #expect(projected.cards.first?.primaryEntityID == secondID)
+        #expect(refreshed.primaryControlEntity?.entityID == secondID)
+        #expect(refreshed.needsReview == false)
+        #expect(HomeAssistantAccessoryStateResolver.resolve(refreshed).power == .off)
     }
 
     @Test("Control policy rejects missing services and confirms unlock")
