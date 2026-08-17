@@ -10261,13 +10261,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ZCode Remote"
+            "value" : "ZCode"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "ZCode 远控"
+            "value" : "ZCode"
           }
         }
       }

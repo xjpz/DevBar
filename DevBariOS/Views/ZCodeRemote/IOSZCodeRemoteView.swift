@@ -10,17 +10,14 @@ struct IOSZCodeRemoteView: View {
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var connectionStore = IOSZCodeRemoteConnectionStore()
-    @State private var navigationState: IOSZCodeRemoteNavigationState = .idle
+    // WebView 与主题/导航状态由会话控制器持有，返回其他页面后仍保留，重进免重新加载
+    @ObservedObject private var session = IOSZCodeRemoteSessionController.shared
     @State private var reloadToken = 0
     @State private var isShowingScanner = false
     @State private var scannerStartsWithPaste = false
     @State private var isConfirmingDisconnect = false
     @State private var isChromeVisible = false
     @State private var chromeAutoHideTask: Task<Void, Never>?
-    // 页面主题探测结果：isDark 驱动 chrome 配色；usesSystemTheme 时状态栏跟随 iPhone 系统
-    @State private var pageIsDark = true
-    @State private var pageUsesSystemTheme = true
-    @State private var pageBackground: UIColor?
 
     private var isPaired: Bool {
         connectionStore.connectionURLString != nil
@@ -29,16 +26,16 @@ struct IOSZCodeRemoteView: View {
     /// 沉浸期间的状态栏/指示条方案：页面为系统默认模式时不干预（跟随 iPhone），
     /// 否则钉在页面实际主题上，保证状态栏文字与页面底色对比正确。
     private var immersiveColorScheme: ColorScheme? {
-        guard isPaired, !pageUsesSystemTheme else { return nil }
-        return pageIsDark ? .dark : .light
+        guard isPaired, !session.pageUsesSystemTheme else { return nil }
+        return session.pageIsDark ? .dark : .light
     }
 
     private var chromeForeground: Color {
-        pageIsDark ? .white : .black
+        session.pageIsDark ? .white : .black
     }
 
     private var chromeForegroundSecondary: Color {
-        pageIsDark ? .white.opacity(0.75) : .black.opacity(0.7)
+        session.pageIsDark ? .white.opacity(0.75) : .black.opacity(0.7)
     }
 
     var body: some View {
@@ -59,7 +56,6 @@ struct IOSZCodeRemoteView: View {
         .sheet(isPresented: $isShowingScanner) {
             IOSZCodeRemoteScannerSheet(startsWithPaste: scannerStartsWithPaste) { link in
                 connectionStore.save(link.url.absoluteString)
-                navigationState = .idle
                 reloadToken += 1
             }
         }
@@ -70,14 +66,26 @@ struct IOSZCodeRemoteView: View {
         ) {
             Button("ios_zcode_remote_menu_disconnect", role: .destructive) {
                 connectionStore.clear()
-                navigationState = .idle
+                session.teardown()
+                reloadToken = 0
             }
             Button("ios_common_cancel", role: .cancel) {}
         }
         .onChange(of: scenePhase) { _, phase in
             // 回前台且上次加载失败时自动重试一次（地址可能已恢复可用）
-            guard phase == .active, navigationState == .failed else { return }
+            guard phase == .active, session.navigationState == .failed else { return }
             reloadToken += 1
+        }
+        .onChange(of: session.navigationState) { _, state in
+            if state == .failed {
+                showChrome(pinned: true)
+            }
+        }
+        .onChange(of: session.isSubpage) { _, isSubpage in
+            // 进入二级页面立即收起悬浮控制；返回一级页面恢复点按唤出
+            if isSubpage {
+                hideChrome()
+            }
         }
         .onDisappear {
             chromeAutoHideTask?.cancel()
@@ -87,65 +95,69 @@ struct IOSZCodeRemoteView: View {
     // MARK: - 已配对（全屏远控）
 
     private func remoteContent(urlString: String) -> some View {
-        ZStack {
-            IOSZCodeRemoteWebView(
-                urlString: urlString,
-                reloadToken: reloadToken,
-                prefersDarkChrome: pageIsDark,
-                pageBackground: pageBackground,
-                onNavigationStateChange: { state in
-                    DispatchQueue.main.async {
-                        navigationState = state
-                        if state == .failed {
-                            showChrome(pinned: true)
-                        }
-                    }
-                },
-                onPageThemeChange: { isDark, usesSystemTheme, paint in
-                    pageIsDark = isDark
-                    pageUsesSystemTheme = usesSystemTheme
-                    pageBackground = paint
-                }
-            )
-            .ignoresSafeArea()
-            // 点按 WebView 任意处唤出/收起悬浮控制；simultaneous 保证网页点击不被拦截
-            .simultaneousGesture(TapGesture().onEnded {
-                toggleChrome()
-            })
-
+        GeometryReader { proxy in
             VStack(spacing: 0) {
-                if isChromeVisible {
-                    HStack(alignment: .top) {
-                        floatingBackButton
+                ZStack {
+                    IOSZCodeRemoteWebView(
+                        urlString: urlString,
+                        reloadToken: reloadToken
+                    )
+                    .ignoresSafeArea()
+                    // 点按 WebView 任意处唤出/收起悬浮控制；simultaneous 保证网页点击不被拦截
+                    .simultaneousGesture(TapGesture().onEnded {
+                        toggleChrome()
+                    })
 
-                        Spacer(minLength: 12)
+                    VStack(spacing: 0) {
+                        if isChromeVisible {
+                            HStack(alignment: .top) {
+                                floatingBackButton
 
-                        floatingMenuButton
+                                Spacer(minLength: 12)
+
+                                floatingMenuButton
+                            }
+                            .padding(.horizontal, 12)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+
+                        Spacer()
                     }
-                    .padding(.horizontal, 12)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+
+                    switch session.navigationState {
+                    case .connecting:
+                        connectingOverlay
+                    case .failed:
+                        expiredOverlay
+                    case .idle, .connected:
+                        EmptyView()
+                    }
                 }
 
-                Spacer()
+                // 底部出血带：与页面最底栏底色对齐（顶栏与最底栏不同色，需单独对色）。
+                // 容器整体 ignoresSafeArea 下沉到物理底边，色带垫在 VStack 末尾即恰好覆盖安全区
+                if proxy.safeAreaInsets.bottom > 0, let bottomColor = session.pageBottomBackground {
+                    Rectangle()
+                        .fill(Color(bottomColor))
+                        .frame(height: proxy.safeAreaInsets.bottom)
+                        .allowsHitTesting(false)
+                }
             }
-
-            switch navigationState {
-            case .connecting:
-                connectingOverlay
-            case .failed:
-                expiredOverlay
-            case .idle, .connected:
-                EmptyView()
+            .ignoresSafeArea(edges: .bottom)
+            .background {
+                // 导航栏隐藏后系统默认禁用边缘返回手势，这里重新启用
+                IOSNavigationPopGestureEnabler()
+                    .frame(width: 0, height: 0)
             }
-        }
-        .background {
-            // 导航栏隐藏后系统默认禁用边缘返回手势，这里重新启用
-            IOSNavigationPopGestureEnabler()
-                .frame(width: 0, height: 0)
         }
     }
 
     private func toggleChrome() {
+        // 远控页内部二级页面（网页自带返回导航）不显示悬浮控制；失效态除外
+        if session.isSubpage && session.navigationState != .failed {
+            hideChrome()
+            return
+        }
         withAnimation(.easeInOut(duration: 0.2)) {
             isChromeVisible.toggle()
         }
@@ -157,12 +169,20 @@ struct IOSZCodeRemoteView: View {
 
     /// pinned = true 时不自动隐藏（如菜单打开、失效态）
     private func showChrome(pinned: Bool) {
+        if session.isSubpage && session.navigationState != .failed { return }
         withAnimation(.easeInOut(duration: 0.2)) {
             isChromeVisible = true
         }
         chromeAutoHideTask?.cancel()
         if !pinned {
             scheduleChromeAutoHide()
+        }
+    }
+
+    private func hideChrome() {
+        chromeAutoHideTask?.cancel()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isChromeVisible = false
         }
     }
 
@@ -194,7 +214,6 @@ struct IOSZCodeRemoteView: View {
     private var floatingMenuButton: some View {
         Menu {
             Button {
-                navigationState = .idle
                 reloadToken += 1
             } label: {
                 Label("ios_zcode_remote_menu_refresh", systemImage: "arrow.clockwise")
@@ -271,7 +290,7 @@ struct IOSZCodeRemoteView: View {
                     .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
-                    .background(pageIsDark ? .white.opacity(0.16) : .black.opacity(0.1), in: Capsule())
+                    .background(session.pageIsDark ? .white.opacity(0.16) : .black.opacity(0.1), in: Capsule())
                     .foregroundStyle(chromeForeground)
             }
             .buttonStyle(.plain)

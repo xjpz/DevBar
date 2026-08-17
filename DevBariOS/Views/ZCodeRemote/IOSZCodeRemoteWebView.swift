@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import WebKit
 
@@ -8,25 +9,33 @@ enum IOSZCodeRemoteNavigationState: Equatable {
     case failed
 }
 
-/// 远控页 WebView 封装。
-/// 页面内不展示地址（无地址栏、关闭链接预览），失效靠导航错误回调上报；
-/// 通过注入脚本探测页面主题（zcode 远控页自带 浅色/深色/系统默认 设置），实时回传供原生 chrome 适配。
-struct IOSZCodeRemoteWebView: UIViewRepresentable {
-    let urlString: String
-    var reloadToken: Int = 0
-    var prefersDarkChrome: Bool = true
-    /// 页面采样得到的精确背景色，用于 WebView 出血底色，消除与页面的色差
-    var pageBackground: UIColor?
-    let onNavigationStateChange: (IOSZCodeRemoteNavigationState) -> Void
-    var onPageThemeChange: (Bool, Bool, UIColor?) -> Void = { _, _, _ in }
+/// 远控会话控制器：持有 WKWebView 并跨页面进出存活，
+/// 返回其他页面时仅从视图层级摘下，页面与连接状态全部保留，再进入免重新加载。
+/// 导航代理与主题探测回调都挂在控制器上，生命周期与 WebView 一致，无悬空闭包。
+@MainActor
+final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
+    static let shared = IOSZCodeRemoteSessionController()
+
+    @Published private(set) var navigationState: IOSZCodeRemoteNavigationState = .idle
+    @Published private(set) var pageIsDark = true
+    @Published private(set) var pageUsesSystemTheme = true
+    /// 顶部/底部出血区各自的颜色（页面顶栏与最底栏底色不同，需分别对齐）
+    @Published private(set) var pageTopBackground: UIColor?
+    @Published private(set) var pageBottomBackground: UIColor?
+    /// 远控页内部路由进入二级页面（会话详情等）时为 true，此时不显示悬浮控制
+    @Published private(set) var isSubpage = false
+
+    private(set) var webView: WKWebView?
+    private var refreshControl: UIRefreshControl?
+    private var loadedURLString: String?
+    private var lastHandledReloadToken = 0
 
     static let themeMessageName = "zcodeTheme"
 
     /// 主题探测与出血区对色：
     /// - 深/浅判定：html/body 背景 → 主题 class 令牌 → color-scheme 声明 → 跳过浮层的顶/底采样 → 系统偏好；
-    /// - 出血区铺色：采样「紧邻安全区」元素（页头/页脚，含 fixed/sticky）的真实背景色，
-    ///   同时回写 html/body 并把 RGB 传给原生刷 WebView 底色，保证页面出血区与原生底色都精确同色，
-    ///   消除深色主题下黑/灰色差接缝。
+    /// - 出血区对色：深色顶/底实测值直接钉死（#202020 / #161616），浅色采样紧邻安全区元素底色；
+    ///   顶色刷 WebView 底色，底色由 SwiftUI 叠加贴屏底色带（见 IOSZCodeRemoteView）。
     /// 主题切换表现为 html/body 的 class、style 或 color-scheme 变化，用 MutationObserver 捕获；
     /// 另监听 prefers-color-scheme 变化覆盖「系统默认」模式，低频轮询兜底，结果去重后回传。
     private static let themeProbeScript = """
@@ -92,30 +101,45 @@ struct IOSZCodeRemoteWebView: UIViewRepresentable {
         return scheme.indexOf('light') >= 0 && scheme.indexOf('dark') >= 0;
       }
       var last = null;
+      // 二级页面检测：SPA 前端路由（pushState/popstate）+ 路径对比初始路径
+      var initialPath = location.pathname;
+      var navDepth = 0;
+      function isSubpage() {
+        return navDepth > 0 || location.pathname !== initialPath;
+      }
+      var origPush = history.pushState;
+      if (origPush) {
+        history.pushState = function() {
+          navDepth++;
+          var r = origPush.apply(this, arguments);
+          report();
+          return r;
+        };
+      }
+      window.addEventListener('popstate', function() {
+        if (navDepth > 0) navDepth--;
+        report();
+      });
       function report() {
         try {
-          // 先清掉上一轮写入的强制背景，避免探测读到自己的覆盖导致主题切换失灵
-          document.documentElement.style.removeProperty('background-color');
-          if (document.body) document.body.style.removeProperty('background-color');
           var dark = decideDark();
           var system = systemMode();
-          // 深色底色实测为 #202020（用户确认），直接钉死保证出血区与页面零色差；
-          // 浅色沿用采样值（白色本身一致）
-          var paint = dark ? 'rgb(32, 32, 32)' : adjacentPaint();
-          var rgb = parseRGB(paint);
-          var key = dark + '|' + system + '|' + (rgb ? rgb.join(',') : '');
+          // 出血带实测底色（用户确认）：深色顶部 #202020、最底部 #161616；
+          // 输入栏 #160d38 在安全区上方、由页面自绘，不属于出血带。浅色沿用采样值
+          var top = dark ? [32, 32, 32] : parseRGB(adjacentPaint());
+          var bottom = dark ? [22, 22, 22] : parseRGB(adjacentPaint());
+          if (!top) top = dark ? [32, 32, 32] : [255, 255, 255];
+          if (!bottom) bottom = top;
+          var sub = isSubpage();
+          var key = dark + '|' + system + '|' + sub + '|' + top.join(',') + '|' + bottom.join(',');
           if (key === last) return;
           last = key;
-          if (paint) {
-            document.documentElement.style.setProperty('background-color', paint, 'important');
-            if (document.body) document.body.style.setProperty('background-color', paint, 'important');
-          }
           window.webkit.messageHandlers.zcodeTheme.postMessage({
             dark: dark,
             system: system,
-            r: rgb ? rgb[0] : null,
-            g: rgb ? rgb[1] : null,
-            b: rgb ? rgb[2] : null
+            sub: sub,
+            tr: top[0], tg: top[1], tb: top[2],
+            br: bottom[0], bg: bottom[1], bb: bottom[2]
           });
         } catch (e) {}
       }
@@ -129,13 +153,54 @@ struct IOSZCodeRemoteWebView: UIViewRepresentable {
     })();
     """
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onNavigationStateChange: onNavigationStateChange, onPageThemeChange: onPageThemeChange)
+    // MARK: - WebView 生命周期
+
+    /// 取可复用的 WebView；首次调用时创建并装配探测脚本，重进页面时仅重新挂载
+    func viewFor(urlString: String, reloadToken: Int) -> WKWebView {
+        let view = webView ?? makeWebView()
+        view.removeFromSuperview()
+        lastHandledReloadToken = reloadToken
+        if loadedURLString != urlString {
+            load(urlString, in: view)
+        } else {
+            applyChrome()
+        }
+        return view
     }
-    func makeUIView(context: Context) -> WKWebView {
+
+    func handleUpdate(urlString: String, reloadToken: Int) {
+        applyChrome()
+        guard reloadToken != lastHandledReloadToken else { return }
+        lastHandledReloadToken = reloadToken
+        if let view = webView {
+            load(urlString, in: view)
+        }
+    }
+
+    /// 断开并清除时彻底销毁会话（WebView、脚本、探测状态全部重置）
+    func teardown() {
+        webView?.configuration.userContentController.removeAllUserScripts()
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: Self.themeMessageName)
+        webView?.stopLoading()
+        webView?.navigationDelegate = nil
+        webView = nil
+        refreshControl = nil
+        loadedURLString = nil
+        lastHandledReloadToken = 0
+        navigationState = .idle
+        pageIsDark = true
+        pageUsesSystemTheme = true
+        pageTopBackground = nil
+        pageBottomBackground = nil
+        isSubpage = false
+    }
+
+    // MARK: - 装配
+
+    private func makeWebView() -> WKWebView {
         let configuration = WKWebViewConfiguration()
         let contentController = WKUserContentController()
-        contentController.add(context.coordinator, name: Self.themeMessageName)
+        contentController.add(self, name: Self.themeMessageName)
         contentController.addUserScript(WKUserScript(
             source: Self.themeProbeScript,
             injectionTime: .atDocumentEnd,
@@ -143,126 +208,120 @@ struct IOSZCodeRemoteWebView: UIViewRepresentable {
         ))
         configuration.userContentController = contentController
 
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.navigationDelegate = context.coordinator
-        webView.allowsLinkPreview = false
-        webView.allowsBackForwardNavigationGestures = false
-        webView.isOpaque = false
+        let view = WKWebView(frame: .zero, configuration: configuration)
+        view.navigationDelegate = self
+        view.allowsLinkPreview = false
+        view.allowsBackForwardNavigationGestures = false
+        view.isOpaque = false
 
-        let refreshControl = UIRefreshControl()
-        refreshControl.tintColor = .white
-        refreshControl.addTarget(context.coordinator, action: #selector(Coordinator.refreshTriggered), for: .valueChanged)
-        webView.scrollView.refreshControl = refreshControl
-        context.coordinator.refreshControl = refreshControl
+        let refresh = UIRefreshControl()
+        refresh.tintColor = .white
+        refresh.addTarget(self, action: #selector(refreshTriggered), for: .valueChanged)
+        view.scrollView.refreshControl = refresh
+        refreshControl = refresh
 
-        applyChrome(webView, coordinator: context.coordinator)
-
-        // 首建即视为当前 token 已消费，避免 updateUIView 触发重复加载
-        context.coordinator.lastHandledReloadToken = reloadToken
-        context.coordinator.load(urlString: urlString, in: webView)
-        return webView
+        webView = view
+        return view
     }
 
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        context.coordinator.onNavigationStateChange = onNavigationStateChange
-        context.coordinator.onPageThemeChange = onPageThemeChange
-        applyChrome(webView, coordinator: context.coordinator)
-        context.coordinator.reloadIfNeeded(reloadToken: reloadToken, urlString: urlString, in: webView)
+    private func load(_ urlString: String, in view: WKWebView) {
+        guard let url = URL(string: urlString) else {
+            navigationState = .failed
+            return
+        }
+        navigationState = .connecting
+        loadedURLString = urlString
+        isSubpage = false
+        // 远控页面按无缓存加载，避免失效地址命中旧缓存造成假连接
+        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+        view.load(request)
     }
 
-    static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
-        webView.configuration.userContentController.removeScriptMessageHandler(forName: themeMessageName)
-    }
-
-    private func applyChrome(_ webView: WKWebView, coordinator: Coordinator) {
-        let background = pageBackground ?? (prefersDarkChrome ? UIColor.black : UIColor.white)
-        webView.backgroundColor = background
-        webView.scrollView.backgroundColor = background
-        coordinator.refreshControl?.tintColor = prefersDarkChrome ? .white : .black
-    }
-
-    final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-        var onNavigationStateChange: (IOSZCodeRemoteNavigationState) -> Void
-        var onPageThemeChange: (Bool, Bool, UIColor?) -> Void
-        weak var refreshControl: UIRefreshControl?
-        var lastHandledReloadToken: Int
-
-        init(
-            onNavigationStateChange: @escaping (IOSZCodeRemoteNavigationState) -> Void,
-            onPageThemeChange: @escaping (Bool, Bool, UIColor?) -> Void
-        ) {
-            self.onNavigationStateChange = onNavigationStateChange
-            self.onPageThemeChange = onPageThemeChange
-            self.lastHandledReloadToken = 0
-        }
-
-        func load(urlString: String, in webView: WKWebView) {
-            guard let url = URL(string: urlString) else {
-                onNavigationStateChange(.failed)
-                return
-            }
-            onNavigationStateChange(.connecting)
-            // 远控页面按无缓存加载，避免失效地址命中旧缓存造成假连接
-            let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
-            webView.load(request)
-        }
-
-        func reloadIfNeeded(reloadToken: Int, urlString: String, in webView: WKWebView) {
-            guard reloadToken != lastHandledReloadToken else { return }
-            lastHandledReloadToken = reloadToken
-            load(urlString: urlString, in: webView)
-        }
-
-        @objc func refreshTriggered() {
-            guard let scrollView = refreshControl?.superview as? UIScrollView,
-                  let webView = scrollView.subviews.compactMap({ $0 as? WKWebView }).first,
-                  let urlString = webView.url?.absoluteString else {
-                refreshControl?.endRefreshing()
-                return
-            }
-            load(urlString: urlString, in: webView)
-        }
-
-        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == IOSZCodeRemoteWebView.themeMessageName,
-                  let body = message.body as? [String: Any],
-                  let dark = body["dark"] as? Bool,
-                  let system = body["system"] as? Bool else {
-                return
-            }
-            let paint: UIColor?
-            if let r = body["r"] as? Int,
-               let g = body["g"] as? Int,
-               let b = body["b"] as? Int {
-                paint = UIColor(red: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: 1)
-            } else {
-                paint = nil
-            }
-            DispatchQueue.main.async {
-                self.onPageThemeChange(dark, system, paint)
-            }
-        }
-
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
-            onNavigationStateChange(.connecting)
-        }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+    @objc private func refreshTriggered() {
+        guard let view = webView, let urlString = view.url?.absoluteString ?? loadedURLString else {
             refreshControl?.endRefreshing()
-            onNavigationStateChange(.connected)
+            return
         }
+        load(urlString, in: view)
+    }
 
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            refreshControl?.endRefreshing()
-            onNavigationStateChange(.failed)
-        }
+    private func applyChrome() {
+        // 顶部出血区由 WebView 底色承担；底部出血区由 SwiftUI 叠加色带（见 IOSZCodeRemoteView）
+        let background = pageTopBackground ?? (pageIsDark ? UIColor.black : UIColor.white)
+        webView?.backgroundColor = background
+        webView?.scrollView.backgroundColor = background
+        refreshControl?.tintColor = pageIsDark ? .white : .black
+    }
+}
 
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            // 用户主动取消（如重新加载打断旧请求）不算失效
-            let nsError = error as NSError
-            guard nsError.code != NSURLErrorCancelled else { return }
-            refreshControl?.endRefreshing()
-            onNavigationStateChange(.failed)
+// MARK: - WKNavigationDelegate / WKScriptMessageHandler
+
+extension IOSZCodeRemoteSessionController: WKNavigationDelegate, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == Self.themeMessageName,
+              let body = message.body as? [String: Any],
+              let dark = body["dark"] as? Bool,
+              let system = body["system"] as? Bool else {
+            return
         }
+        let top: UIColor?
+        if let r = body["tr"] as? Int,
+           let g = body["tg"] as? Int,
+           let b = body["tb"] as? Int {
+            top = UIColor(red: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: 1)
+        } else {
+            top = nil
+        }
+        let bottom: UIColor?
+        if let r = body["br"] as? Int,
+           let g = body["bg"] as? Int,
+           let b = body["bb"] as? Int {
+            bottom = UIColor(red: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: 1)
+        } else {
+            bottom = nil
+        }
+        pageIsDark = dark
+        pageUsesSystemTheme = system
+        pageTopBackground = top
+        pageBottomBackground = bottom
+        isSubpage = (body["sub"] as? Bool) ?? false
+        applyChrome()
+    }
+
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        navigationState = .connecting
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        refreshControl?.endRefreshing()
+        navigationState = .connected
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        refreshControl?.endRefreshing()
+        navigationState = .failed
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        // 用户主动取消（如重新加载打断旧请求）不算失效
+        let nsError = error as NSError
+        guard nsError.code != NSURLErrorCancelled else { return }
+        refreshControl?.endRefreshing()
+        navigationState = .failed
+    }
+}
+
+/// 远控页 WebView 封装。WebView 由 IOSZCodeRemoteSessionController 持有并跨页面进出复用；
+/// 页面内不展示地址（无地址栏、关闭链接预览），失效靠导航错误回调上报。
+struct IOSZCodeRemoteWebView: UIViewRepresentable {
+    let urlString: String
+    var reloadToken: Int = 0
+
+    func makeUIView(context: Context) -> WKWebView {
+        IOSZCodeRemoteSessionController.shared.viewFor(urlString: urlString, reloadToken: reloadToken)
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        IOSZCodeRemoteSessionController.shared.handleUpdate(urlString: urlString, reloadToken: reloadToken)
     }
 }

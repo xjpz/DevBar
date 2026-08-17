@@ -544,7 +544,7 @@ enum IOSToolCatalog {
             IOSToolDefinition(id: "memo", title: "备忘录", subtitle: "Memo", systemImage: "note.text", iconColor: .brown, tabTitle: "Memo"),
             IOSToolDefinition(id: "chatbot-hermes", title: "Hermes", subtitle: "ChatBot", systemImage: "bubble.left.and.bubble.right.fill", iconColor: .green, tabTitle: "Hermes"),
             IOSToolDefinition(id: "home-assistant", title: "Home Assistant", subtitle: "家庭控制台", systemImage: "apple.homekit", iconColor: .blue, tabTitle: "家庭"),
-            IOSToolDefinition(id: "zcode-remote", title: "ZCode 远控", subtitle: "Remote Control", systemImage: "macbook.and.iphone", iconColor: IOSZCodeRemoteToolPalette.brandIconColor, tabTitle: "ZCode"),
+            IOSToolDefinition(id: "zcode-remote", title: "ZCode", subtitle: "Remote Control", systemImage: "macbook.and.iphone", iconColor: IOSZCodeRemoteToolPalette.brandIconColor, tabTitle: "ZCode"),
         ])
 
         return tools
