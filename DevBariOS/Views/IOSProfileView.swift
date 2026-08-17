@@ -48,8 +48,8 @@ struct IOSProfileView: View {
     @EnvironmentObject private var accountViewModel: IOSAccountViewModel
     @Environment(\.themeTokens) private var theme
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dismiss) private var dismiss
     @State private var rawNonce: String?
+    @State private var isContentScrolled = false
 
     var body: some View {
         ZStack {
@@ -57,40 +57,35 @@ struct IOSProfileView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
-            VStack(spacing: 0) {
-                profileNavigationHeader
+            GeometryReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        profileHeader
 
-                GeometryReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 12) {
-                            profileHeader
-
-                            if accountViewModel.isAuthenticated {
-                                messageCard
-                                accountAndPrivacyCard
-                                Spacer(minLength: 18)
-                                logoutCard
-                            } else {
-                                signInCard
-                            }
+                        if accountViewModel.isAuthenticated {
+                            messageCard
+                            accountAndPrivacyCard
+                            Spacer(minLength: 18)
+                            logoutCard
+                        } else {
+                            signInCard
                         }
-                        .frame(width: contentWidth(for: proxy.size.width), alignment: .leading)
-                        .frame(minHeight: max(proxy.size.height - 12, 0), alignment: .top)
-                        .padding(.top, 4)
-                        .padding(.bottom, 8)
-                        .frame(width: proxy.size.width)
                     }
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .scrollIndicators(.hidden)
+                    .frame(width: contentWidth(for: proxy.size.width), alignment: .leading)
+                    .frame(minHeight: max(proxy.size.height - 12, 0), alignment: .top)
+                    .padding(.top, 4)
+                    .padding(.bottom, 8)
+                    .frame(width: proxy.size.width)
                 }
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .scrollIndicators(.hidden)
+                .profileTopScrollEdgeEffect(isScrolled: $isContentScrolled)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle("个人中心")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
-        .background {
-            IOSNavigationPopGestureEnabler()
-                .frame(width: 0, height: 0)
-        }
         .alert("操作失败", isPresented: Binding(
             get: { accountViewModel.errorMessage != nil },
             set: { if !$0 { accountViewModel.errorMessage = nil } }
@@ -99,42 +94,6 @@ struct IOSProfileView: View {
         } message: {
             Text(accountViewModel.errorMessage ?? "")
         }
-    }
-
-    private var profileNavigationHeader: some View {
-        ZStack {
-            Text("个人中心")
-                .font(.system(size: 19, weight: .semibold, design: .rounded))
-                .foregroundStyle(profilePrimaryText)
-
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(profilePrimaryText)
-                        .frame(width: 40, height: 40)
-                        .background {
-                            Circle()
-                                .fill(isDarkAppearance ? Color.white.opacity(0.08) : Color.white.opacity(0.38))
-                                .overlay {
-                                    Circle().stroke(
-                                        isDarkAppearance ? Color.white.opacity(0.12) : Color(hex: "AFC4E3").opacity(0.46),
-                                        lineWidth: 1
-                                    )
-                                }
-                        }
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("返回")
-
-                Spacer()
-            }
-        }
-        .padding(.horizontal, 18)
-        .frame(height: 52)
     }
 
     private var profileHeader: some View {
@@ -725,6 +684,10 @@ private struct IOSDisplayNameEditorView: View {
 }
 
 private extension View {
+    func profileTopScrollEdgeEffect(isScrolled: Binding<Bool>) -> some View {
+        modifier(IOSProfileScrollEdgeEffectModifier(isScrolled: isScrolled))
+    }
+
     func profileGlassCard(isDark: Bool, cornerRadius: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         return background {
@@ -740,6 +703,25 @@ private extension View {
         }
     }
 
+}
+
+private struct IOSProfileScrollEdgeEffectModifier: ViewModifier {
+    @Binding var isScrolled: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .scrollEdgeEffectHidden(!isScrolled, for: .top)
+                .onScrollGeometryChange(for: Bool.self) { geometry in
+                    geometry.contentOffset.y + geometry.contentInsets.top > 1
+                } action: { _, newValue in
+                    isScrolled = newValue
+                }
+        } else {
+            content
+        }
+    }
 }
 
 private enum IOSAppleNonce {

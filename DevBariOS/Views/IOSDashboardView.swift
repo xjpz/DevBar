@@ -43,12 +43,18 @@ struct IOSDashboardView: View {
             .background(Color.clear)
         }
         .id("dashboard.list.\(languageManager.selectedLanguage.rawValue)")
-        .navigationTitle("")
+        .navigationTitle("ios_tab_overview")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(dashboardNavigationBackground, for: .navigationBar)
         .toolbarBackground(theme.isGeek ? .visible : .hidden, for: .navigationBar)
         .toolbarColorScheme(theme.isGeek ? .dark : nil, for: .navigationBar)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .accessibilityHidden(true)
+            }
+
             ToolbarItem(placement: .topBarLeading) {
                 NavigationLink {
                     IOSProfileView()
