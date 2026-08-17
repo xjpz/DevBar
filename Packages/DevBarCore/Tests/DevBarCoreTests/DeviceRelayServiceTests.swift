@@ -628,6 +628,28 @@ func deviceRelayLockScreenMessageUsesSystemCommandType() throws {
     #expect(decoded.payload["command"] == "lockScreen")
 }
 
+@MainActor
+@Test
+func deviceRelayDisplayCommandsUseMatchingSystemMessageTypes() throws {
+    let wakeMessage = DeviceRelayManager.makeSystemCommandMessage(
+        localDeviceID: "iphone-unit",
+        targetDeviceId: "mac-unit",
+        command: .wakeDisplay
+    )
+    let sleepMessage = DeviceRelayManager.makeSystemCommandMessage(
+        localDeviceID: "iphone-unit",
+        targetDeviceId: "mac-unit",
+        command: .displaySleep
+    )
+
+    #expect(wakeMessage.type == .systemWakeDisplay)
+    #expect(wakeMessage.requestId?.hasPrefix("wake-") == true)
+    #expect(wakeMessage.payload["command"] == "wakeDisplay")
+    #expect(sleepMessage.type == .systemDisplaySleep)
+    #expect(sleepMessage.requestId?.hasPrefix("sleep-") == true)
+    #expect(sleepMessage.payload["command"] == "displaySleep")
+}
+
 @Test
 func deviceRelayCommandPostUsesPairedMacCommandEndpoint() async throws {
     let recorder = DeviceRelayRequestRecorder(

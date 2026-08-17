@@ -595,12 +595,16 @@ struct IOSToolDestinationView: View {
         .toolbar(entryContext.tabBarVisibility, for: .tabBar)
         .toolbarTitleDisplayMode(entryContext.toolbarTitleDisplayMode)
         .toolbarBackground(toolNavigationBackground, for: .navigationBar)
-        .toolbarBackground(theme.isGeek ? .visible : .hidden, for: .navigationBar)
+        .toolbarBackground(toolNavigationBackgroundVisibility, for: .navigationBar)
         .toolbarColorScheme(theme.isGeek ? .dark : nil, for: .navigationBar)
     }
 
     private var toolNavigationBackground: Color {
         theme.isGeek ? .black : .clear
+    }
+
+    private var toolNavigationBackgroundVisibility: Visibility {
+        theme.isGeek && toolID != "home-assistant" ? .visible : .hidden
     }
 }
 

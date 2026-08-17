@@ -54,6 +54,9 @@ public enum HomeAssistantStateFormatter {
         case "humidity", "current_humidity": "湿度"
         case "fan_mode": "风速模式"
         case "swing_mode": "摆风"
+        case "swing_horizontal_mode": "左右摆风"
+        case "oscillating": "摆风"
+        case "current_direction": "风向"
         case "preset_mode": "预设模式"
         case "percentage": "风速"
         case "hvac_action": "运行状态"
@@ -125,13 +128,21 @@ public enum HomeAssistantStateFormatter {
             case "off": "关闭"
             default: readableFallback(rawValue)
             }
-        case "swing_mode":
+        case "swing_mode", "swing_horizontal_mode":
             return switch rawValue {
             case "on": "开启"
             case "off": "关闭"
             case "vertical": "上下摆风"
             case "horizontal": "左右摆风"
             case "both": "全向摆风"
+            default: readableFallback(rawValue)
+            }
+        case "oscillating":
+            return ["true", "on"].contains(rawValue.lowercased()) ? "开启" : "关闭"
+        case "current_direction":
+            return switch rawValue {
+            case "forward": "正向"
+            case "reverse", "backward": "反向"
             default: readableFallback(rawValue)
             }
         case "preset_mode", "preset_modes":

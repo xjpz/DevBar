@@ -228,13 +228,7 @@ struct IOSHomeAssistantDeviceDetailView: View {
                 percentageSlider(entity: entity, label: "亮度", attribute: "brightness", scale: 255) { .setBrightness($0) }
             }
         case "fan":
-            Button(entity.isOn ? "关闭" : "开启") {
-                perform(entity, action: entity.isOn ? .turnOff : .turnOn)
-            }
-            .buttonStyle(.borderedProminent)
-            if entity.state.attributes["percentage"] != nil {
-                percentageSlider(entity: entity, label: "风速", attribute: "percentage") { .setPercentage($0) }
-            }
+            fanControls(entity)
         case "cover":
             HStack {
                 actionButton("打开", image: "arrow.up", entity: entity, action: .open)
@@ -246,6 +240,8 @@ struct IOSHomeAssistantDeviceDetailView: View {
             }
         case "climate":
             climateControls(entity)
+        case "select", "input_select":
+            selectControl(entity)
         case "lock":
             Button(entity.state.state == "locked" ? "解锁" : "上锁", role: entity.state.state == "locked" ? .destructive : nil) {
                 perform(entity, action: entity.state.state == "locked" ? .unlock : .lock)
@@ -260,39 +256,203 @@ struct IOSHomeAssistantDeviceDetailView: View {
     }
 
     @ViewBuilder
-    private func climateControls(_ entity: HomeAssistantEntity) -> some View {
-        let temperature = entity.state.attributes["temperature"]?.doubleValue ?? 22
-        if let modes = entity.state.attributes["hvac_modes"]?.arrayValue?.compactMap(\.stringValue), !modes.isEmpty {
+    private func fanControls(_ entity: HomeAssistantEntity) -> some View {
+        let capabilities = HomeAssistantFanCapabilities(entity: entity)
+        Button(entity.isOn ? "关闭" : "开启") {
+            perform(entity, action: entity.isOn ? .turnOff : .turnOn)
+        }
+        .buttonStyle(.borderedProminent)
+
+        if capabilities.supportsPercentage {
+            percentageSlider(
+                entity: entity,
+                label: "风速",
+                attribute: "percentage",
+                step: capabilities.percentageStep
+            ) { .setPercentage($0) }
+        }
+
+        if !capabilities.presetModes.isEmpty {
             Menu {
-                ForEach(modes, id: \.self) { mode in
-                    Button(
-                        model.attributeValue(
-                            key: "hvac_modes",
-                            value: .string(mode),
-                            entity: entity
-                        ) ?? HomeAssistantStateFormatter.translatedState(
-                            mode,
-                            domain: "climate",
-                            deviceClass: nil,
-                            role: nil
-                        )
-                    ) {
-                        perform(entity, action: .setHVACMode(mode))
+                ForEach(capabilities.presetModes, id: \.self) { mode in
+                    Button(model.attributeValue(
+                        key: "preset_mode",
+                        value: .string(mode),
+                        entity: entity
+                    ) ?? mode) {
+                        perform(entity, action: .setPresetMode(mode))
                     }
                 }
             } label: {
                 Label(
-                    "模式 · \(model.stateText(for: entity))",
-                    systemImage: "thermometer.medium"
+                    "送风模式 · \(capabilities.presetMode.map { model.attributeValue(key: "preset_mode", value: .string($0), entity: entity) ?? $0 } ?? "未设置")",
+                    systemImage: "wind"
                 )
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
         }
-        Stepper("目标温度 \(temperature.formatted(.number.precision(.fractionLength(0...1))))°", value: Binding(
-            get: { entity.state.attributes["temperature"]?.doubleValue ?? 22 },
-            set: { perform(entity, action: .setTemperature($0)) }
-        ), in: 10...35, step: 0.5)
+
+        if capabilities.supportsOscillation {
+            Button(capabilities.oscillating == true ? "关闭摆风" : "开启摆风") {
+                perform(entity, action: .setOscillating(!(capabilities.oscillating ?? false)))
+            }
+            .buttonStyle(.bordered)
+        }
+
+        if capabilities.supportsDirection,
+           let currentDirection = capabilities.currentDirection,
+           let nextDirection = nextFanDirection(currentDirection) {
+            Button("切换风向") {
+                perform(entity, action: .setDirection(nextDirection))
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    @ViewBuilder
+    private func climateControls(_ entity: HomeAssistantEntity) -> some View {
+        let capabilities = HomeAssistantClimateCapabilities(entity: entity)
+
+        if let powerAction = climatePowerAction(for: capabilities) {
+            Button(capabilities.isOn ? "关闭" : "开启") {
+                perform(entity, action: powerAction)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+
+        if capabilities.supportsTargetTemperature,
+           let temperature = capabilities.targetTemperature {
+            Stepper(
+                "目标温度 \(temperature.formatted(.number.precision(.fractionLength(0...1))))\(capabilities.temperatureUnit)",
+                value: Binding(
+                    get: { HomeAssistantClimateCapabilities(entity: entity).targetTemperature ?? temperature },
+                    set: { perform(entity, action: .setTemperature($0)) }
+                ),
+                in: capabilities.temperatureRange,
+                step: capabilities.temperatureStep
+            )
+        }
+
+        if capabilities.supportsHVACMode {
+            climateOptionMenu(
+                entity: entity,
+                title: "运行模式",
+                image: "thermometer.medium",
+                values: capabilities.hvacModes,
+                selected: capabilities.hvacMode,
+                attributeKey: "hvac_modes"
+            ) { .setHVACMode($0) }
+        }
+
+        if capabilities.supportsFanMode {
+            climateOptionMenu(
+                entity: entity,
+                title: "风速",
+                image: "wind",
+                values: capabilities.fanModes,
+                selected: capabilities.fanMode,
+                attributeKey: "fan_mode"
+            ) { .setClimateFanMode($0) }
+        }
+
+        if capabilities.supportsSwingMode {
+            climateOptionMenu(
+                entity: entity,
+                title: capabilities.supportsHorizontalSwingMode ? "上下摆风" : "摆风",
+                image: "arrow.up.and.down",
+                values: capabilities.swingModes,
+                selected: capabilities.swingMode,
+                attributeKey: "swing_mode"
+            ) { .setClimateSwingMode($0) }
+        }
+
+        if capabilities.supportsHorizontalSwingMode {
+            climateOptionMenu(
+                entity: entity,
+                title: "左右摆风",
+                image: "arrow.left.and.right",
+                values: capabilities.horizontalSwingModes,
+                selected: capabilities.horizontalSwingMode,
+                attributeKey: "swing_horizontal_mode"
+            ) { .setClimateHorizontalSwingMode($0) }
+        }
+
+        if capabilities.supportsPresetMode {
+            climateOptionMenu(
+                entity: entity,
+                title: "预设模式",
+                image: "sparkles",
+                values: capabilities.presetModes,
+                selected: capabilities.presetMode,
+                attributeKey: "preset_mode"
+            ) { .setClimatePresetMode($0) }
+        }
+    }
+
+    private func climateOptionMenu(
+        entity: HomeAssistantEntity,
+        title: String,
+        image: String,
+        values: [String],
+        selected: String?,
+        attributeKey: String,
+        action: @escaping (String) -> HomeAssistantControlAction
+    ) -> some View {
+        Menu {
+            ForEach(values, id: \.self) { value in
+                Button(climateOptionTitle(value, key: attributeKey, entity: entity)) {
+                    perform(entity, action: action(value))
+                }
+            }
+        } label: {
+            Label(
+                "\(title) · \(selected.map { climateOptionTitle($0, key: attributeKey, entity: entity) } ?? "未设置")",
+                systemImage: image
+            )
+            .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+    }
+
+    private func climateOptionTitle(
+        _ value: String,
+        key: String,
+        entity: HomeAssistantEntity?
+    ) -> String {
+        let fallbackKey = key == "swing_horizontal_mode" ? "swing_mode" : key
+        guard let entity else {
+            return HomeAssistantStateFormatter.translatedAttributeState(value, key: fallbackKey)
+        }
+        return model.attributeValue(key: key, value: .string(value), entity: entity)
+            ?? HomeAssistantStateFormatter.translatedAttributeState(value, key: fallbackKey)
+    }
+
+    private func climatePowerAction(
+        for capabilities: HomeAssistantClimateCapabilities
+    ) -> HomeAssistantControlAction? {
+        if capabilities.isOn {
+            if capabilities.supportsTurnOff { return .turnOff }
+            if capabilities.hvacModes.contains("off") { return .setHVACMode("off") }
+            return nil
+        }
+        return capabilities.supportsTurnOn ? .turnOn : nil
+    }
+
+    private func selectControl(_ entity: HomeAssistantEntity) -> some View {
+        let options = entity.state.attributes["options"]?.arrayValue?.compactMap(\.stringValue) ?? []
+        return Menu {
+            ForEach(options, id: \.self) { option in
+                Button(option) {
+                    perform(entity, action: .selectOption(option))
+                }
+            }
+        } label: {
+            Label("选择 · \(model.stateText(for: entity))", systemImage: "list.bullet")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .disabled(options.isEmpty || !entity.availableServices.contains("select_option"))
     }
 
     private func percentageSlider(
@@ -300,11 +460,25 @@ struct IOSHomeAssistantDeviceDetailView: View {
         label: String,
         attribute: String,
         scale: Double = 100,
+        step: Double = 1,
         action: @escaping (Double) -> HomeAssistantControlAction
     ) -> some View {
         let current = (entity.state.attributes[attribute]?.doubleValue ?? 0) / scale * 100
-        return HomeAssistantPercentageControl(label: label, initialValue: current, theme: theme) { value in
+        return HomeAssistantPercentageControl(
+            label: label,
+            initialValue: current,
+            step: step,
+            theme: theme
+        ) { value in
             perform(entity, action: action(value))
+        }
+    }
+
+    private func nextFanDirection(_ currentDirection: String) -> String? {
+        switch currentDirection.lowercased() {
+        case "forward": "reverse"
+        case "reverse", "backward": "forward"
+        default: nil
         }
     }
 
@@ -402,8 +576,8 @@ struct IOSHomeAssistantDeviceDetailView: View {
     private func displayAttributes(_ entity: HomeAssistantEntity) -> [(String, String)] {
         let keys: [String]
         switch entity.domain {
-        case "climate": keys = ["current_temperature", "temperature", "current_humidity", "fan_mode", "swing_mode", "preset_mode", "hvac_action"]
-        case "fan": keys = ["percentage", "preset_mode"]
+        case "climate": keys = ["current_temperature", "temperature", "current_humidity", "fan_mode", "swing_mode", "swing_horizontal_mode", "preset_mode", "hvac_action"]
+        case "fan": keys = ["percentage", "preset_mode", "oscillating", "current_direction"]
         case "cover": keys = ["current_position"]
         default: keys = []
         }
@@ -459,13 +633,21 @@ private struct DetailConfirmation: Identifiable {
 private struct HomeAssistantPercentageControl: View {
     let label: String
     let initialValue: Double
+    let step: Double
     let theme: IOSThemeTokens
     let commit: (Double) -> Void
     @State private var value: Double
 
-    init(label: String, initialValue: Double, theme: IOSThemeTokens, commit: @escaping (Double) -> Void) {
+    init(
+        label: String,
+        initialValue: Double,
+        step: Double = 1,
+        theme: IOSThemeTokens,
+        commit: @escaping (Double) -> Void
+    ) {
         self.label = label
         self.initialValue = initialValue
+        self.step = step
         self.theme = theme
         self.commit = commit
         _value = State(initialValue: initialValue)
@@ -476,7 +658,7 @@ private struct HomeAssistantPercentageControl: View {
             Text("\(label) \(Int(value))%")
                 .font(theme.captionWeightFont)
                 .foregroundStyle(theme.textSecondary)
-            Slider(value: $value, in: 0...100) { isEditing in
+            Slider(value: $value, in: 0...100, step: step) { isEditing in
                 if !isEditing { commit(value) }
             }
         }

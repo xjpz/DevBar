@@ -13,8 +13,11 @@ public actor HomeAssistantWebSocketClient {
     private var socket: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
+    private var commandSendTask: Task<Void, Never>?
+    private var commandSendTaskEpoch: Int?
     private var nextID = 1
     private var pending: [Int: PendingCommand] = [:]
+    private var outboundCommands = HomeAssistantWebSocketCommandQueue()
     private var authContinuation: CheckedContinuation<Void, Error>?
     private var authenticated = false
     private var eventContinuation: EventStream.Continuation?
@@ -64,6 +67,10 @@ public actor HomeAssistantWebSocketClient {
         receiveTask = nil
         heartbeatTask?.cancel()
         heartbeatTask = nil
+        commandSendTask?.cancel()
+        commandSendTask = nil
+        commandSendTaskEpoch = nil
+        outboundCommands.removeAll()
         socket?.cancel(with: .goingAway, reason: nil)
         socket = nil
         authenticated = false
@@ -213,6 +220,7 @@ public actor HomeAssistantWebSocketClient {
         guard authenticated, let socket else { throw HomeAssistantError.disconnected }
         let id = nextID
         nextID += 1
+        let epoch = connectionEpoch.current
         var body = payload
         body["id"] = .number(Double(id))
         body["type"] = .string(type)
@@ -221,22 +229,62 @@ public actor HomeAssistantWebSocketClient {
 
         return try await withCheckedThrowingContinuation { continuation in
             pending[id] = PendingCommand(operation: type, continuation: continuation)
-            Task {
-                do {
-                    try await socket.send(.string(text))
-                } catch {
-                    self.diagnostics.record(
-                        category: "home_assistant.websocket",
-                        name: "websocket_command_failed",
-                        operation: type,
-                        endpoint: self.endpointURL,
-                        error: error,
-                        details: ["stage": "send"]
-                    )
-                    self.failPending(id: id, error: error)
-                }
+            outboundCommands.enqueue(
+                .init(id: id, operation: type, text: text, epoch: epoch)
+            )
+            startCommandSenderIfNeeded(using: socket, epoch: epoch)
+        }
+    }
+
+    private func startCommandSenderIfNeeded(
+        using socket: URLSessionWebSocketTask,
+        epoch: Int
+    ) {
+        guard commandSendTask == nil, connectionEpoch.isCurrent(epoch) else { return }
+        commandSendTaskEpoch = epoch
+        commandSendTask = Task { [weak self] in
+            await self?.drainOutboundCommands(using: socket, epoch: epoch)
+        }
+    }
+
+    private func drainOutboundCommands(
+        using socket: URLSessionWebSocketTask,
+        epoch: Int
+    ) async {
+        defer { finishCommandSender(epoch: epoch, socket: socket) }
+
+        while !Task.isCancelled, connectionEpoch.isCurrent(epoch) {
+            guard let command = outboundCommands.next(for: epoch) else { return }
+            do {
+                try await socket.send(.string(command.text))
+            } catch {
+                guard connectionEpoch.isCurrent(epoch) else { return }
+                diagnostics.record(
+                    category: "home_assistant.websocket",
+                    name: "websocket_command_failed",
+                    operation: command.operation,
+                    endpoint: endpointURL,
+                    error: error,
+                    details: [
+                        "stage": "send",
+                        "commandID": String(command.id),
+                        "connectionEpoch": String(epoch),
+                    ]
+                )
+                failPending(id: command.id, error: error)
             }
         }
+    }
+
+    private func finishCommandSender(
+        epoch: Int,
+        socket: URLSessionWebSocketTask
+    ) {
+        guard commandSendTaskEpoch == epoch else { return }
+        commandSendTask = nil
+        commandSendTaskEpoch = nil
+        guard connectionEpoch.isCurrent(epoch), !outboundCommands.isEmpty else { return }
+        startCommandSenderIfNeeded(using: socket, epoch: epoch)
     }
 
     private func failPending(id: Int, error: Error) {
@@ -322,7 +370,11 @@ public actor HomeAssistantWebSocketClient {
                     from: envelope["error"]
                 )
                 let responseData = try? JSONEncoder().encode(envelope["error"] ?? .null)
-                var details = ["stage": "result"]
+                var details = [
+                    "stage": "result",
+                    "commandID": String(id),
+                    "connectionEpoch": String(connectionEpoch.current),
+                ]
                 if let errorCode = HomeAssistantWebSocketCommandAdapter.errorCode(
                     from: envelope["error"]
                 ) {
@@ -464,6 +516,35 @@ public actor HomeAssistantWebSocketClient {
             error: error,
             responseData: try? JSONEncoder().encode(value)
         )
+    }
+}
+
+struct HomeAssistantWebSocketQueuedCommand: Equatable, Sendable {
+    let id: Int
+    let operation: String
+    let text: String
+    let epoch: Int
+}
+
+struct HomeAssistantWebSocketCommandQueue: Sendable {
+    private var commands: [HomeAssistantWebSocketQueuedCommand] = []
+
+    var isEmpty: Bool { commands.isEmpty }
+
+    mutating func enqueue(_ command: HomeAssistantWebSocketQueuedCommand) {
+        commands.append(command)
+    }
+
+    mutating func next(for epoch: Int) -> HomeAssistantWebSocketQueuedCommand? {
+        while !commands.isEmpty {
+            let command = commands.removeFirst()
+            if command.epoch == epoch { return command }
+        }
+        return nil
+    }
+
+    mutating func removeAll() {
+        commands.removeAll(keepingCapacity: true)
     }
 }
 

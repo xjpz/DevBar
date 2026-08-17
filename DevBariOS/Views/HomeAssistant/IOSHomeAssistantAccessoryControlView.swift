@@ -37,14 +37,27 @@ struct IOSHomeAssistantAccessoryControlView: View {
                         .foregroundStyle(theme.textSecondary)
                 }
 
-                Spacer(minLength: controlProjection.usesChildControlGrid ? 0 : 8)
-                controlSurface
-                    .disabled(!model.canControlDevices || isPending)
-                if controlProjection.usesChildControlGrid {
-                    childControlGrid
+                if usesScrollableControlSurface {
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 14) {
+                            controlSurface
+                                .disabled(!model.canControlDevices || isPending)
+                            auxiliaryControls
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                } else {
+                    Spacer(minLength: controlProjection.usesChildControlGrid ? 0 : 8)
+                    controlSurface
+                        .disabled(!model.canControlDevices || isPending)
+                    if controlProjection.usesChildControlGrid {
+                        childControlGrid
+                    }
+                    auxiliaryControls
+                    Spacer(minLength: controlProjection.usesChildControlGrid ? 0 : 8)
                 }
-                auxiliaryControls
-                Spacer(minLength: controlProjection.usesChildControlGrid ? 0 : 8)
                 bottomBar
             }
             .padding(.horizontal, 22)
@@ -99,7 +112,11 @@ struct IOSHomeAssistantAccessoryControlView: View {
     }
 
     private var isPending: Bool {
-        liveAccessory.entities.contains { model.pendingEntityIDs.contains($0.entityID) }
+        controlEntity.map { model.pendingEntityIDs.contains($0.entityID) } ?? false
+    }
+
+    private var usesScrollableControlSurface: Bool {
+        controlEntity?.domain == "climate"
     }
 
     private var dismissalScale: CGFloat {
@@ -131,11 +148,6 @@ struct IOSHomeAssistantAccessoryControlView: View {
 
     private var topBar: some View {
         HStack {
-            glassCircleButton("xmark", diameter: 48) {
-                dismiss()
-            }
-            .accessibilityLabel("关闭")
-
             Spacer()
 
             if !model.canControlDevices {
@@ -144,9 +156,10 @@ struct IOSHomeAssistantAccessoryControlView: View {
                     .foregroundStyle(.white.opacity(0.72))
                     .padding(.horizontal, 12)
                     .frame(height: 36)
-                    .background(.ultraThinMaterial, in: Capsule())
+                .background(.ultraThinMaterial, in: Capsule())
             }
         }
+        .frame(minHeight: 48)
     }
 
     @ViewBuilder
@@ -166,15 +179,7 @@ struct IOSHomeAssistantAccessoryControlView: View {
                     levelAction: { .setBrightness($0) }
                 )
             case "fan":
-                levelControl(
-                    entity: entity,
-                    value: fanLevel(entity),
-                    symbol: liveAccessory.systemImage,
-                    accent: .cyan,
-                    supportsLevel: entity.state.attributes["percentage"] != nil,
-                    compact: controlProjection.usesChildControlGrid,
-                    levelAction: { .setPercentage($0) }
-                )
+                fanControl(entity)
             case "switch", "input_boolean":
                 levelControl(
                     entity: entity,
@@ -199,6 +204,47 @@ struct IOSHomeAssistantAccessoryControlView: View {
         } else {
             metricSummary
         }
+    }
+
+    private func fanControl(_ entity: HomeAssistantEntity) -> some View {
+        let capabilities = HomeAssistantFanCapabilities(entity: entity)
+        return IOSHomeAssistantFanControlPanel(
+            isOn: entity.isOn,
+            percentage: capabilities.percentage,
+            percentageStep: capabilities.percentageStep,
+            supportsPercentage: capabilities.supportsPercentage,
+            presetModes: capabilities.presetModes,
+            selectedPresetMode: capabilities.presetMode,
+            supportsOscillation: capabilities.supportsOscillation,
+            isOscillating: capabilities.oscillating,
+            supportsDirection: capabilities.supportsDirection,
+            currentDirection: capabilities.currentDirection,
+            symbol: liveAccessory.systemImage,
+            theme: theme,
+            titleForPreset: { mode in
+                model.attributeValue(
+                    key: "preset_mode",
+                    value: .string(mode),
+                    entity: entity
+                ) ?? mode
+            },
+            togglePower: {
+                perform(entity, action: entity.isOn ? .turnOff : .turnOn)
+            },
+            setPercentage: { value in
+                perform(entity, action: .setPercentage(value))
+            },
+            setPresetMode: { mode in
+                perform(entity, action: .setPresetMode(mode))
+            },
+            setOscillating: { value in
+                perform(entity, action: .setOscillating(value))
+            },
+            setDirection: { value in
+                perform(entity, action: .setDirection(value))
+            }
+        )
+        .frame(maxWidth: 360)
     }
 
     private func levelControl(
@@ -233,70 +279,55 @@ struct IOSHomeAssistantAccessoryControlView: View {
     }
 
     private func climateControl(_ entity: HomeAssistantEntity) -> some View {
-        let current = entity.state.attributes["current_temperature"]?.doubleValue
-        let target = entity.state.attributes["temperature"]?.doubleValue ?? current ?? 22
-        return VStack(spacing: 22) {
-            ZStack {
-                Circle()
-                    .stroke(.white.opacity(0.18), lineWidth: 28)
-                Circle()
-                    .trim(from: 0.08, to: 0.82)
-                    .stroke(
-                        Color.cyan,
-                        style: StrokeStyle(lineWidth: 28, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(90))
-
-                VStack(spacing: 5) {
-                    Text(target.formatted(.number.precision(.fractionLength(0...1))) + "°")
-                        .font(.system(size: 58, weight: .medium))
-                        .foregroundStyle(.white)
-                    if let current {
-                        Text("当前 \(current.formatted(.number.precision(.fractionLength(0...1))))°")
-                            .font(theme.subheadlineWeightFont)
-                            .foregroundStyle(.white.opacity(0.62))
-                    }
-                }
+        let capabilities = HomeAssistantClimateCapabilities(entity: entity)
+        return IOSHomeAssistantClimateControlPanel(
+            capabilities: capabilities,
+            symbol: liveAccessory.systemImage,
+            theme: theme,
+            titleForValue: { key, value in
+                model.attributeValue(
+                    key: key,
+                    value: .string(value),
+                    entity: entity
+                ) ?? HomeAssistantStateFormatter.translatedAttributeState(
+                    value,
+                    key: key == "swing_horizontal_mode" ? "swing_mode" : key
+                )
+            },
+            togglePower: climatePowerAction(for: capabilities).map { action in
+                { perform(entity, action: action) }
+            },
+            setTemperature: { value in
+                perform(entity, action: .setTemperature(value))
+            },
+            setHVACMode: { mode in
+                perform(entity, action: .setHVACMode(mode))
+            },
+            setFanMode: { mode in
+                perform(entity, action: .setClimateFanMode(mode))
+            },
+            setPresetMode: { mode in
+                perform(entity, action: .setClimatePresetMode(mode))
+            },
+            setSwingMode: { mode in
+                perform(entity, action: .setClimateSwingMode(mode))
+            },
+            setHorizontalSwingMode: { mode in
+                perform(entity, action: .setClimateHorizontalSwingMode(mode))
             }
-            .frame(width: 250, height: 250)
-
-            HStack(spacing: 28) {
-                roundActionButton("minus") {
-                    perform(entity, action: .setTemperature(max(10, target - 0.5)))
-                }
-                roundActionButton("plus") {
-                    perform(entity, action: .setTemperature(min(35, target + 0.5)))
-                }
-            }
-
-            climateModeMenu(entity)
-        }
+        )
+        .frame(maxWidth: 390)
     }
 
-    private func climateModeMenu(_ entity: HomeAssistantEntity) -> some View {
-        Menu {
-            ForEach(entity.state.attributes["hvac_modes"]?.arrayValue?.compactMap(\.stringValue) ?? [], id: \.self) { mode in
-                Button(HomeAssistantStateFormatter.translatedState(
-                    mode,
-                    domain: "climate",
-                    deviceClass: nil,
-                    role: nil
-                )) {
-                    perform(entity, action: .setHVACMode(mode))
-                }
-            }
-        } label: {
-            HStack {
-                Text(model.stateText(for: entity))
-                Spacer()
-                Image(systemName: "chevron.up.chevron.down")
-            }
-            .font(theme.appFont.font(.headline, weight: .semibold))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 22)
-            .frame(maxWidth: 300, minHeight: 58)
-            .background(.ultraThinMaterial, in: Capsule())
+    private func climatePowerAction(
+        for capabilities: HomeAssistantClimateCapabilities
+    ) -> HomeAssistantControlAction? {
+        if capabilities.isOn {
+            if capabilities.supportsTurnOff { return .turnOff }
+            if capabilities.hvacModes.contains("off") { return .setHVACMode("off") }
+            return nil
         }
+        return capabilities.supportsTurnOn ? .turnOn : nil
     }
 
     private func coverControl(_ entity: HomeAssistantEntity) -> some View {
@@ -384,43 +415,117 @@ struct IOSHomeAssistantAccessoryControlView: View {
     private var auxiliaryControls: some View {
         let auxiliary = auxiliaryControlEntities
         if !auxiliary.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(auxiliary) { entity in
-                        Button {
-                            if let action = HomeAssistantControlPolicy.quickAction(for: entity) {
-                                perform(entity, action: action)
-                            }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(model.displayName(for: entity))
-                                    .font(theme.captionWeightFont)
-                                    .lineLimit(1)
-                                Text(model.stateText(for: entity))
-                                    .font(theme.captionFont)
-                                    .foregroundStyle(.white.opacity(0.58))
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 14)
-                            .frame(minWidth: 112, minHeight: 52, alignment: .leading)
-                            .background(.ultraThinMaterial, in: Capsule())
+            if usesScrollableControlSurface {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("辅助功能")
+                        .font(theme.captionWeightFont)
+                        .foregroundStyle(.white.opacity(0.64))
+
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 10),
+                            GridItem(.flexible(), spacing: 10),
+                        ],
+                        spacing: 10
+                    ) {
+                        ForEach(auxiliary) { entity in
+                            auxiliaryControl(entity)
                         }
-                        .buttonStyle(.plain)
-                        .disabled(
-                            !model.canControlDevices
-                                || !entity.isAvailable
-                                || model.pendingEntityIDs.contains(entity.entityID)
-                                || HomeAssistantControlPolicy.quickAction(for: entity) == nil
-                        )
                     }
                 }
+                .frame(maxWidth: 390)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(auxiliary) { entity in
+                            auxiliaryControl(entity)
+                        }
+                    }
+                }
+                .contentMargins(.horizontal, 0, for: .scrollContent)
             }
-            .contentMargins(.horizontal, 0, for: .scrollContent)
         }
     }
 
+    @ViewBuilder
+    private func auxiliaryControl(_ entity: HomeAssistantEntity) -> some View {
+        if ["select", "input_select"].contains(entity.domain) {
+            let options = entity.state.attributes["options"]?.arrayValue?.compactMap(\.stringValue) ?? []
+            Menu {
+                ForEach(options, id: \.self) { option in
+                    Button(option) {
+                        perform(entity, action: .selectOption(option))
+                    }
+                }
+            } label: {
+                auxiliaryControlLabel(entity, showsDisclosure: true)
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                !model.canControlDevices
+                    || !entity.isAvailable
+                    || model.pendingEntityIDs.contains(entity.entityID)
+                    || options.isEmpty
+                    || !entity.availableServices.contains("select_option")
+            )
+        } else {
+            let action = HomeAssistantControlPolicy.quickAction(for: entity)
+            Button {
+                if let action { perform(entity, action: action) }
+            } label: {
+                auxiliaryControlLabel(entity, showsDisclosure: false)
+            }
+            .buttonStyle(.plain)
+            .disabled(
+                !model.canControlDevices
+                    || !entity.isAvailable
+                    || model.pendingEntityIDs.contains(entity.entityID)
+                    || action == nil
+            )
+        }
+    }
+
+    private func auxiliaryControlLabel(
+        _ entity: HomeAssistantEntity,
+        showsDisclosure: Bool
+    ) -> some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.displayName(for: entity))
+                    .font(theme.captionWeightFont)
+                    .lineLimit(1)
+                Text(model.stateText(for: entity))
+                    .font(theme.captionFont)
+                    .foregroundStyle(.white.opacity(0.58))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+
+            if showsDisclosure {
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white.opacity(0.56))
+            }
+        }
+        .foregroundStyle(.white)
+        .padding(.horizontal, 14)
+        .frame(minWidth: 112, minHeight: 58, alignment: .leading)
+        .background(
+            entity.isOn ? controlAccent.opacity(0.18) : Color.clear,
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(.white.opacity(0.12), lineWidth: 0.75)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(model.displayName(for: entity))，\(model.stateText(for: entity))")
+    }
+
     private var auxiliaryControlEntities: [HomeAssistantEntity] {
-        let roles: [HomeAssistantAccessoryRole] = [.power, .childControl, .indicator, .action]
+        let roles: [HomeAssistantAccessoryRole] = [.power, .mode, .childControl, .indicator, .action]
         let childEntityIDs = Set(controlProjection.childEntities.map(\.entityID))
         var seen = Set<String>()
         return roles
@@ -575,11 +680,6 @@ struct IOSHomeAssistantAccessoryControlView: View {
         return (entity.state.attributes["brightness"]?.doubleValue ?? 255) / 255 * 100
     }
 
-    private func fanLevel(_ entity: HomeAssistantEntity) -> Double {
-        guard entity.isOn else { return 0 }
-        return entity.state.attributes["percentage"]?.doubleValue ?? 100
-    }
-
     private func roundActionButton(_ image: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: image)
@@ -655,6 +755,588 @@ struct IOSHomeAssistantAccessoryControlView: View {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+}
+
+private struct IOSHomeAssistantClimateControlPanel: View {
+    let capabilities: HomeAssistantClimateCapabilities
+    let symbol: String
+    let theme: IOSThemeTokens
+    let titleForValue: (String, String) -> String
+    let togglePower: (() -> Void)?
+    let setTemperature: (Double) -> Void
+    let setHVACMode: (String) -> Void
+    let setFanMode: (String) -> Void
+    let setPresetMode: (String) -> Void
+    let setSwingMode: (String) -> Void
+    let setHorizontalSwingMode: (String) -> Void
+
+    @State private var draftTemperature: Double
+    @State private var isAdjustingTemperature = false
+
+    init(
+        capabilities: HomeAssistantClimateCapabilities,
+        symbol: String,
+        theme: IOSThemeTokens,
+        titleForValue: @escaping (String, String) -> String,
+        togglePower: (() -> Void)?,
+        setTemperature: @escaping (Double) -> Void,
+        setHVACMode: @escaping (String) -> Void,
+        setFanMode: @escaping (String) -> Void,
+        setPresetMode: @escaping (String) -> Void,
+        setSwingMode: @escaping (String) -> Void,
+        setHorizontalSwingMode: @escaping (String) -> Void
+    ) {
+        self.capabilities = capabilities
+        self.symbol = symbol
+        self.theme = theme
+        self.titleForValue = titleForValue
+        self.togglePower = togglePower
+        self.setTemperature = setTemperature
+        self.setHVACMode = setHVACMode
+        self.setFanMode = setFanMode
+        self.setPresetMode = setPresetMode
+        self.setSwingMode = setSwingMode
+        self.setHorizontalSwingMode = setHorizontalSwingMode
+        _draftTemperature = State(initialValue: Self.normalizedTemperature(
+            capabilities.targetTemperature
+                ?? capabilities.currentTemperature
+                ?? capabilities.minimumTemperature,
+            capabilities: capabilities
+        ))
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            statusHeader
+
+            if capabilities.supportsTargetTemperature {
+                temperatureControl
+            }
+
+            if capabilities.supportsHVACMode {
+                optionSection(
+                    title: "运行模式",
+                    image: "thermometer.medium",
+                    values: capabilities.hvacModes,
+                    selected: capabilities.hvacMode,
+                    attributeKey: "hvac_modes",
+                    action: setHVACMode
+                )
+            }
+
+            if capabilities.supportsFanMode {
+                optionSection(
+                    title: "风速",
+                    image: "wind",
+                    values: capabilities.fanModes,
+                    selected: capabilities.fanMode,
+                    attributeKey: "fan_mode",
+                    action: setFanMode
+                )
+            }
+
+            if capabilities.supportsSwingMode {
+                optionSection(
+                    title: capabilities.supportsHorizontalSwingMode ? "上下摆风" : "摆风",
+                    image: "arrow.up.and.down",
+                    values: capabilities.swingModes,
+                    selected: capabilities.swingMode,
+                    attributeKey: "swing_mode",
+                    action: setSwingMode
+                )
+            }
+
+            if capabilities.supportsHorizontalSwingMode {
+                optionSection(
+                    title: "左右摆风",
+                    image: "arrow.left.and.right",
+                    values: capabilities.horizontalSwingModes,
+                    selected: capabilities.horizontalSwingMode,
+                    attributeKey: "swing_horizontal_mode",
+                    action: setHorizontalSwingMode
+                )
+            }
+
+            if capabilities.supportsPresetMode {
+                optionSection(
+                    title: "预设模式",
+                    image: "sparkles",
+                    values: capabilities.presetModes,
+                    selected: capabilities.presetMode,
+                    attributeKey: "preset_mode",
+                    action: setPresetMode
+                )
+            }
+        }
+        .padding(20)
+        .background(.ultraThinMaterial, in: panelShape)
+        .background(Color.cyan.opacity(theme.isGeek ? 0.08 : 0.06), in: panelShape)
+        .overlay(panelShape.stroke(.white.opacity(0.14), lineWidth: 0.75))
+        .shadow(color: .black.opacity(0.10), radius: 12, y: 5)
+        .onChange(of: capabilities.targetTemperature) { _, newValue in
+            guard !isAdjustingTemperature, let newValue else { return }
+            draftTemperature = Self.normalizedTemperature(newValue, capabilities: capabilities)
+        }
+    }
+
+    private var panelShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 30, style: .continuous)
+    }
+
+    private var statusHeader: some View {
+        HStack(spacing: 16) {
+            Group {
+                if let togglePower {
+                    Button(action: togglePower) {
+                        powerSymbol
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(capabilities.isOn ? "关闭空调" : "开启空调")
+                } else {
+                    powerSymbol
+                        .accessibilityHidden(true)
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(capabilities.isOn ? "运行中" : "已关闭")
+                    .font(theme.appFont.font(.title2, weight: .semibold))
+                    .foregroundStyle(.white)
+                if let currentTemperature = capabilities.currentTemperature {
+                    Text("室内 \(temperatureText(currentTemperature))")
+                        .font(theme.subheadlineWeightFont)
+                        .foregroundStyle(.white.opacity(0.62))
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            if let targetTemperature = capabilities.targetTemperature {
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text("目标")
+                        .font(theme.captionFont)
+                        .foregroundStyle(.white.opacity(0.54))
+                    Text(temperatureText(targetTemperature))
+                        .font(.system(size: 30, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .contentTransition(.numericText())
+                }
+            }
+        }
+    }
+
+    private var powerSymbol: some View {
+        ZStack {
+            Circle()
+                .fill(capabilities.isOn ? Color.cyan : Color.black.opacity(0.20))
+            Circle()
+                .stroke(.white.opacity(capabilities.isOn ? 0.26 : 0.14), lineWidth: 1)
+            Image(systemName: symbol)
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(capabilities.isOn ? Color.black.opacity(0.74) : Color.cyan)
+        }
+        .frame(width: 76, height: 76)
+    }
+
+    private var temperatureControl: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text("目标温度")
+                    .font(theme.captionWeightFont)
+                    .foregroundStyle(.white.opacity(0.62))
+                Spacer()
+                Text(temperatureText(draftTemperature))
+                    .font(.system(size: 42, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white)
+                    .contentTransition(.numericText())
+            }
+
+            HStack(spacing: 12) {
+                temperatureButton("minus") {
+                    commitTemperature(draftTemperature - capabilities.temperatureStep)
+                }
+
+                Slider(
+                    value: $draftTemperature,
+                    in: capabilities.temperatureRange,
+                    step: capabilities.temperatureStep
+                ) { editing in
+                    isAdjustingTemperature = editing
+                    if !editing { setTemperature(draftTemperature) }
+                }
+                .tint(.cyan)
+                .accessibilityLabel("目标温度")
+                .accessibilityValue(temperatureText(draftTemperature))
+
+                temperatureButton("plus") {
+                    commitTemperature(draftTemperature + capabilities.temperatureStep)
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.black.opacity(0.16), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    private func optionSection(
+        title: String,
+        image: String,
+        values: [String],
+        selected: String?,
+        attributeKey: String,
+        action: @escaping (String) -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: image)
+                .font(theme.captionWeightFont)
+                .foregroundStyle(.white.opacity(0.64))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 9) {
+                    ForEach(values, id: \.self) { value in
+                        let isSelected = value == selected
+                        Button {
+                            action(value)
+                        } label: {
+                            Text(titleForValue(attributeKey, value))
+                                .font(theme.subheadlineWeightFont)
+                                .foregroundStyle(isSelected ? Color.black.opacity(0.78) : Color.white)
+                                .padding(.horizontal, 16)
+                                .frame(minHeight: 42)
+                                .background(
+                                    isSelected ? Color.cyan : Color.white.opacity(0.09),
+                                    in: Capsule()
+                                )
+                                .overlay(Capsule().stroke(.white.opacity(0.12), lineWidth: 0.75))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    }
+                }
+            }
+            .contentMargins(.horizontal, 0, for: .scrollContent)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func temperatureButton(
+        _ image: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: image)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 42, height: 42)
+                .background(Color.white.opacity(0.10), in: Circle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func commitTemperature(_ value: Double) {
+        let normalized = Self.normalizedTemperature(value, capabilities: capabilities)
+        draftTemperature = normalized
+        setTemperature(normalized)
+    }
+
+    private func temperatureText(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0...1))) + capabilities.temperatureUnit
+    }
+
+    private static func normalizedTemperature(
+        _ value: Double,
+        capabilities: HomeAssistantClimateCapabilities
+    ) -> Double {
+        let clamped = min(capabilities.maximumTemperature, max(capabilities.minimumTemperature, value))
+        let step = capabilities.temperatureStep
+        let steps = ((clamped - capabilities.minimumTemperature) / step).rounded()
+        return min(
+            capabilities.maximumTemperature,
+            max(capabilities.minimumTemperature, capabilities.minimumTemperature + steps * step)
+        )
+    }
+}
+
+private struct IOSHomeAssistantFanControlPanel: View {
+    let isOn: Bool
+    let percentage: Double?
+    let percentageStep: Double
+    let supportsPercentage: Bool
+    let presetModes: [String]
+    let selectedPresetMode: String?
+    let supportsOscillation: Bool
+    let isOscillating: Bool?
+    let supportsDirection: Bool
+    let currentDirection: String?
+    let symbol: String
+    let theme: IOSThemeTokens
+    let titleForPreset: (String) -> String
+    let togglePower: () -> Void
+    let setPercentage: (Double) -> Void
+    let setPresetMode: (String) -> Void
+    let setOscillating: (Bool) -> Void
+    let setDirection: (String) -> Void
+
+    @State private var draftPercentage: Double
+    @State private var isAdjustingPercentage = false
+
+    init(
+        isOn: Bool,
+        percentage: Double?,
+        percentageStep: Double,
+        supportsPercentage: Bool,
+        presetModes: [String],
+        selectedPresetMode: String?,
+        supportsOscillation: Bool,
+        isOscillating: Bool?,
+        supportsDirection: Bool,
+        currentDirection: String?,
+        symbol: String,
+        theme: IOSThemeTokens,
+        titleForPreset: @escaping (String) -> String,
+        togglePower: @escaping () -> Void,
+        setPercentage: @escaping (Double) -> Void,
+        setPresetMode: @escaping (String) -> Void,
+        setOscillating: @escaping (Bool) -> Void,
+        setDirection: @escaping (String) -> Void
+    ) {
+        self.isOn = isOn
+        self.percentage = percentage
+        self.percentageStep = percentageStep
+        self.supportsPercentage = supportsPercentage
+        self.presetModes = presetModes
+        self.selectedPresetMode = selectedPresetMode
+        self.supportsOscillation = supportsOscillation
+        self.isOscillating = isOscillating
+        self.supportsDirection = supportsDirection
+        self.currentDirection = currentDirection
+        self.symbol = symbol
+        self.theme = theme
+        self.titleForPreset = titleForPreset
+        self.togglePower = togglePower
+        self.setPercentage = setPercentage
+        self.setPresetMode = setPresetMode
+        self.setOscillating = setOscillating
+        self.setDirection = setDirection
+        _draftPercentage = State(
+            initialValue: Self.normalizedPercentage(
+                percentage ?? 100,
+                step: percentageStep
+            )
+        )
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            HStack(spacing: 22) {
+                powerButton
+                if supportsPercentage {
+                    speedControl
+                } else {
+                    powerSummary
+                }
+            }
+
+            if !presetModes.isEmpty {
+                presetControl
+            }
+
+            if supportsOscillation || supportsDirection {
+                HStack(spacing: 10) {
+                    if supportsOscillation {
+                        featureButton(
+                            title: "摆风",
+                            subtitle: oscillationSubtitle,
+                            image: "fan.oscillation",
+                            isActive: isOscillating == true
+                        ) {
+                            setOscillating(!(isOscillating ?? false))
+                        }
+                    }
+
+                    if supportsDirection, let nextDirection {
+                        featureButton(
+                            title: "风向",
+                            subtitle: directionTitle(currentDirection),
+                            image: "arrow.left.arrow.right",
+                            isActive: false
+                        ) {
+                            setDirection(nextDirection)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(.ultraThinMaterial, in: panelShape)
+        .background(Color.cyan.opacity(theme.isGeek ? 0.08 : 0.06), in: panelShape)
+        .overlay(panelShape.stroke(.white.opacity(0.14), lineWidth: 0.75))
+        .shadow(color: .black.opacity(0.10), radius: 12, y: 5)
+        .onChange(of: percentage) { _, newValue in
+            guard !isAdjustingPercentage, let newValue else { return }
+            draftPercentage = Self.normalizedPercentage(newValue, step: percentageStep)
+        }
+    }
+
+    private var panelShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 30, style: .continuous)
+    }
+
+    private var powerButton: some View {
+        Button(action: togglePower) {
+            ZStack {
+                Circle()
+                    .fill(isOn ? Color.cyan : Color.white.opacity(0.08))
+                Circle()
+                    .stroke(.white.opacity(isOn ? 0.28 : 0.14), lineWidth: 1)
+                Image(systemName: symbol)
+                    .font(.system(size: 45, weight: .semibold))
+                    .foregroundStyle(isOn ? Color.black.opacity(0.74) : Color.cyan)
+                    .symbolEffect(.variableColor.iterative, options: .nonRepeating, value: isOn)
+            }
+            .frame(width: 118, height: 118)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isOn ? "关闭风扇" : "开启风扇")
+    }
+
+    private var speedControl: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("风速")
+                .font(theme.captionWeightFont)
+                .foregroundStyle(.white.opacity(0.62))
+            Text("\(Int(draftPercentage.rounded()))%")
+                .font(.system(size: 42, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .contentTransition(.numericText())
+            Slider(
+                value: $draftPercentage,
+                in: percentageStep...100,
+                step: percentageStep
+            ) { editing in
+                isAdjustingPercentage = editing
+                if !editing {
+                    setPercentage(draftPercentage)
+                }
+            }
+            .tint(.cyan)
+            Text(speedStepText)
+                .font(theme.captionFont)
+                .foregroundStyle(.white.opacity(0.52))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("风速")
+        .accessibilityValue("\(Int(draftPercentage.rounded()))%")
+    }
+
+    private var powerSummary: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("电源")
+                .font(theme.captionWeightFont)
+                .foregroundStyle(.white.opacity(0.62))
+            Text(isOn ? "运行中" : "已关闭")
+                .font(theme.appFont.font(.title2, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var presetControl: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("送风模式")
+                .font(theme.captionWeightFont)
+                .foregroundStyle(.white.opacity(0.62))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 9) {
+                    ForEach(presetModes, id: \.self) { mode in
+                        let isSelected = mode == selectedPresetMode
+                        Button {
+                            setPresetMode(mode)
+                        } label: {
+                            Text(titleForPreset(mode))
+                                .font(theme.subheadlineWeightFont)
+                                .foregroundStyle(isSelected ? Color.black.opacity(0.78) : Color.white)
+                                .padding(.horizontal, 17)
+                                .frame(minHeight: 42)
+                                .background(
+                                    isSelected ? Color.cyan : Color.white.opacity(0.09),
+                                    in: Capsule()
+                                )
+                                .overlay(Capsule().stroke(.white.opacity(0.12), lineWidth: 0.75))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    }
+                }
+            }
+            .contentMargins(.horizontal, 0, for: .scrollContent)
+        }
+    }
+
+    private func featureButton(
+        title: String,
+        subtitle: String,
+        image: String,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: image)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isActive ? Color.black.opacity(0.76) : Color.cyan)
+                    .frame(width: 38, height: 38)
+                    .background(isActive ? Color.cyan : Color.black.opacity(0.20), in: Circle())
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(title)
+                        .font(theme.subheadlineWeightFont)
+                    Text(subtitle)
+                        .font(theme.captionFont)
+                        .foregroundStyle(.white.opacity(0.58))
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+            .background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var oscillationSubtitle: String {
+        guard let isOscillating else { return "轻点开启" }
+        return isOscillating ? "已开启" : "已关闭"
+    }
+
+    private var nextDirection: String? {
+        switch currentDirection?.lowercased() {
+        case "forward": "reverse"
+        case "reverse", "backward": "forward"
+        default: nil
+        }
+    }
+
+    private func directionTitle(_ direction: String?) -> String {
+        switch direction?.lowercased() {
+        case "forward": "正向"
+        case "reverse", "backward": "反向"
+        default: "状态未知"
+        }
+    }
+
+    private var speedStepText: String {
+        percentageStep > 1 ? "每档 \(Int(percentageStep.rounded()))%" : "连续调速"
+    }
+
+    private static func normalizedPercentage(_ value: Double, step: Double) -> Double {
+        let normalizedStep = min(100, max(1, step))
+        return min(100, max(normalizedStep, (value / normalizedStep).rounded() * normalizedStep))
     }
 }
 

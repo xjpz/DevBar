@@ -663,6 +663,50 @@ struct HomeAssistantTests {
         #expect(projection.usesChildControlGrid)
     }
 
+    @Test("Air conditioner control projection prefers climate over a bound power switch")
+    func airConditionerControlProjectionUsesClimate() throws {
+        let climate = try entity(
+            #"{"entity_id":"climate.bedroom","state":"cool","attributes":{"friendly_name":"主卧空调","temperature":24}}"#,
+            deviceID: "bedroom-ac"
+        )
+        let power = try entity(
+            #"{"entity_id":"switch.bedroom_ac_power","state":"on","attributes":{"friendly_name":"空调电源"}}"#,
+            deviceID: "bedroom-ac"
+        )
+        let sourceCard = HomeAssistantDeviceCard(
+            id: "bedroom-ac",
+            name: "主卧空调",
+            areaID: "bedroom",
+            primaryEntityID: climate.entityID,
+            entities: [climate, power],
+            hasMultiplePrimaryControls: false
+        )
+        let accessory = HomeAssistantAccessory(
+            id: sourceCard.id,
+            sourceCard: sourceCard,
+            kind: .airConditioner,
+            name: sourceCard.name,
+            areaID: sourceCard.areaID,
+            systemImage: "air.conditioner.horizontal.fill",
+            bindings: [
+                .init(role: .primaryControl, entityIDs: [climate.entityID]),
+                .init(role: .power, entityIDs: [power.entityID]),
+            ],
+            classification: .init(
+                confidence: 1,
+                source: .user,
+                reasons: ["用户确认空调实体"],
+                needsReview: false
+            ),
+            isUserConfigured: true
+        )
+
+        let projection = HomeAssistantAccessoryControlProjection(accessory: accessory)
+
+        #expect(projection.masterEntity?.entityID == climate.entityID)
+        #expect(accessory.quickControlEntity?.entityID == power.entityID)
+    }
+
     @Test("State formatter translates domain and binary sensor semantics")
     func stateFormatterUsesDomainAndDeviceClass() throws {
         let switchEntity = try entity(#"{"entity_id":"switch.socket","state":"on","attributes":{"friendly_name":"插座"}}"#)
@@ -1061,6 +1105,242 @@ struct HomeAssistantTests {
 
         #expect(call.service == "unlock")
         #expect(call.requiresConfirmation)
+    }
+
+    @Test("Fan capabilities and actions follow the entity feature attributes")
+    func fanCapabilitiesAndActions() throws {
+        let state = try decode(HomeAssistantState.self, """
+        {
+          "entity_id":"fan.living_room",
+          "state":"on",
+          "attributes":{
+            "percentage":75,
+            "percentage_step":25,
+            "preset_mode":"自然风",
+            "preset_modes":["直吹风","自然风"],
+            "oscillating":true,
+            "current_direction":"forward",
+            "supported_features":63
+          }
+        }
+        """)
+        let entity = HomeAssistantEntity(
+            entityID: state.entityID,
+            deviceID: "fan-device",
+            areaID: "living",
+            name: "客厅落地扇",
+            domain: "fan",
+            deviceClass: nil,
+            icon: nil,
+            state: state,
+            availableServices: [
+                "turn_on", "turn_off", "set_percentage", "set_preset_mode",
+                "oscillate", "set_direction",
+            ]
+        )
+
+        let capabilities = HomeAssistantFanCapabilities(entity: entity)
+        #expect(capabilities.percentage == 75)
+        #expect(capabilities.percentageStep == 25)
+        #expect(capabilities.presetModes == ["直吹风", "自然风"])
+        #expect(capabilities.presetMode == "自然风")
+        #expect(capabilities.oscillating == true)
+        #expect(capabilities.currentDirection == "forward")
+        #expect(capabilities.supportsPercentage)
+        #expect(capabilities.supportsPresetMode)
+        #expect(capabilities.supportsOscillation)
+        #expect(capabilities.supportsDirection)
+
+        let speedCall = try HomeAssistantControlPolicy.serviceCall(entity: entity, action: .setPercentage(75))
+        let modeCall = try HomeAssistantControlPolicy.serviceCall(entity: entity, action: .setPresetMode("自然风"))
+        let oscillationCall = try HomeAssistantControlPolicy.serviceCall(entity: entity, action: .setOscillating(false))
+        let directionCall = try HomeAssistantControlPolicy.serviceCall(entity: entity, action: .setDirection("reverse"))
+
+        #expect(speedCall.service == "set_percentage")
+        #expect(speedCall.data == ["percentage": .number(75)])
+        #expect(modeCall.service == "set_preset_mode")
+        #expect(modeCall.data == ["preset_mode": .string("自然风")])
+        #expect(oscillationCall.service == "oscillate")
+        #expect(oscillationCall.data == ["oscillating": .bool(false)])
+        #expect(directionCall.service == "set_direction")
+        #expect(directionCall.data == ["direction": .string("reverse")])
+    }
+
+    @Test("Fan presentation attributes survive snapshot caching")
+    func fanAttributesSurviveSnapshotCaching() throws {
+        let config = try decode(HomeAssistantConfig.self, #"{"location_name":"Home"}"#)
+        let state = try decode(HomeAssistantState.self, """
+        {
+          "entity_id":"fan.living_room",
+          "state":"on",
+          "attributes":{
+            "percentage":50,
+            "oscillating":true,
+            "current_direction":"reverse",
+            "latitude":36.0
+          }
+        }
+        """)
+        let snapshot = HomeAssistantTopologyBuilder.build(
+            config: config,
+            states: [state],
+            registryEntries: [],
+            areas: [],
+            devices: [],
+            services: [
+                HomeAssistantService(
+                    domain: "fan",
+                    services: ["turn_on": .null, "oscillate": .null, "set_direction": .null]
+                ),
+            ]
+        )
+
+        let cached = HomeAssistantSnapshotProjection.cacheSnapshot(from: snapshot)
+        let attributes = try #require(cached.entities.first?.state.attributes)
+        #expect(attributes["oscillating"] == .bool(true))
+        #expect(attributes["current_direction"] == .string("reverse"))
+        #expect(attributes["latitude"] == nil)
+    }
+
+    @Test("Climate capabilities map every standard air conditioner control")
+    func climateCapabilitiesAndActions() throws {
+        let state = try decode(HomeAssistantState.self, """
+        {
+          "entity_id":"climate.bedroom",
+          "state":"cool",
+          "attributes":{
+            "current_temperature":27.5,
+            "temperature":24,
+            "min_temp":16,
+            "max_temp":30,
+            "target_temp_step":1,
+            "hvac_modes":["off","cool","dry","fan_only"],
+            "fan_mode":"medium",
+            "fan_modes":["auto","low","medium","high"],
+            "preset_mode":"eco",
+            "preset_modes":["none","eco","sleep"],
+            "swing_mode":"vertical",
+            "swing_modes":["off","vertical"],
+            "swing_horizontal_mode":"off",
+            "swing_horizontal_modes":["off","on"],
+            "supported_features":953
+          }
+        }
+        """)
+        let services: Set<String> = [
+            "turn_on", "turn_off", "set_temperature", "set_hvac_mode",
+            "set_fan_mode", "set_preset_mode", "set_swing_mode", "set_swing_horizontal_mode",
+        ]
+        let entity = HomeAssistantEntity(
+            entityID: state.entityID,
+            deviceID: "bedroom-ac",
+            areaID: "bedroom",
+            name: "主卧空调",
+            domain: "climate",
+            deviceClass: nil,
+            icon: nil,
+            state: state,
+            availableServices: services
+        )
+
+        let capabilities = HomeAssistantClimateCapabilities(entity: entity)
+
+        #expect(capabilities.currentTemperature == 27.5)
+        #expect(capabilities.targetTemperature == 24)
+        #expect(capabilities.temperatureRange == 16...30)
+        #expect(capabilities.temperatureStep == 1)
+        #expect(capabilities.hvacModes == ["off", "cool", "dry", "fan_only"])
+        #expect(capabilities.fanModes == ["auto", "low", "medium", "high"])
+        #expect(capabilities.presetModes == ["none", "eco", "sleep"])
+        #expect(capabilities.swingModes == ["off", "vertical"])
+        #expect(capabilities.horizontalSwingModes == ["off", "on"])
+        #expect(capabilities.supportsTargetTemperature)
+        #expect(capabilities.supportsFanMode)
+        #expect(capabilities.supportsPresetMode)
+        #expect(capabilities.supportsSwingMode)
+        #expect(capabilities.supportsHorizontalSwingMode)
+        #expect(capabilities.supportsTurnOn)
+        #expect(capabilities.supportsTurnOff)
+
+        let temperatureCall = try HomeAssistantControlPolicy.serviceCall(entity: entity, action: .setTemperature(25))
+        let fanCall = try HomeAssistantControlPolicy.serviceCall(entity: entity, action: .setClimateFanMode("high"))
+        let presetCall = try HomeAssistantControlPolicy.serviceCall(entity: entity, action: .setClimatePresetMode("sleep"))
+        let swingCall = try HomeAssistantControlPolicy.serviceCall(entity: entity, action: .setClimateSwingMode("off"))
+        let horizontalCall = try HomeAssistantControlPolicy.serviceCall(
+            entity: entity,
+            action: .setClimateHorizontalSwingMode("on")
+        )
+
+        #expect(temperatureCall.service == "set_temperature")
+        #expect(temperatureCall.data == ["temperature": .number(25)])
+        #expect(fanCall.data == ["fan_mode": .string("high")])
+        #expect(presetCall.data == ["preset_mode": .string("sleep")])
+        #expect(swingCall.data == ["swing_mode": .string("off")])
+        #expect(horizontalCall.data == ["swing_horizontal_mode": .string("on")])
+    }
+
+    @Test("Physical air conditioners retain safe configuration controls and cache their options")
+    func airConditionerRetainsConfigurationControls() throws {
+        let config = try decode(HomeAssistantConfig.self, #"{"location_name":"Home"}"#)
+        let states = try decode([HomeAssistantState].self, """
+        [
+          {"entity_id":"climate.bedroom","state":"cool","attributes":{"friendly_name":"主卧空调","temperature":24,"swing_mode":"off","swing_modes":["off","vertical"],"supported_features":33}},
+          {"entity_id":"switch.bedroom_anti_direct_blow","state":"on","attributes":{"friendly_name":"防直吹"}},
+          {"entity_id":"select.bedroom_airflow","state":"上摆","attributes":{"friendly_name":"送风角度","options":["上摆","中间","下摆"]}},
+          {"entity_id":"button.bedroom_self_clean","state":"2026-08-17T00:00:00+00:00","attributes":{"friendly_name":"自清洁"}},
+          {"entity_id":"sensor.bedroom_signal","state":"80","attributes":{"device_class":"signal_strength"}},
+          {"entity_id":"select.config_only_mode","state":"auto","attributes":{"friendly_name":"配置模式","options":["auto","manual"]}}
+        ]
+        """)
+        let device = try decode(HomeAssistantDevice.self, #"{"id":"bedroom-ac","name":"主卧空调","area_id":"bedroom"}"#)
+        let configOnlyDevice = try decode(HomeAssistantDevice.self, #"{"id":"config-only","name":"配置实体"}"#)
+        let registry = [
+            HomeAssistantEntityRegistryEntry(entityID: "climate.bedroom", deviceID: device.id),
+            HomeAssistantEntityRegistryEntry(entityID: "switch.bedroom_anti_direct_blow", deviceID: device.id, entityCategory: "config"),
+            HomeAssistantEntityRegistryEntry(entityID: "select.bedroom_airflow", deviceID: device.id, entityCategory: "config"),
+            HomeAssistantEntityRegistryEntry(entityID: "button.bedroom_self_clean", deviceID: device.id, entityCategory: "config"),
+            HomeAssistantEntityRegistryEntry(entityID: "sensor.bedroom_signal", deviceID: device.id, entityCategory: "diagnostic"),
+            HomeAssistantEntityRegistryEntry(entityID: "select.config_only_mode", deviceID: configOnlyDevice.id, entityCategory: "config"),
+        ]
+
+        let snapshot = HomeAssistantTopologyBuilder.build(
+            config: config,
+            states: states,
+            registryEntries: registry,
+            areas: [try decode(HomeAssistantArea.self, #"{"area_id":"bedroom","name":"主卧"}"#)],
+            devices: [device, configOnlyDevice],
+            services: []
+        )
+        let card = try #require(snapshot.cards.first)
+        let accessory = try #require(HomeAssistantAccessoryReconciler.accessories(
+            from: snapshot.cards,
+            entities: snapshot.entities
+        ).first)
+
+        #expect(Set(card.entities.map(\.entityID)) == [
+            "climate.bedroom", "switch.bedroom_anti_direct_blow",
+            "select.bedroom_airflow", "button.bedroom_self_clean",
+        ])
+        #expect(!snapshot.entities.contains { $0.entityID == "sensor.bedroom_signal" })
+        #expect(snapshot.entities.contains { $0.entityID == "select.config_only_mode" })
+        #expect(snapshot.cards.count == 1)
+        #expect(accessory.entities(for: .childControl).map(\.entityID) == ["switch.bedroom_anti_direct_blow"])
+        #expect(accessory.entities(for: .mode).map(\.entityID) == ["select.bedroom_airflow"])
+        #expect(accessory.entities(for: .action).map(\.entityID) == ["button.bedroom_self_clean"])
+
+        let selectEntity = try #require(card.entities.first { $0.domain == "select" })
+        let selectCall = try HomeAssistantControlPolicy.serviceCall(
+            entity: selectEntity,
+            action: .selectOption("下摆")
+        )
+        #expect(selectCall.service == "select_option")
+        #expect(selectCall.data == ["option": .string("下摆")])
+
+        let cached = HomeAssistantSnapshotProjection.cacheSnapshot(from: snapshot)
+        let cachedClimate = try #require(cached.entities.first { $0.domain == "climate" })
+        let cachedSelect = try #require(cached.entities.first { $0.domain == "select" })
+        #expect(cachedClimate.state.attributes["swing_modes"]?.arrayValue?.compactMap(\.stringValue) == ["off", "vertical"])
+        #expect(cachedSelect.state.attributes["options"]?.arrayValue?.compactMap(\.stringValue) == ["上摆", "中间", "下摆"])
     }
 
     @Test("AI result cannot introduce unknown identifiers")

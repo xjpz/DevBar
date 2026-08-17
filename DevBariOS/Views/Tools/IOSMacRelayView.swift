@@ -5,77 +5,52 @@ struct IOSMacRelayView: View {
     @EnvironmentObject private var appViewModel: IOSAppViewModel
     @Environment(\.themeTokens) private var theme
     @Environment(\.iosToolEntryContext) private var toolEntryContext
-    @State private var relayPrompt = ""
-    @State private var relaySendError: String?
-    @State private var isSendingRelayPrompt = false
-    @State private var isSendingLockScreenCommand = false
-    @State private var isShowingLockConfirmation = false
-    @State private var lockScreenTargetPeer: DeviceRelayDevice?
     @State private var relayStatusNow = Date()
     @State private var isShowingScanner = false
     @State private var isResolvingScan = false
     @State private var scanError: String?
-    @State private var listTopOffset: CGFloat = 0
-    @State private var isMacStatusCardCollapsed = false
+    @State private var controlError: String?
+    @State private var sendingCommand: DeviceRelayCommandType?
+    @State private var isShowingLockConfirmation = false
+    @State private var lockScreenTargetPeer: DeviceRelayDevice?
 
     private var relayManager: DeviceRelayManager {
         appViewModel.deviceRelayManager
-    }
-
-    private var firstOnlineMacPeer: DeviceRelayDevice? {
-        pairedMacPeers.first { relayManager.isPeerReachable($0, now: relayStatusNow) }
     }
 
     private var pairedMacPeers: [DeviceRelayDevice] {
         relayManager.peers.filter { $0.deviceType == .mac }
     }
 
-    private var shouldHideMacStatusCard: Bool {
-        !pairedMacPeers.isEmpty && isMacStatusCardCollapsed
-    }
-
-    private var titleConnectionStatus: DeviceRelayPeerConnectionStatus {
-        let statuses = pairedMacPeers.map { relayManager.connectionStatus(for: $0, now: relayStatusNow) }
-        if statuses.contains(.local) {
-            return .local
-        }
-        if statuses.contains(.remote) {
-            return .remote
-        }
-        return .offline
+    private var selectedMacPeer: DeviceRelayDevice? {
+        pairedMacPeers.first
     }
 
     var body: some View {
         ZStack(alignment: .bottom) {
             ScrollView {
-                Color.clear
-                    .frame(height: 0)
-                    .background(
-                        GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: MacRelayListTopOffsetKey.self,
-                                value: proxy.frame(in: .named("macRelayList")).minY
-                            )
-                        }
-                    )
-
-                VStack(spacing: 16) {
-                    if !shouldHideMacStatusCard {
-                        relayStatusCard
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                VStack(spacing: 18) {
+                    if let peer = selectedMacPeer {
+                        macStatusCard(peer)
+                        controlCard(peer)
+                    } else {
+                        emptyRelayCard
                     }
 
-                    if !pairedMacPeers.isEmpty {
-                        relayPromptEditor
-                    }
-
-                    if !relayManager.agentTasks.isEmpty {
-                        agentTaskList
+                    if let error = controlError ?? relayManager.lastErrorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(theme.danger)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 24)
+            }
+            .refreshable {
+                await refreshRelayState()
             }
 
             if isShowingLockConfirmation {
@@ -93,19 +68,6 @@ struct IOSMacRelayView: View {
             }
         }
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: isShowingLockConfirmation)
-        .animation(.spring(response: 0.26, dampingFraction: 0.9), value: shouldHideMacStatusCard)
-        .coordinateSpace(name: "macRelayList")
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 16)
-                .onChanged { value in
-                    updateMacStatusCardVisibility(translation: value.translation.height)
-                }
-        )
-        .onPreferenceChange(MacRelayListTopOffsetKey.self) { offset in
-            listTopOffset = offset
-            updateMacStatusCardVisibility(offset: offset)
-        }
-        .scrollDismissesKeyboard(.interactively)
         .iosGeekScreenBackground(theme)
         .navigationTitle("Mac Relay")
         .iosToolTitleDisplayMode(toolEntryContext)
@@ -114,11 +76,13 @@ struct IOSMacRelayView: View {
         .toolbar {
             if toolEntryContext == .pushed {
                 ToolbarItem(placement: .principal) {
-                    titleStatusView
+                    Text("Mac Relay")
+                        .font(.headline)
+                        .foregroundStyle(theme.textPrimary)
                 }
             }
 
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
                     Task {
                         await refreshRelayState()
@@ -128,6 +92,27 @@ struct IOSMacRelayView: View {
                         .iosToolToolbarIcon(theme)
                 }
                 .accessibilityLabel("刷新")
+
+                Menu {
+                    Button {
+                        Task {
+                            await refreshRelayState()
+                        }
+                    } label: {
+                        Label("刷新状态", systemImage: "arrow.clockwise")
+                    }
+
+                    Button {
+                        isShowingScanner = true
+                    } label: {
+                        Label("扫描连接二维码", systemImage: "qrcode.viewfinder")
+                    }
+                    .disabled(!pairedMacPeers.isEmpty)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .iosToolToolbarIcon(theme)
+                }
+                .accessibilityLabel("更多")
             }
         }
         .sheet(isPresented: $isShowingScanner) {
@@ -173,306 +158,220 @@ struct IOSMacRelayView: View {
         }
     }
 
-    private var titleStatusView: some View {
-        HStack(spacing: 6) {
-            if shouldHideMacStatusCard {
-                Circle()
-                    .fill(titleConnectionColor)
-                    .frame(width: 7, height: 7)
-            }
-            Text("Mac Relay")
-                .font(.headline)
-                .foregroundStyle(theme.textPrimary)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(titleAccessibilityLabel)
-    }
-
-    private var titleConnectionColor: Color {
-        switch titleConnectionStatus {
-        case .local:
-            return .green
-        case .remote:
-            return theme.brandPrimary
-        case .offline:
-            return theme.textTertiary
-        }
-    }
-
-    private var titleAccessibilityLabel: Text {
-        switch titleConnectionStatus {
-        case .local:
-            return Text("Mac Relay, \(String(localized: "device_relay_status_local"))")
-        case .remote:
-            return Text("Mac Relay, \(String(localized: "device_relay_status_remote"))")
-        case .offline:
-            return Text("Mac Relay, \(String(localized: "device_relay_status_offline"))")
-        }
-    }
-
-    private var relayStatusCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            let macPeers = pairedMacPeers
-            if macPeers.isEmpty {
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "macbook.and.iphone")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(theme.brandPrimary)
-                        .frame(width: 36, height: 36)
-                        .background(theme.brandPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Mac Relay")
-                            .font(.headline)
-                        relayConnectionLabel
-                            .font(.caption)
-                            .foregroundStyle(theme.textSecondary)
-                    }
-
-                    Spacer(minLength: 0)
-                }
-
-                Text("扫描 Mac DevBar 里的连接二维码后，这里会显示已绑定 Mac。")
-                    .font(.caption)
-                    .foregroundStyle(theme.textSecondary)
-
-                Button {
-                    isShowingScanner = true
-                } label: {
-                    Text("ios_mac_relay_scan_pair")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-            } else {
-                ForEach(macPeers) { peer in
-                    peerRow(peer)
-                }
-            }
-
-            if let error = relaySendError ?? relayManager.lastErrorMessage {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(theme.danger)
-            }
-        }
-        .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
-    @ViewBuilder
-    private var relayConnectionLabel: some View {
-        switch relayManager.activeTransport {
-        case .local:
-            Text("本地连接")
-        case .relay:
-            Text("远程中继")
-        case .none:
-            switch relayManager.connectionState {
-            case .connected:
-                Text("远程中继")
-            case .connecting:
-                Text("连接中")
-            case .disconnected:
-                Text("中继未连接")
-            case .failed:
-                Text("中继连接失败")
-            }
-        }
-    }
-
-    private func peerTransportColor(for peer: DeviceRelayDevice) -> Color {
-        switch relayManager.connectionStatus(for: peer, now: relayStatusNow) {
-        case .local:
-            return Color.green
-        case .remote:
-            return theme.brandPrimary
-        case .offline:
-            return theme.textTertiary
-        }
-    }
-
-    private func peerTransportTitle(for peer: DeviceRelayDevice) -> LocalizedStringKey {
-        switch relayManager.connectionStatus(for: peer, now: relayStatusNow) {
-        case .local:
-            return "device_relay_status_local"
-        case .remote:
-            return "device_relay_status_remote"
-        case .offline:
-            return "device_relay_status_offline"
-        }
-    }
-
-    private func peerRow(_ peer: DeviceRelayDevice) -> some View {
+    private func macStatusCard(_ peer: DeviceRelayDevice) -> some View {
         let isReachable = relayManager.isPeerReachable(peer, now: relayStatusNow)
-        let isScreenLocked = relayManager.screenLocked(for: peer) == true
-        return HStack(spacing: 10) {
-            Image(systemName: "macbook")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(theme.brandPrimary)
-                .frame(width: 36, height: 36)
-                .background(theme.brandPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        return VStack(spacing: 22) {
+            HStack(spacing: 22) {
+                Image(systemName: "laptopcomputer")
+                    .font(.system(size: 62, weight: .light))
+                    .foregroundStyle(isReachable ? theme.textSecondary : theme.textTertiary)
+                    .frame(width: 92, height: 86)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(relayManager.displayName(for: peer))
-                    .font(.subheadline.weight(.medium))
-                HStack(spacing: 5) {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 7, weight: .semibold))
-                        .foregroundStyle(isReachable ? peerTransportColor(for: peer) : theme.textTertiary)
-                    Text(peerTransportTitle(for: peer))
-                        .font(.caption)
-                        .foregroundStyle(peerTransportColor(for: peer))
-                }
-            }
-            Spacer()
-            Button(role: .destructive) {
-                lockScreenTargetPeer = peer
-                isShowingLockConfirmation = true
-            } label: {
-                if isSendingLockScreenCommand && lockScreenTargetPeer?.deviceId == peer.deviceId {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Label(isScreenLocked ? "device_relay_lock_locked" : "锁定", systemImage: isScreenLocked ? "lock.circle.fill" : "lock.fill")
-                        .labelStyle(.iconOnly)
-                }
-            }
-            .buttonStyle(.bordered)
-            .disabled(!isReachable || isScreenLocked || isSendingLockScreenCommand)
-            .accessibilityLabel(isScreenLocked ? "device_relay_lock_locked" : "锁定 \(relayManager.displayName(for: peer))")
-        }
-        .padding(10)
-        .background(theme.surfaceSecondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(relayManager.displayName(for: peer))
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(theme.textPrimary)
+                        .lineLimit(2)
 
-    private var relayPromptEditor: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TextField("发送任务到在线 Mac", text: $relayPrompt, axis: .vertical)
-                .lineLimit(2...4)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(10)
-                .background(theme.surfaceSecondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            Button {
-                sendRelayPrompt()
-            } label: {
-                HStack {
-                    Spacer(minLength: 0)
-                    if isSendingRelayPrompt {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "paperplane.fill")
-                        Text("发送")
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(peerTransportColor(for: peer))
+                            .frame(width: 10, height: 10)
+                        Text("\(peerTransportText(for: peer)) · \(statusFreshnessText(for: peer))")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(peerTransportColor(for: peer))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.76)
                     }
-                    Spacer(minLength: 0)
                 }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isSendingRelayPrompt || relayPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || firstOnlineMacPeer == nil)
-        }
-        .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
-    private var agentTaskList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("ios_mac_relay_tasks_title")
-                .font(.headline)
-                .foregroundStyle(theme.textPrimary)
-
-            ForEach(relayManager.agentTasks) { task in
-                agentTaskRow(task)
-            }
-        }
-        .padding(16)
-        .background(theme.surfacePrimary, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-    }
-
-    private func agentTaskRow(_ task: DeviceRelayAgentTask) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: agentTaskIcon(task.status))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(agentTaskColor(task.status))
-                    .frame(width: 18)
-
-                Text(agentTaskTitle(task.status))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(agentTaskColor(task.status))
 
                 Spacer(minLength: 0)
-
-                Text(task.agent == "default" ? "Default" : task.agent)
-                    .font(.caption2)
-                    .foregroundStyle(theme.textSecondary)
-                    .lineLimit(1)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(task.prompt)
+            Divider()
+                .overlay(theme.textTertiary.opacity(0.25))
+
+            HStack(spacing: 0) {
+                metricView(
+                    title: "CPU",
+                    value: relayManager.cpuPercent(for: peer).map { "\($0)%" } ?? "--"
+                )
+
+                metricDivider
+
+                metricView(
+                    title: "内存",
+                    value: relayManager.memoryPercent(for: peer).map { "\($0)%" } ?? "--"
+                )
+
+                metricDivider
+
+                networkMetricView(peer)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 24)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(theme.textTertiary.opacity(0.2), lineWidth: 1)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ios.tools.macRelay.statusCard")
+    }
+
+    private func metricView(title: String, value: String) -> some View {
+        VStack(spacing: 8) {
+            Text(title)
                 .font(.subheadline)
+                .foregroundStyle(theme.textSecondary)
+            Text(value)
+                .font(.title3.weight(.semibold))
                 .foregroundStyle(theme.textPrimary)
-                .lineLimit(3)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
+    }
 
-            if let detail = agentTaskDetail(task) {
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(task.status == .failed ? theme.danger : theme.textSecondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
+    private func networkMetricView(_ peer: DeviceRelayDevice) -> some View {
+        VStack(spacing: 6) {
+            Text("网速")
+                .font(.subheadline)
+                .foregroundStyle(theme.textSecondary)
+
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.down")
+                    .foregroundStyle(theme.info)
+                Text(formattedSpeed(relayManager.networkDownBytesPerSecond(for: peer)))
+                    .foregroundStyle(theme.textPrimary)
+            }
+
+            HStack(spacing: 3) {
+                Image(systemName: "arrow.up")
+                    .foregroundStyle(theme.success)
+                Text(formattedSpeed(relayManager.networkUpBytesPerSecond(for: peer)))
+                    .foregroundStyle(theme.textPrimary)
             }
         }
-        .padding(10)
-        .background(theme.surfaceSecondary, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .font(.caption2.weight(.semibold))
+        .monospacedDigit()
+        .frame(maxWidth: .infinity)
+        .minimumScaleFactor(0.72)
     }
 
-    private func agentTaskTitle(_ status: DeviceRelayAgentTaskStatus) -> LocalizedStringKey {
-        switch status {
-        case .pending:
-            return "ios_mac_relay_task_pending"
-        case .running:
-            return "ios_mac_relay_task_running"
-        case .succeeded:
-            return "ios_mac_relay_task_succeeded"
-        case .failed:
-            return "ios_mac_relay_task_failed"
+    private var metricDivider: some View {
+        Rectangle()
+            .fill(theme.textTertiary.opacity(0.25))
+            .frame(width: 1, height: 54)
+    }
+
+    private func controlCard(_ peer: DeviceRelayDevice) -> some View {
+        HStack(spacing: 0) {
+            controlButton(
+                title: "锁定",
+                systemImage: "lock",
+                command: .lockScreen,
+                peer: peer
+            )
+
+            controlDivider
+
+            controlButton(
+                title: "唤醒",
+                systemImage: "sun.max",
+                command: .wakeDisplay,
+                peer: peer
+            )
+
+            controlDivider
+
+            controlButton(
+                title: "休眠",
+                systemImage: "moon",
+                command: .displaySleep,
+                peer: peer
+            )
         }
-    }
-
-    private func agentTaskIcon(_ status: DeviceRelayAgentTaskStatus) -> String {
-        switch status {
-        case .pending:
-            return "clock"
-        case .running:
-            return "bolt.horizontal.circle.fill"
-        case .succeeded:
-            return "checkmark.circle.fill"
-        case .failed:
-            return "xmark.circle.fill"
+        .padding(.vertical, 18)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(theme.textTertiary.opacity(0.2), lineWidth: 1)
         }
+        .accessibilityIdentifier("ios.tools.macRelay.controls")
     }
 
-    private func agentTaskColor(_ status: DeviceRelayAgentTaskStatus) -> Color {
-        switch status {
-        case .pending:
-            return theme.textSecondary
-        case .running:
-            return theme.brandPrimary
-        case .succeeded:
-            return .green
-        case .failed:
-            return theme.danger
+    private func controlButton(
+        title: String,
+        systemImage: String,
+        command: DeviceRelayCommandType,
+        peer: DeviceRelayDevice
+    ) -> some View {
+        let isEnabled = isControlEnabled(command, for: peer)
+        let isSending = sendingCommand == command
+        return Button {
+            perform(command, on: peer)
+        } label: {
+            VStack(spacing: 10) {
+                if isSending {
+                    ProgressView()
+                        .controlSize(.regular)
+                        .frame(height: 34)
+                } else {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 28, weight: .regular))
+                        .frame(height: 34)
+                }
+
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+            }
+            .foregroundStyle(isEnabled ? theme.textSecondary : theme.textTertiary.opacity(0.48))
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .accessibilityLabel(controlAccessibilityLabel(command, for: peer))
+        .accessibilityHint(isEnabled ? "双击执行" : controlDisabledReason(command, for: peer))
     }
 
-    private func agentTaskDetail(_ task: DeviceRelayAgentTask) -> String? {
-        switch task.status {
-        case .pending, .running:
-            return task.progressMessage
-        case .succeeded:
-            return task.resultSummary ?? task.progressMessage
-        case .failed:
-            return task.errorMessage ?? task.progressMessage
+    private var controlDivider: some View {
+        Rectangle()
+            .fill(theme.textTertiary.opacity(0.25))
+            .frame(width: 1, height: 64)
+    }
+
+    private var emptyRelayCard: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "macbook.and.iphone")
+                .font(.system(size: 52, weight: .light))
+                .foregroundStyle(theme.brandPrimary)
+
+            VStack(spacing: 6) {
+                Text("连接你的 Mac")
+                    .font(.headline)
+                    .foregroundStyle(theme.textPrimary)
+                Text("扫描 Mac DevBar 中的连接二维码后，即可查看状态并进行快捷控制。")
+                    .font(.subheadline)
+                    .foregroundStyle(theme.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button {
+                isShowingScanner = true
+            } label: {
+                Label("ios_mac_relay_scan_pair", systemImage: "qrcode.viewfinder")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(24)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(theme.textTertiary.opacity(0.2), lineWidth: 1)
         }
     }
 
@@ -504,28 +403,28 @@ struct IOSMacRelayView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
-                .disabled(isSendingLockScreenCommand)
+                .disabled(sendingCommand != nil)
 
                 Button(role: .destructive) {
                     if let lockScreenTargetPeer {
-                        sendLockScreenCommand(to: lockScreenTargetPeer)
+                        sendSystemCommand(.lockScreen, to: lockScreenTargetPeer)
                     }
                 } label: {
                     HStack {
                         Spacer(minLength: 0)
-                        if isSendingLockScreenCommand {
+                        if sendingCommand == .lockScreen {
                             ProgressView()
                                 .controlSize(.small)
                         } else {
                             Image(systemName: "lock.fill")
-                            Text(lockScreenTargetPeer.map { relayManager.screenLocked(for: $0) == true } == true ? "device_relay_lock_locked" : "锁定")
+                            Text("锁定")
                         }
                         Spacer(minLength: 0)
                     }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(theme.danger)
-                .disabled(isSendingLockScreenCommand || lockScreenTargetPeer.map { relayManager.isPeerReachable($0, now: relayStatusNow) && relayManager.screenLocked(for: $0) != true } != true)
+                .disabled(lockScreenTargetPeer.map { !isControlEnabled(.lockScreen, for: $0) } ?? true)
             }
         }
         .padding(16)
@@ -534,63 +433,138 @@ struct IOSMacRelayView: View {
         .accessibilityIdentifier("ios.tools.macRelay.lockConfirmation")
     }
 
-    private func sendRelayPrompt() {
-        guard let peer = firstOnlineMacPeer else {
-            relaySendError = "没有在线 Mac 可发送"
-            return
-        }
-        let prompt = relayPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !prompt.isEmpty else { return }
+    private var cardBackground: Color {
+        theme.isGeek ? theme.surfacePrimary.opacity(0.78) : theme.surfacePrimary
+    }
 
-        relaySendError = nil
-        isSendingRelayPrompt = true
-        Task {
-            defer { isSendingRelayPrompt = false }
-            do {
-                try await relayManager.sendAgentCommand(
-                    prompt: prompt,
-                    targetDeviceId: peer.deviceId
-                )
-                relayPrompt = ""
-            } catch {
-                relaySendError = error.localizedDescription
-            }
+    private func peerTransportColor(for peer: DeviceRelayDevice) -> Color {
+        switch relayManager.connectionStatus(for: peer, now: relayStatusNow) {
+        case .local:
+            return theme.success
+        case .remote:
+            return theme.brandPrimary
+        case .offline:
+            return theme.textTertiary
         }
     }
 
-    private func sendLockScreenCommand(to peer: DeviceRelayDevice) {
-        guard relayManager.isPeerReachable(peer, now: relayStatusNow) else {
-            relaySendError = "没有在线 Mac 可锁定"
-            return
+    private func peerTransportText(for peer: DeviceRelayDevice) -> String {
+        switch relayManager.connectionStatus(for: peer, now: relayStatusNow) {
+        case .local:
+            return "局域网直连"
+        case .remote:
+            return "远程中继"
+        case .offline:
+            return "离线"
         }
-        guard relayManager.screenLocked(for: peer) != true else {
-            relaySendError = nil
-            isShowingLockConfirmation = false
-            lockScreenTargetPeer = nil
-            return
+    }
+
+    private func statusFreshnessText(for peer: DeviceRelayDevice) -> String {
+        guard let updatedAt = relayManager.systemMetricsUpdatedAt(for: peer) else {
+            return relayManager.isPeerReachable(peer, now: relayStatusNow) ? "等待状态" : "状态不可用"
+        }
+        let elapsed = max(0, Int(relayStatusNow.timeIntervalSince(updatedAt)))
+        if elapsed < 15 {
+            return "刚刚更新"
+        }
+        if elapsed < 60 {
+            return "\(elapsed) 秒前更新"
+        }
+        return "\(max(1, elapsed / 60)) 分钟前更新"
+    }
+
+    private func formattedSpeed(_ bytesPerSecond: Int?) -> String {
+        guard let bytesPerSecond else { return "--" }
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        formatter.includesUnit = true
+        formatter.isAdaptive = true
+        return formatter.string(fromByteCount: Int64(bytesPerSecond)) + "/s"
+    }
+
+    private func isControlEnabled(_ command: DeviceRelayCommandType, for peer: DeviceRelayDevice) -> Bool {
+        guard sendingCommand == nil,
+              relayManager.isPeerReachable(peer, now: relayStatusNow) else {
+            return false
         }
 
-        relaySendError = nil
-        isSendingLockScreenCommand = true
+        switch command {
+        case .lockScreen:
+            return relayManager.screenLocked(for: peer) != true
+        case .wakeDisplay:
+            return relayManager.displayAwake(for: peer) == false
+        case .displaySleep:
+            return relayManager.displayAwake(for: peer) == true
+        }
+    }
+
+    private func controlAccessibilityLabel(_ command: DeviceRelayCommandType, for peer: DeviceRelayDevice) -> String {
+        let name = relayManager.displayName(for: peer)
+        switch command {
+        case .lockScreen:
+            return "锁定 \(name)"
+        case .wakeDisplay:
+            return "唤醒 \(name) 显示器"
+        case .displaySleep:
+            return "让 \(name) 显示器休眠"
+        }
+    }
+
+    private func controlDisabledReason(_ command: DeviceRelayCommandType, for peer: DeviceRelayDevice) -> String {
+        guard relayManager.isPeerReachable(peer, now: relayStatusNow) else {
+            return "Mac 当前离线"
+        }
+        if sendingCommand != nil {
+            return "另一项控制正在执行"
+        }
+        switch command {
+        case .lockScreen:
+            return "Mac 已锁定"
+        case .wakeDisplay:
+            return relayManager.displayAwake(for: peer) == true ? "显示器已唤醒" : "显示器状态未知"
+        case .displaySleep:
+            return relayManager.displayAwake(for: peer) == false ? "显示器已休眠" : "显示器状态未知"
+        }
+    }
+
+    private func perform(_ command: DeviceRelayCommandType, on peer: DeviceRelayDevice) {
+        guard isControlEnabled(command, for: peer) else { return }
+        if command == .lockScreen {
+            lockScreenTargetPeer = peer
+            isShowingLockConfirmation = true
+        } else {
+            sendSystemCommand(command, to: peer)
+        }
+    }
+
+    private func sendSystemCommand(_ command: DeviceRelayCommandType, to peer: DeviceRelayDevice) {
+        guard isControlEnabled(command, for: peer) else { return }
+        controlError = nil
+        sendingCommand = command
         Task {
             defer {
-                isSendingLockScreenCommand = false
-                isShowingLockConfirmation = false
-                lockScreenTargetPeer = nil
+                sendingCommand = nil
+                if command == .lockScreen {
+                    isShowingLockConfirmation = false
+                    lockScreenTargetPeer = nil
+                }
             }
             do {
-                try await relayManager.sendLockScreenCommand(targetDeviceId: peer.deviceId)
+                try await relayManager.sendSystemCommand(command, targetDeviceId: peer.deviceId)
                 try? await Task.sleep(for: .seconds(1))
                 try? await relayManager.sendSystemStatusRequest(targetDeviceId: peer.deviceId)
             } catch {
-                relaySendError = error.localizedDescription
+                controlError = error.localizedDescription
             }
         }
     }
 
     private func requestMacStatuses() async {
-        let macPeers = relayManager.peers.filter { $0.deviceType == .mac && relayManager.isPeerReachable($0, now: relayStatusNow) }
-        for peer in macPeers {
+        let reachablePeers = pairedMacPeers.filter {
+            relayManager.isPeerReachable($0, now: relayStatusNow)
+        }
+        for peer in reachablePeers {
             try? await relayManager.sendSystemStatusRequest(targetDeviceId: peer.deviceId)
         }
     }
@@ -600,32 +574,6 @@ struct IOSMacRelayView: View {
         await relayManager.refreshPeers()
         relayStatusNow = Date()
         await requestMacStatuses()
-    }
-
-    private func updateMacStatusCardVisibility(offset: CGFloat) {
-        guard !pairedMacPeers.isEmpty else {
-            isMacStatusCardCollapsed = false
-            return
-        }
-
-        if offset < -72, !isMacStatusCardCollapsed {
-            isMacStatusCardCollapsed = true
-        } else if offset > -16, isMacStatusCardCollapsed {
-            isMacStatusCardCollapsed = false
-        }
-    }
-
-    private func updateMacStatusCardVisibility(translation: CGFloat) {
-        guard !pairedMacPeers.isEmpty else {
-            isMacStatusCardCollapsed = false
-            return
-        }
-
-        if translation < -24, !isMacStatusCardCollapsed {
-            isMacStatusCardCollapsed = true
-        } else if translation > 24, isMacStatusCardCollapsed {
-            isMacStatusCardCollapsed = false
-        }
     }
 
     @MainActor
@@ -651,16 +599,8 @@ struct IOSMacRelayView: View {
     }
 
     private func cancelLockConfirmation() {
-        guard !isSendingLockScreenCommand else { return }
+        guard sendingCommand == nil else { return }
         isShowingLockConfirmation = false
         lockScreenTargetPeer = nil
-    }
-}
-
-private struct MacRelayListTopOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }

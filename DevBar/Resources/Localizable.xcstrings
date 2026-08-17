@@ -2157,6 +2157,7 @@
       }
     },
     "device_relay_lock_locked" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5371,6 +5372,7 @@
       }
     },
     "ios_mac_relay_task_failed" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5387,6 +5389,7 @@
       }
     },
     "ios_mac_relay_task_pending" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5403,6 +5406,7 @@
       }
     },
     "ios_mac_relay_task_running" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5419,6 +5423,7 @@
       }
     },
     "ios_mac_relay_task_succeeded" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -5435,6 +5440,7 @@
       }
     },
     "ios_mac_relay_tasks_title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -10075,6 +10081,7 @@
       }
     },
     "Mac Relay, %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13852,6 +13859,7 @@
       }
     },
     "中继未连接" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13862,6 +13870,7 @@
       }
     },
     "中继连接失败" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -13996,6 +14005,9 @@
         }
       }
     },
+    "传感器仍可通过上方状态或房间详情查看" : {
+
+    },
     "使用 Apple 登录后，可以同步昵称并查看消息。" : {
 
     },
@@ -14128,6 +14140,9 @@
         }
       }
     },
+    "关闭摆风" : {
+
+    },
     "关闭显示器" : {
       "localizations" : {
         "en" : {
@@ -14147,6 +14162,12 @@
           }
         }
       }
+    },
+    "关闭空调" : {
+
+    },
+    "关闭风扇" : {
+
     },
     "其他实体（%lld）" : {
 
@@ -14226,6 +14247,9 @@
         }
       }
     },
+    "切换风向" : {
+
+    },
     "刚刚" : {
       "localizations" : {
         "en" : {
@@ -14271,6 +14295,9 @@
         }
       }
     },
+    "刷新状态" : {
+
+    },
     "剩余" : {
       "localizations" : {
         "en" : {
@@ -14313,7 +14340,11 @@
     "原始信息" : {
 
     },
+    "双击设为家庭墙纸" : {
+
+    },
     "发送" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14334,6 +14365,7 @@
       }
     },
     "发送任务到在线 Mac" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14598,7 +14630,13 @@
     "实体与状态" : {
 
     },
+    "室内 %@" : {
+
+    },
     "家庭 Wi-Fi SSID %lld" : {
+
+    },
+    "家庭墙纸" : {
 
     },
     "导入到 iPhone" : {
@@ -14734,6 +14772,9 @@
     "已关联 %lld 条历史 Snippet" : {
 
     },
+    "已关闭" : {
+
+    },
     "已卡住" : {
       "localizations" : {
         "en" : {
@@ -14819,10 +14860,16 @@
     "开启后，Mac 会通过 Relay 把此账号的 token/cookie 同步到 iPhone。请只用于自己的可信设备。" : {
 
     },
-    "强调色" : {
+    "开启摆风" : {
 
     },
-    "当前 %@°" : {
+    "开启空调" : {
+
+    },
+    "开启风扇" : {
+
+    },
+    "强调色" : {
 
     },
     "当前不可控制" : {
@@ -14951,7 +14998,11 @@
         }
       }
     },
+    "扫描 Mac DevBar 中的连接二维码后，即可查看状态并进行快捷控制。" : {
+
+    },
     "扫描 Mac DevBar 里的连接二维码后，这里会显示已绑定 Mac。" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -14960,6 +15011,9 @@
           }
         }
       }
+    },
+    "扫描连接二维码" : {
+
     },
     "把快捷指令收到的短信内容提交到 DevBar 服务端，优先通过 Relay 转发到已配对电脑，离线时使用系统通知兜底。" : {
       "localizations" : {
@@ -15229,6 +15283,9 @@
     "暖白" : {
 
     },
+    "更多" : {
+
+    },
     "更多工具操作" : {
 
     },
@@ -15293,6 +15350,7 @@
 
     },
     "本地连接" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -15352,9 +15410,6 @@
       }
     },
     "检查 iCloud 状态" : {
-
-    },
-    "模式 · %@" : {
 
     },
     "橙色" : {
@@ -15636,6 +15691,9 @@
         }
       }
     },
+    "电源" : {
+
+    },
     "电脑" : {
       "localizations" : {
         "en" : {
@@ -15678,8 +15736,21 @@
         }
       }
     },
-    "目标温度 %@°" : {
+    "目标" : {
 
+    },
+    "目标温度" : {
+
+    },
+    "目标温度 %@%@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "目标温度 %1$@%2$@"
+          }
+        }
+      }
     },
     "短信内容" : {
       "localizations" : {
@@ -16123,6 +16194,9 @@
     "轻点或上下拖动调整，轻点底部图标开关" : {
 
     },
+    "辅助功能" : {
+
+    },
     "输入要显示在灵动岛的一句文案" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16190,9 +16264,6 @@
         }
       }
     },
-    "返回" : {
-
-    },
     "这些信息会用于 Mac 主题小组件和 Relay 设备识别。" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16258,6 +16329,7 @@
       }
     },
     "连接中" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -16267,16 +16339,28 @@
         }
       }
     },
+    "连接你的 Mac" : {
+
+    },
     "连接地址" : {
 
     },
     "退出登录" : {
 
     },
+    "送风模式" : {
+
+    },
+    "送风模式 · %@" : {
+
+    },
     "选中的控制会在完成设备设置后成为独立配件。未选中的控制、状态和参数仍保留在原设备中。" : {
 
     },
     "选取图标" : {
+
+    },
+    "选择 · %@" : {
 
     },
     "选择 Agent Watcher 小组件显示的内容。" : {
@@ -16581,6 +16665,7 @@
       }
     },
     "锁定 %@" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -16706,6 +16791,12 @@
           }
         }
       }
+    },
+    "风速" : {
+
+    },
+    "首页没有可控制设备" : {
+
     },
     "香槟金" : {
 

@@ -320,6 +320,7 @@ public struct HomeAssistantEntity: Codable, Equatable, Identifiable, Sendable {
     public let icon: String?
     public let platform: String?
     public let translationKey: String?
+    public let entityCategory: String?
     public let state: HomeAssistantState
     public let availableServices: Set<String>
 
@@ -337,6 +338,7 @@ public struct HomeAssistantEntity: Codable, Equatable, Identifiable, Sendable {
         icon: String?,
         platform: String? = nil,
         translationKey: String? = nil,
+        entityCategory: String? = nil,
         state: HomeAssistantState,
         availableServices: Set<String>
     ) {
@@ -349,6 +351,7 @@ public struct HomeAssistantEntity: Codable, Equatable, Identifiable, Sendable {
         self.icon = icon
         self.platform = platform
         self.translationKey = translationKey
+        self.entityCategory = entityCategory
         self.state = state
         self.availableServices = availableServices
     }

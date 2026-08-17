@@ -20,7 +20,13 @@ public enum HomeAssistantTopologyBuilder {
         let entities = states.compactMap { state -> HomeAssistantEntity? in
             let entry = registryByID[state.entityID]
             if entry?.isHidden == true { return nil }
-            if !showsDiagnosticEntities, ["config", "diagnostic"].contains(entry?.entityCategory ?? "") { return nil }
+            if !showsDiagnosticEntities {
+                if entry?.entityCategory == "diagnostic" { return nil }
+                if entry?.entityCategory == "config" {
+                    guard entry?.deviceID != nil,
+                          retainedConfigurationControlDomains.contains(state.domain) else { return nil }
+                }
+            }
 
             let device = entry?.deviceID.flatMap { deviceByID[$0] }
             let areaID = entry?.areaID ?? device?.areaID
@@ -38,6 +44,7 @@ public enum HomeAssistantTopologyBuilder {
                 icon: entry?.icon ?? state.attributes["icon"]?.stringValue,
                 platform: entry?.platform,
                 translationKey: entry?.translationKey,
+                entityCategory: entry?.entityCategory,
                 state: state,
                 availableServices: (discoveredServices[state.domain] ?? []).union(standardServices[state.domain] ?? [])
             )
@@ -54,6 +61,9 @@ public enum HomeAssistantTopologyBuilder {
                 return nil
             }
             let presented = presentedEntities(from: values, isPhysicalDevice: isPhysicalDevice)
+            if isPhysicalDevice, presented.allSatisfy({ $0.entityCategory == "config" }) {
+                return nil
+            }
             let ranked = HomeAssistantPrimaryEntityPolicy.rankedCandidates(
                 presented,
                 rank: HomeAssistantPrimaryEntityPolicy.topologyRank
@@ -111,7 +121,8 @@ public enum HomeAssistantTopologyBuilder {
                 areaID: entity.areaID,
                 deviceID: entity.deviceID,
                 name: entity.name,
-                icon: entity.icon
+                icon: entity.icon,
+                entityCategory: entity.entityCategory
             )
         }
         let areas = snapshot.rooms.compactMap { room -> HomeAssistantArea? in
@@ -141,7 +152,15 @@ public enum HomeAssistantTopologyBuilder {
         let genericControls = entities.filter {
             ["switch", "input_boolean"].contains($0.domain) && !isLikelyConfigurationHelper($0)
         }
-        let persistentControls = majorControls + genericControls
+        let selectableControls = entities.filter {
+            ["select", "input_select"].contains($0.domain) && !isLikelyConfigurationHelper($0)
+        }
+        let configurationActions = entities.filter {
+            $0.domain == "button"
+                && $0.entityCategory == "config"
+                && !isLikelyConfigurationHelper($0)
+        }
+        let persistentControls = majorControls + genericControls + selectableControls + configurationActions
         let informativeEntities = entities.filter(isInformativeEntity)
         let result = persistentControls + informativeEntities
 
@@ -160,6 +179,7 @@ public enum HomeAssistantTopologyBuilder {
         let hint = "\(entity.entityID) \(entity.name)".lowercased()
         return [
             "flex_switch", "滚动开关", "factory_reset", "恢复出厂", "参数重置",
+            "factory", "reset", "校准", "calibration", "firmware", "固件",
             "default_state", "默认状态", "dimming_mode", "灯光变化",
         ].contains { hint.contains($0) }
     }
@@ -193,15 +213,24 @@ public enum HomeAssistantTopologyBuilder {
         "light": ["turn_on", "turn_off", "toggle"],
         "switch": ["turn_on", "turn_off", "toggle"],
         "input_boolean": ["turn_on", "turn_off", "toggle"],
-        "fan": ["turn_on", "turn_off", "toggle", "set_percentage"],
+        "fan": ["turn_on", "turn_off", "toggle", "set_percentage", "set_preset_mode", "oscillate", "set_direction"],
         "cover": ["open_cover", "close_cover", "stop_cover", "set_cover_position"],
-        "climate": ["set_temperature", "set_hvac_mode"],
+        "climate": [
+            "turn_on", "turn_off", "toggle", "set_temperature", "set_hvac_mode",
+            "set_fan_mode", "set_preset_mode", "set_swing_mode", "set_swing_horizontal_mode",
+        ],
+        "select": ["select_option"],
+        "input_select": ["select_option"],
         "lock": ["lock", "unlock"],
         "scene": ["turn_on"],
         "script": ["turn_on"],
         "automation": ["trigger"],
         "button": ["press"],
     ]
+
+    private static let retainedConfigurationControlDomains = Set([
+        "switch", "input_boolean", "select", "input_select", "button",
+    ])
 }
 
 private extension Array where Element == HomeAssistantEntity {

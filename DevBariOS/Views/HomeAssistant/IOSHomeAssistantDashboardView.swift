@@ -189,7 +189,6 @@ struct IOSHomeAssistantDashboardView: View {
                     }
                     .accessibilityAddTraits(.isHeader)
 
-                if showsConnectionStatus { connectionRow }
                 IOSHomeAssistantStatusStrip(
                     items: statusItems,
                     selection: selectedStatusCategory,
@@ -263,19 +262,6 @@ struct IOSHomeAssistantDashboardView: View {
             .fixedSize(horizontal: true, vertical: false)
             .opacity(titleCollapseProgress)
             .accessibilityHidden(titleCollapseProgress < 0.9)
-    }
-
-    private var connectionRow: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(connectionColor)
-                .frame(width: 8, height: 8)
-            Text(connectionText)
-                .font(theme.captionWeightFont)
-                .foregroundStyle(theme.isGeek ? theme.textSecondary : Color.white.opacity(0.78))
-            Spacer()
-        }
-        .padding(.top, 4)
     }
 
     @ViewBuilder
@@ -529,35 +515,6 @@ struct IOSHomeAssistantDashboardView: View {
         case .resetLayoutSuggestion:
             model.resetLayoutSuggestion()
         }
-    }
-
-    private var connectionText: String {
-        switch model.connectionState {
-        case .connected(.internalNetwork): "Home Assistant · 内网"
-        case .connected(.externalNetwork): "Home Assistant · 公网"
-        case .connecting(.internalNetwork): "正在连接内网…"
-        case .connecting(.externalNetwork): "正在连接公网…"
-        case .reconnecting: "正在重新连接…"
-        case .authenticationFailed: "认证失败"
-        case .failed: "连接失败"
-        case .offline:
-            model.snapshotPhase == .empty ? "离线" : "Home Assistant · 离线缓存"
-        case .notConfigured: "未配置"
-        }
-    }
-
-    private var connectionColor: Color {
-        switch model.connectionState {
-        case .connected: theme.success
-        case .connecting, .reconnecting: theme.warning
-        case .offline, .notConfigured: theme.textTertiary
-        case .authenticationFailed, .failed: theme.danger
-        }
-    }
-
-    private var showsConnectionStatus: Bool {
-        if case .connected = model.connectionState { return false }
-        return true
     }
 
 }

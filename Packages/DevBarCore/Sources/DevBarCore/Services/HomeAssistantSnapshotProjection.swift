@@ -161,6 +161,7 @@ public enum HomeAssistantSnapshotProjection {
             icon: entity.icon,
             platform: entity.platform,
             translationKey: entity.translationKey,
+            entityCategory: entity.entityCategory,
             state: state,
             availableServices: entity.availableServices
         )
@@ -179,8 +180,10 @@ public enum HomeAssistantSnapshotProjection {
     private static let cachedAttributeKeys = Set([
         "brightness", "color_mode", "color_temp", "current_position", "current_temperature",
         "device_class", "fan_mode", "fan_modes", "hvac_action", "hvac_modes", "max_temp",
-        "min_temp", "percentage", "percentage_step", "preset_mode", "preset_modes", "rgb_color",
+        "current_direction", "min_temp", "oscillating", "percentage", "percentage_step",
+        "options", "preset_mode", "preset_modes", "rgb_color", "swing_horizontal_mode",
+        "swing_horizontal_modes", "swing_mode", "swing_modes",
         "supported_color_modes", "supported_features", "target_temp_high", "target_temp_low",
-        "target_temp_step", "temperature", "unit_of_measurement",
+        "target_temp_step", "temperature", "temperature_unit", "unit_of_measurement",
     ])
 }

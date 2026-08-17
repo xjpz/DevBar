@@ -305,6 +305,7 @@ public enum HomeAssistantAccessoryReconciler {
             icon: entity.icon,
             platform: entity.platform,
             translationKey: entity.translationKey,
+            entityCategory: entity.entityCategory,
             state: state,
             availableServices: entity.availableServices
         )

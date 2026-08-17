@@ -593,16 +593,21 @@ public final class DeviceRelayManager: ObservableObject {
         )
     }
 
-    public func sendLockScreenCommand(targetDeviceId: String) async throws {
+    public func sendSystemCommand(_ command: DeviceRelayCommandType, targetDeviceId: String) async throws {
         guard let localDeviceID else {
             throw DeviceRelayError.missingDeviceID
         }
         try await send(
-            Self.makeLockScreenMessage(
+            Self.makeSystemCommandMessage(
                 localDeviceID: localDeviceID,
-                targetDeviceId: targetDeviceId
+                targetDeviceId: targetDeviceId,
+                command: command
             )
         )
+    }
+
+    public func sendLockScreenCommand(targetDeviceId: String) async throws {
+        try await sendSystemCommand(.lockScreen, targetDeviceId: targetDeviceId)
     }
 
     public func sendSystemStatusRequest(targetDeviceId: String) async throws {
@@ -799,13 +804,41 @@ public final class DeviceRelayManager: ObservableObject {
         )
     }
 
-    public static func makeLockScreenMessage(localDeviceID: String, targetDeviceId: String) -> DeviceRelayMessage {
-        DeviceRelayMessage(
-            type: .systemLockScreen,
-            requestId: "lock-\(UUID().uuidString.lowercased())",
+    public static func makeSystemCommandMessage(
+        localDeviceID: String,
+        targetDeviceId: String,
+        command: DeviceRelayCommandType
+    ) -> DeviceRelayMessage {
+        let messageType: DeviceRelayMessageType = switch command {
+        case .lockScreen:
+            .systemLockScreen
+        case .wakeDisplay:
+            .systemWakeDisplay
+        case .displaySleep:
+            .systemDisplaySleep
+        }
+        let requestPrefix = switch command {
+        case .lockScreen:
+            "lock"
+        case .wakeDisplay:
+            "wake"
+        case .displaySleep:
+            "sleep"
+        }
+        return DeviceRelayMessage(
+            type: messageType,
+            requestId: "\(requestPrefix)-\(UUID().uuidString.lowercased())",
             fromDeviceId: localDeviceID,
             targetDeviceId: targetDeviceId,
-            payload: ["command": "lockScreen"]
+            payload: ["command": command.rawValue]
+        )
+    }
+
+    public static func makeLockScreenMessage(localDeviceID: String, targetDeviceId: String) -> DeviceRelayMessage {
+        makeSystemCommandMessage(
+            localDeviceID: localDeviceID,
+            targetDeviceId: targetDeviceId,
+            command: .lockScreen
         )
     }
 

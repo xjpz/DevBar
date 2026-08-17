@@ -368,7 +368,12 @@ public struct HomeAssistantAccessoryControlProjection: Equatable, Sendable {
     public let usesChildControlGrid: Bool
 
     public init(accessory: HomeAssistantAccessory) {
-        let masterEntity = accessory.powerEntity ?? accessory.primaryControlEntity
+        let climateEntity = accessory.primaryControlEntity.flatMap { entity in
+            entity.domain == "climate" ? entity : nil
+        } ?? accessory.entities.first(where: { $0.domain == "climate" && $0.isAvailable })
+        let masterEntity = accessory.kind == .airConditioner
+            ? climateEntity ?? accessory.powerEntity ?? accessory.primaryControlEntity
+            : accessory.powerEntity ?? accessory.primaryControlEntity
         self.masterEntity = masterEntity
 
         let directlyControllableDomains = Set([

@@ -333,11 +333,37 @@ final class IOSHomeAssistantViewModel: ObservableObject {
             return
         }
         restoreCachedSnapshotIfNeeded()
+        if let connectionTask {
+            await connectionTask.value
+            return
+        }
+
+        switch connectionState {
+        case .connected where connectedCandidate != nil:
+            return
+        case .connecting, .reconnecting:
+            return
+        default:
+            break
+        }
+
         await reconnect()
     }
 
     func resume() async {
         restoreCachedSnapshotIfNeeded()
+        if let connectionTask {
+            await connectionTask.value
+            return
+        }
+
+        switch connectionState {
+        case .connecting, .reconnecting:
+            return
+        default:
+            break
+        }
+
         let preferredCandidate = await endpointCandidates().first
         if connectedCandidate == preferredCandidate {
             await refresh()
@@ -465,6 +491,9 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         }
         connectionTask = task
         await task.value
+        if generation == connectionGeneration {
+            connectionTask = nil
+        }
     }
 
     func refresh() async {
