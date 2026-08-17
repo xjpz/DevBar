@@ -16,6 +16,7 @@ struct IOSTranslationView: View {
     @State private var copyFeedback = false
     @State private var errorMessage: String?
     @State private var translationConfig: TranslationSession.Configuration?
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
         ScrollView {
@@ -27,8 +28,9 @@ struct IOSTranslationView: View {
             }
             .padding(16)
         }
+        .scrollDismissesKeyboard(.interactively)
         .background(Color.clear)
-            .toolbarBackground(.hidden, for: .navigationBar)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .navigationTitle("ios_tools_translate")
         .iosToolTitleDisplayMode(toolEntryContext)
         .toolbar(toolEntryContext.tabBarVisibility, for: .tabBar)
@@ -37,15 +39,24 @@ struct IOSTranslationView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("ios_tools_translate_clear_input") {
+                        isInputFocused = false
                         inputText = ""
                     }
                     Button("ios_tools_translate_clear_result") {
+                        isInputFocused = false
                         translatedText = ""
                         errorMessage = nil
                     }
                 } label: {
                     Image(systemName: "ellipsis")
                         .iosToolToolbarIcon(theme)
+                }
+            }
+
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("ios_common_done") {
+                    isInputFocused = false
                 }
             }
         }
@@ -61,6 +72,7 @@ struct IOSTranslationView: View {
             languagePicker("Source", selection: $sourceLanguage)
 
             Button {
+                isInputFocused = false
                 withAnimation(.easeInOut(duration: 0.25)) {
                     let temp = sourceLanguage
                     sourceLanguage = targetLanguage
@@ -82,6 +94,7 @@ struct IOSTranslationView: View {
         Menu {
             ForEach(AppLanguage.allCases) { lang in
                 Button {
+                    isInputFocused = false
                     selection.wrappedValue = lang
                 } label: {
                     HStack {
@@ -130,6 +143,7 @@ struct IOSTranslationView: View {
                 TextEditor(text: $inputText)
                     .font(.system(.body, design: .monospaced))
                     .scrollContentBackground(.hidden)
+                    .focused($isInputFocused)
                     .frame(minHeight: 140)
                     .padding(10)
             }
@@ -204,12 +218,17 @@ struct IOSTranslationView: View {
                 }
             }
         }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            isInputFocused = false
+        }
         .animation(.easeOut(duration: 0.25), value: copyFeedback)
     }
 
     // MARK: - Translation Logic
 
     private func startTranslation() {
+        isInputFocused = false
         errorMessage = nil
         isTranslating = true
 
