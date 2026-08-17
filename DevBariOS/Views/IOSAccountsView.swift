@@ -782,6 +782,9 @@ struct IOSAccountsView: View {
             case let .providerTransfer(preview, relayURL):
                 pendingRelayTransferURL = relayURL
                 pendingImportPreview = preview
+            case .zcodeRemote:
+                pendingRelayTransferURL = nil
+                transferImportError = String(localized: "ios_mac_relay_scan_zcode_remote_unsupported")
             }
         } catch {
             pendingRelayTransferURL = nil

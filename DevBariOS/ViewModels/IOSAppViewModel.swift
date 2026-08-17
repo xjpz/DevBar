@@ -10,6 +10,7 @@ enum IOSScannedCodeResolution {
     case macPaired
     case accountBinding(DeviceAccountBindScan)
     case providerTransfer(preview: TransferImportPreview, relayURL: URL?)
+    case zcodeRemote(ZCodeRemoteLink)
 }
 
 enum IOSDebugLogger {
@@ -1366,6 +1367,10 @@ final class IOSAppViewModel: ObservableObject {
         if DeviceRelayPairQRCodeCodec.canDecode(rawValue) {
             try await pairMacDevice(from: rawValue)
             return .macPaired
+        }
+
+        if let zcodeLink = ZCodeRemoteLink(rawValue: rawValue) {
+            return .zcodeRemote(zcodeLink)
         }
 
         let payload = try await prepareTransferImport(from: rawValue)

@@ -592,6 +592,8 @@ struct IOSMacRelayView: View {
                 scanError = "请使用首页右上角的扫码按钮关联账号。"
             case .providerTransfer:
                 scanError = String(localized: "ios_mac_relay_scan_provider_transfer_unsupported")
+            case .zcodeRemote:
+                scanError = String(localized: "ios_mac_relay_scan_zcode_remote_unsupported")
             }
         } catch {
             scanError = error.localizedDescription

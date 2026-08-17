@@ -511,6 +511,16 @@ struct IOSToolDefinition: Identifiable {
 }
 
 enum IOSToolCatalog {
+    /// ZCode 官网品牌色：深炭底 + 白。图标取带蓝调的深石墨（#37474F，官网色系），
+    /// 避免近黑显得沉闷；深色外观下反转为白
+    private enum IOSZCodeRemoteToolPalette {
+        static let brandIconColor = Color(UIColor { trait in
+            trait.userInterfaceStyle == .dark
+                ? .white
+                : UIColor(red: 0x37 / 255, green: 0x47 / 255, blue: 0x4F / 255, alpha: 1)
+        })
+    }
+
     static func availableTools() -> [IOSToolDefinition] {
         var tools: [IOSToolDefinition] = [
             IOSToolDefinition(id: "api-client", title: "API 调试", subtitle: "API Client", systemImage: "globe", iconColor: .cyan, tabTitle: "API"),
@@ -534,6 +544,7 @@ enum IOSToolCatalog {
             IOSToolDefinition(id: "memo", title: "备忘录", subtitle: "Memo", systemImage: "note.text", iconColor: .brown, tabTitle: "Memo"),
             IOSToolDefinition(id: "chatbot-hermes", title: "Hermes", subtitle: "ChatBot", systemImage: "bubble.left.and.bubble.right.fill", iconColor: .green, tabTitle: "Hermes"),
             IOSToolDefinition(id: "home-assistant", title: "Home Assistant", subtitle: "家庭控制台", systemImage: "apple.homekit", iconColor: .blue, tabTitle: "家庭"),
+            IOSToolDefinition(id: "zcode-remote", title: "ZCode 远控", subtitle: "Remote Control", systemImage: "macbook.and.iphone", iconColor: IOSZCodeRemoteToolPalette.brandIconColor, tabTitle: "ZCode"),
         ])
 
         return tools
@@ -587,6 +598,8 @@ struct IOSToolDestinationView: View {
                 IOSHermesConversationListView(provider: .hermes)
             case "home-assistant":
                 IOSHomeAssistantDashboardView()
+            case "zcode-remote":
+                IOSZCodeRemoteView()
             default:
                 EmptyView()
             }

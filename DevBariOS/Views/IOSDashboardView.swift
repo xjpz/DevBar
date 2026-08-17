@@ -9,6 +9,7 @@ struct IOSDashboardView: View {
     @Environment(\.themeTokens) private var theme
     @State private var isShowingAccounts = false
     @State private var isShowingScanner = false
+    @State private var isShowingZCodeRemote = false
     @State private var isResolvingScan = false
     @State private var pendingImportPreview: TransferImportPreview?
     @State private var pendingAccountBinding: DeviceAccountBindScan?
@@ -101,6 +102,9 @@ struct IOSDashboardView: View {
         .accessibilityIdentifier("ios.dashboard.screen")
         .navigationDestination(isPresented: $isShowingAccounts) {
             IOSAccountsView()
+        }
+        .navigationDestination(isPresented: $isShowingZCodeRemote) {
+            IOSToolDestinationView(toolID: "zcode-remote")
         }
         .sheet(isPresented: $isShowingScanner) {
             NavigationStack {
@@ -761,6 +765,10 @@ struct IOSDashboardView: View {
             case let .providerTransfer(preview, relayURL):
                 pendingRelayTransferURL = relayURL
                 pendingImportPreview = preview
+            case let .zcodeRemote(link):
+                pendingRelayTransferURL = nil
+                IOSZCodeRemoteConnectionStore().save(link.url.absoluteString)
+                isShowingZCodeRemote = true
             }
         } catch {
             pendingRelayTransferURL = nil
