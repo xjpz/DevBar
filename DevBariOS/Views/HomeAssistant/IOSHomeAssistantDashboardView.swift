@@ -205,7 +205,7 @@ struct IOSHomeAssistantDashboardView: View {
                             ContentUnavailableView(
                                 "所有设备均已隐藏",
                                 systemImage: "eye.slash",
-                                description: Text("可从右上角 … → 隐藏的设备中恢复")
+                                description: Text("可从右上角 … → 未在首页显示中恢复")
                             )
                         } else {
                             ContentUnavailableView(
@@ -220,7 +220,7 @@ struct IOSHomeAssistantDashboardView: View {
                     ContentUnavailableView(
                         "首页没有可控制设备",
                         systemImage: "switch.2",
-                        description: Text("传感器仍可通过上方状态或房间详情查看")
+                        description: Text("可从右上角 … → 未在首页显示中添加传感器")
                     )
                     .foregroundStyle(.white)
                     .frame(minHeight: 220)
@@ -395,18 +395,14 @@ struct IOSHomeAssistantDashboardView: View {
 
     private var hasDefaultDashboardAccessories: Bool {
         model.rooms.contains { room in
-            model.accessories(inRoom: room.id).contains {
-                HomeAssistantDashboardPresentationPolicy.isShownByDefault($0.kind)
-            }
+            model.accessories(inRoom: room.id).contains(where: model.isShownOnDashboard)
         }
     }
 
     private func displayedAccessories(in room: HomeAssistantRoom) -> [HomeAssistantAccessory] {
         let accessories = model.accessories(inRoom: room.id)
         guard let selectedStatusCategory else {
-            return accessories.filter {
-                HomeAssistantDashboardPresentationPolicy.isShownByDefault($0.kind)
-            }
+            return accessories.filter(model.isShownOnDashboard)
         }
         return accessories.filter { matches($0, category: selectedStatusCategory) }
     }
@@ -571,8 +567,8 @@ private struct HomeAssistantDashboardMenu: View, Equatable {
             Button { perform(.hiddenDevices) } label: {
                 Label(
                     hiddenAccessoryCount == 0
-                        ? "隐藏的设备"
-                        : "隐藏的设备（\(hiddenAccessoryCount)）",
+                        ? "未在首页显示"
+                        : "未在首页显示（\(hiddenAccessoryCount)）",
                     systemImage: "eye.slash"
                 )
             }

@@ -10,9 +10,9 @@ struct IOSHomeAssistantHiddenDevicesView: View {
         Group {
             if groups.isEmpty {
                 ContentUnavailableView(
-                    "没有隐藏的设备",
+                    "所有设备均已显示",
                     systemImage: "eye",
-                    description: Text("长按设备卡片或在设备详情中可以隐藏设备。")
+                    description: Text("传感器默认不显示；可在设备设置中选择显示在首页。")
                 )
             } else {
                 List {
@@ -50,7 +50,7 @@ struct IOSHomeAssistantHiddenDevicesView: View {
                 .listStyle(.insetGrouped)
             }
         }
-        .navigationTitle("隐藏的设备")
+        .navigationTitle("未在首页显示")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {

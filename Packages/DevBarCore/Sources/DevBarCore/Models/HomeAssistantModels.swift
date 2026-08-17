@@ -462,9 +462,32 @@ public struct HomeAssistantSnapshotCacheEnvelope: Codable, Equatable, Sendable {
 
 public struct HomeAssistantDeviceVisibilitySettings: Codable, Equatable, Sendable {
     public var hiddenCardIDs: Set<String>
+    public var shownCardIDs: Set<String>
 
-    public init(hiddenCardIDs: Set<String> = []) {
+    public init(
+        hiddenCardIDs: Set<String> = [],
+        shownCardIDs: Set<String> = []
+    ) {
         self.hiddenCardIDs = hiddenCardIDs
+        self.shownCardIDs = shownCardIDs.subtracting(hiddenCardIDs)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case hiddenCardIDs
+        case shownCardIDs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let hiddenCardIDs = try container.decodeIfPresent(Set<String>.self, forKey: .hiddenCardIDs) ?? []
+        let shownCardIDs = try container.decodeIfPresent(Set<String>.self, forKey: .shownCardIDs) ?? []
+        self.init(hiddenCardIDs: hiddenCardIDs, shownCardIDs: shownCardIDs)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(hiddenCardIDs, forKey: .hiddenCardIDs)
+        try container.encode(shownCardIDs, forKey: .shownCardIDs)
     }
 }
 

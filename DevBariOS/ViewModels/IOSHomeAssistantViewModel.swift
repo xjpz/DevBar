@@ -10,6 +10,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
     @Published private(set) var snapshot: HomeAssistantSnapshot?
     @Published private(set) var snapshotPhase: HomeAssistantSnapshotPhase = .empty
     @Published private(set) var hiddenCardIDs = Set<String>()
+    @Published private(set) var shownCardIDs = Set<String>()
     @Published private(set) var dashboardLayout = HomeAssistantDashboardLayoutSettings()
     @Published private(set) var devicePresentations: [String: HomeAssistantDevicePresentation] = [:]
     @Published private(set) var accessoryPresentations: [String: HomeAssistantAccessoryPresentation] = [:]
@@ -78,9 +79,11 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         self.settings = settings
         self.connectionState = settings.isConfigured ? .offline : .notConfigured
         if let fingerprint = HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: settings.externalURL) {
-            self.hiddenCardIDs = settingsStore.loadDeviceVisibility(
+            let visibility = settingsStore.loadDeviceVisibility(
                 instanceFingerprint: fingerprint
-            ).hiddenCardIDs
+            )
+            self.hiddenCardIDs = visibility.hiddenCardIDs
+            self.shownCardIDs = visibility.shownCardIDs
             self.dashboardLayout = settingsStore.loadDashboardLayout(instanceFingerprint: fingerprint)
             self.devicePresentations = settingsStore.loadDevicePresentations(
                 instanceFingerprint: fingerprint
@@ -154,7 +157,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
 
     var hiddenAccessories: [HomeAssistantAccessory] {
         allAccessories
-            .filter { hiddenCardIDs.contains($0.id) }
+            .filter { !isShownOnDashboard($0) }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
@@ -165,6 +168,21 @@ final class IOSHomeAssistantViewModel: ObservableObject {
                     && ($0.areaID == nil || needsAccessoryOrganization($0))
             }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    var deviceVisibility: HomeAssistantDeviceVisibilitySettings {
+        HomeAssistantDeviceVisibilitySettings(
+            hiddenCardIDs: hiddenCardIDs,
+            shownCardIDs: shownCardIDs
+        )
+    }
+
+    func isShownOnDashboard(_ accessory: HomeAssistantAccessory) -> Bool {
+        HomeAssistantDashboardPresentationPolicy.isShown(
+            accessory.kind,
+            cardID: accessory.id,
+            visibility: deviceVisibility
+        )
     }
 
     var hiddenCards: [HomeAssistantDeviceCard] {
@@ -402,9 +420,11 @@ final class IOSHomeAssistantViewModel: ObservableObject {
             cacheWritesSuspended = false
             hasRestoredCache = false
             if let nextFingerprint {
-                hiddenCardIDs = settingsStore.loadDeviceVisibility(
+                let visibility = settingsStore.loadDeviceVisibility(
                     instanceFingerprint: nextFingerprint
-                ).hiddenCardIDs
+                )
+                hiddenCardIDs = visibility.hiddenCardIDs
+                shownCardIDs = visibility.shownCardIDs
                 dashboardLayout = settingsStore.loadDashboardLayout(instanceFingerprint: nextFingerprint)
                 devicePresentations = settingsStore.loadDevicePresentations(
                     instanceFingerprint: nextFingerprint
@@ -421,6 +441,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
                 )
             } else {
                 hiddenCardIDs = []
+                shownCardIDs = []
                 dashboardLayout = HomeAssistantDashboardLayoutSettings()
                 devicePresentations = [:]
                 accessoryPresentations = [:]
@@ -459,6 +480,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         settings = HomeAssistantConnectionSettings()
         resetSnapshotState()
         hiddenCardIDs = []
+        shownCardIDs = []
         dashboardLayout = HomeAssistantDashboardLayoutSettings()
         devicePresentations = [:]
         accessoryPresentations = [:]
@@ -661,16 +683,20 @@ final class IOSHomeAssistantViewModel: ObservableObject {
     func hideDevice(_ cardID: String) {
         guard allAccessories.contains(where: { $0.id == cardID }) else { return }
         hiddenCardIDs.insert(cardID)
+        shownCardIDs.remove(cardID)
         saveDeviceVisibility()
         normalizeSelectedRoom()
     }
 
     func showDevice(_ cardID: String) {
+        guard allAccessories.contains(where: { $0.id == cardID }) else { return }
         hiddenCardIDs.remove(cardID)
+        shownCardIDs.insert(cardID)
         saveDeviceVisibility()
     }
 
     func showAllDevices() {
+        shownCardIDs.formUnion(hiddenAccessories.map(\.id))
         hiddenCardIDs.removeAll()
         saveDeviceVisibility()
     }
@@ -998,6 +1024,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         settings = settingsStore.load()
         guard let fingerprint = instanceFingerprint else {
             hiddenCardIDs = []
+            shownCardIDs = []
             dashboardLayout = HomeAssistantDashboardLayoutSettings()
             devicePresentations = [:]
             accessoryPresentations = [:]
@@ -1005,7 +1032,9 @@ final class IOSHomeAssistantViewModel: ObservableObject {
             rebuildAccessoryProjection()
             return
         }
-        hiddenCardIDs = settingsStore.loadDeviceVisibility(instanceFingerprint: fingerprint).hiddenCardIDs
+        let visibility = settingsStore.loadDeviceVisibility(instanceFingerprint: fingerprint)
+        hiddenCardIDs = visibility.hiddenCardIDs
+        shownCardIDs = visibility.shownCardIDs
         dashboardLayout = settingsStore.loadDashboardLayout(instanceFingerprint: fingerprint)
         devicePresentations = settingsStore.loadDevicePresentations(instanceFingerprint: fingerprint).devices
         accessoryPresentations = settingsStore.loadAccessoryPresentations(instanceFingerprint: fingerprint).accessories
@@ -1076,9 +1105,11 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         guard !hasRestoredCache else { return }
         hasRestoredCache = true
         guard let instanceFingerprint else { return }
-        hiddenCardIDs = settingsStore.loadDeviceVisibility(
+        let visibility = settingsStore.loadDeviceVisibility(
             instanceFingerprint: instanceFingerprint
-        ).hiddenCardIDs
+        )
+        hiddenCardIDs = visibility.hiddenCardIDs
+        shownCardIDs = visibility.shownCardIDs
         dashboardLayout = settingsStore.loadDashboardLayout(instanceFingerprint: instanceFingerprint)
         devicePresentations = settingsStore.loadDevicePresentations(
             instanceFingerprint: instanceFingerprint
@@ -1205,7 +1236,7 @@ final class IOSHomeAssistantViewModel: ObservableObject {
     private func saveDeviceVisibility() {
         guard let instanceFingerprint else { return }
         settingsStore.saveDeviceVisibility(
-            HomeAssistantDeviceVisibilitySettings(hiddenCardIDs: hiddenCardIDs),
+            deviceVisibility,
             instanceFingerprint: instanceFingerprint
         )
     }

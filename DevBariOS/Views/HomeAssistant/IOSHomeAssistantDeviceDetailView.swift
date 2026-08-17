@@ -42,11 +42,20 @@ struct IOSHomeAssistantDeviceDetailView: View {
                     } label: {
                         Label("设备设置", systemImage: "gearshape")
                     }
-                    Button(role: .destructive) {
-                        model.hideDevice(liveAccessory.id)
-                        dismiss()
-                    } label: {
-                        Label("隐藏设备", systemImage: "eye.slash")
+                    if model.isShownOnDashboard(liveAccessory) {
+                        Button(role: .destructive) {
+                            model.hideDevice(liveAccessory.id)
+                            dismiss()
+                        } label: {
+                            Label("从首页隐藏", systemImage: "eye.slash")
+                        }
+                    } else {
+                        Button {
+                            model.showDevice(liveAccessory.id)
+                            dismiss()
+                        } label: {
+                            Label("显示在首页", systemImage: "eye")
+                        }
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")

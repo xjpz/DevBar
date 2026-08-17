@@ -172,7 +172,10 @@ func homeAssistantCloudSnapshotRestoresConnectionThenInstanceLayout() throws {
         HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: connection.externalURL)
     )
     sourceStore.saveDeviceVisibility(
-        HomeAssistantDeviceVisibilitySettings(hiddenCardIDs: ["device-secret-room"]),
+        HomeAssistantDeviceVisibilitySettings(
+            hiddenCardIDs: ["device-secret-room"],
+            shownCardIDs: ["sensor-living-temperature"]
+        ),
         instanceFingerprint: fingerprint
     )
     sourceStore.saveDashboardLayout(
@@ -187,6 +190,10 @@ func homeAssistantCloudSnapshotRestoresConnectionThenInstanceLayout() throws {
     #expect(restoredStore.load() == normalizedConnection)
     #expect(restoredStore.load().lastKnownLocationName == "海边小屋")
     #expect(restoredStore.loadDeviceVisibility(instanceFingerprint: fingerprint).hiddenCardIDs == ["device-secret-room"])
+    #expect(
+        restoredStore.loadDeviceVisibility(instanceFingerprint: fingerprint).shownCardIDs
+            == ["sensor-living-temperature"]
+    )
     #expect(
         restoredStore.loadDashboardLayout(instanceFingerprint: fingerprint).cardOrderByRoom["living"] == ["light.main"]
     )

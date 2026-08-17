@@ -14,6 +14,36 @@ struct HomeAssistantTests {
         #expect(HomeAssistantDashboardPresentationPolicy.defaultCardSize(for: .switchDevice) == .compact)
     }
 
+    @Test("Dashboard visibility lets users explicitly show sensors")
+    func dashboardVisibilitySupportsSensorOverride() throws {
+        let sensorID = "device:sensor-room"
+        let defaults = HomeAssistantDeviceVisibilitySettings()
+        #expect(!HomeAssistantDashboardPresentationPolicy.isShown(.sensorGroup, cardID: sensorID, visibility: defaults))
+
+        let explicitlyShown = HomeAssistantDeviceVisibilitySettings(shownCardIDs: [sensorID])
+        #expect(HomeAssistantDashboardPresentationPolicy.isShown(
+            .sensorGroup,
+            cardID: sensorID,
+            visibility: explicitlyShown
+        ))
+
+        let explicitlyHidden = HomeAssistantDeviceVisibilitySettings(
+            hiddenCardIDs: [sensorID],
+            shownCardIDs: [sensorID]
+        )
+        #expect(!HomeAssistantDashboardPresentationPolicy.isShown(
+            .sensorGroup,
+            cardID: sensorID,
+            visibility: explicitlyHidden
+        ))
+        #expect(explicitlyHidden.shownCardIDs.isEmpty)
+
+        let legacyData = try #require(#"{"hiddenCardIDs":["device:hidden"]}"#.data(using: .utf8))
+        let legacy = try JSONDecoder().decode(HomeAssistantDeviceVisibilitySettings.self, from: legacyData)
+        #expect(legacy.hiddenCardIDs == ["device:hidden"])
+        #expect(legacy.shownCardIDs.isEmpty)
+    }
+
     @Test("Cellular never returns an internal endpoint")
     func cellularSkipsInternalEndpoint() throws {
         let settings = try HomeAssistantEndpointSelector.normalizedSettings(.init(
@@ -237,10 +267,15 @@ struct HomeAssistantTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = HomeAssistantSettingsStore(defaults: defaults)
 
-        store.saveDeviceVisibility(.init(hiddenCardIDs: ["device-a"]), instanceFingerprint: "instance-a")
+        store.saveDeviceVisibility(
+            .init(hiddenCardIDs: ["device-a"], shownCardIDs: ["sensor-a"]),
+            instanceFingerprint: "instance-a"
+        )
 
         #expect(store.loadDeviceVisibility(instanceFingerprint: "instance-a").hiddenCardIDs == ["device-a"])
+        #expect(store.loadDeviceVisibility(instanceFingerprint: "instance-a").shownCardIDs == ["sensor-a"])
         #expect(store.loadDeviceVisibility(instanceFingerprint: "instance-b").hiddenCardIDs.isEmpty)
+        #expect(store.loadDeviceVisibility(instanceFingerprint: "instance-b").shownCardIDs.isEmpty)
     }
 
     @Test("Dashboard card size and room order persist per Home Assistant instance")

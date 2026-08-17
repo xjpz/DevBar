@@ -336,25 +336,26 @@ struct IOSHomeAssistantPageBackground: View {
         wallpaper ?? IOSHomeAssistantWallpaper(rawValue: selectedWallpaperRawValue) ?? .blueMist
     }
 
+    private var wallpaperOverlayOpacity: Double {
+        let baseOpacity = resolvedWallpaper.overlayOpacity(for: colorScheme)
+        return min(baseOpacity + (theme.isGeek ? 0.14 : 0), 0.58)
+    }
+
     var body: some View {
-        Group {
-            if theme.isGeek {
-                ZStack {
-                    Color.black
-                    theme.heroGradient.opacity(0.72)
+        GeometryReader { proxy in
+            Image(resolvedWallpaper.assetName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .clipped()
+                .overlay {
+                    Color.black.opacity(wallpaperOverlayOpacity)
                 }
-            } else {
-                GeometryReader { proxy in
-                    Image(resolvedWallpaper.assetName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .clipped()
-                        .overlay {
-                            Color.black.opacity(resolvedWallpaper.overlayOpacity(for: colorScheme))
-                        }
+                .overlay {
+                    if theme.isGeek {
+                        theme.heroGradient.opacity(0.14)
+                    }
                 }
-            }
         }
         .background {
             if theme.isGeek {

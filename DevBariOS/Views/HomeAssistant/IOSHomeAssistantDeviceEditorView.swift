@@ -160,11 +160,11 @@ struct IOSHomeAssistantDeviceEditorView: View {
             }
 
             Section {
-                Button(model.hiddenCardIDs.contains(accessory.id) ? "显示设备" : "隐藏设备") {
-                    if model.hiddenCardIDs.contains(accessory.id) {
-                        model.showDevice(accessory.id)
-                    } else {
+                Button(model.isShownOnDashboard(accessory) ? "从首页隐藏" : "显示在首页") {
+                    if model.isShownOnDashboard(accessory) {
                         model.hideDevice(accessory.id)
+                    } else {
+                        model.showDevice(accessory.id)
                     }
                     dismiss()
                 }

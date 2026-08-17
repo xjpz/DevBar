@@ -2,6 +2,9 @@ import SwiftUI
 
 enum IOSHomeAssistantWallpaper: String, CaseIterable, Identifiable {
     case blueMist
+    case mistPrism
+    case slateGlass
+    case warmArchitecture
     case warmSunset
     case midnightBlue
     case tealAurora
@@ -13,6 +16,9 @@ enum IOSHomeAssistantWallpaper: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .blueMist: "几何蓝灰"
+        case .mistPrism: "雾蓝折面"
+        case .slateGlass: "青灰玻璃"
+        case .warmArchitecture: "暖灰建筑"
         case .warmSunset: "晨曦渐变"
         case .midnightBlue: "蓝紫渐变"
         case .tealAurora: "暮色渐变"
@@ -22,6 +28,9 @@ enum IOSHomeAssistantWallpaper: String, CaseIterable, Identifiable {
     var assetName: String {
         switch self {
         case .blueMist: "HomeAssistantBackground"
+        case .mistPrism: "HomeAssistantMistPrism"
+        case .slateGlass: "HomeAssistantSlateGlass"
+        case .warmArchitecture: "HomeAssistantWarmArchitecture"
         case .warmSunset: "HomeAssistantWarmSunset"
         case .midnightBlue: "HomeAssistantMidnightBlue"
         case .tealAurora: "HomeAssistantTealAurora"
@@ -32,6 +41,12 @@ enum IOSHomeAssistantWallpaper: String, CaseIterable, Identifiable {
         switch (self, colorScheme) {
         case (.blueMist, .light): 0.08
         case (.blueMist, .dark): 0.22
+        case (.mistPrism, .light): 0.10
+        case (.mistPrism, .dark): 0.30
+        case (.slateGlass, .light): 0.08
+        case (.slateGlass, .dark): 0.22
+        case (.warmArchitecture, .light): 0.10
+        case (.warmArchitecture, .dark): 0.28
         case (.warmSunset, .light): 0.12
         case (.warmSunset, .dark): 0.28
         case (.midnightBlue, .light): 0.02
