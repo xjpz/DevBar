@@ -87,9 +87,16 @@ public struct HomeAssistantSettingsStore {
             importedSettings = HomeAssistantConnectionSettings()
         }
 
-        let oldFingerprint = HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: load().externalURL)
+        let previousSettings = load()
+        let oldFingerprint = HomeAssistantSnapshotCacheStore.instanceFingerprint(
+            externalURL: previousSettings.externalURL,
+            internalURL: previousSettings.internalURL
+        )
         persistConnectionSettings(importedSettings)
-        let newFingerprint = HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: importedSettings.externalURL)
+        let newFingerprint = HomeAssistantSnapshotCacheStore.instanceFingerprint(
+            externalURL: importedSettings.externalURL,
+            internalURL: importedSettings.internalURL
+        )
         if oldFingerprint != newFingerprint, let oldFingerprint {
             removeInstanceSettings(instanceFingerprint: oldFingerprint)
         }
@@ -108,7 +115,11 @@ public struct HomeAssistantSettingsStore {
     }
 
     public func clear() {
-        if let fingerprint = HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: load().externalURL) {
+        let currentSettings = load()
+        if let fingerprint = HomeAssistantSnapshotCacheStore.instanceFingerprint(
+            externalURL: currentSettings.externalURL,
+            internalURL: currentSettings.internalURL
+        ) {
             defaults.removeObject(forKey: visibilityKey(instanceFingerprint: fingerprint))
             defaults.removeObject(forKey: presentationKey(instanceFingerprint: fingerprint))
             defaults.removeObject(forKey: accessoryPresentationKey(instanceFingerprint: fingerprint))

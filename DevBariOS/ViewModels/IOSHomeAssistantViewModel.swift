@@ -78,7 +78,10 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         let settings = settingsStore.load()
         self.settings = settings
         self.connectionState = settings.isConfigured ? .offline : .notConfigured
-        if let fingerprint = HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: settings.externalURL) {
+        if let fingerprint = HomeAssistantSnapshotCacheStore.instanceFingerprint(
+            externalURL: settings.externalURL,
+            internalURL: settings.internalURL
+        ) {
             let visibility = settingsStore.loadDeviceVisibility(
                 instanceFingerprint: fingerprint
             )
@@ -256,7 +259,11 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         let rooms = snapshot.rooms.filter {
             $0.id != HomeAssistantTopologyBuilder.unassignedAreaID && areaIDs.contains($0.id)
         }
-        let order = Dictionary(uniqueKeysWithValues: layoutSuggestion.roomOrder.enumerated().map { ($1, $0) })
+        // 优先用户显式排序（稳定键存储）；缺省时回落到 AI/确定性建议顺序。
+        let sourceOrder = dashboardLayout.roomOrder.isEmpty
+            ? layoutSuggestion.roomOrder
+            : dashboardLayout.roomOrder
+        let order = Dictionary(uniqueKeysWithValues: sourceOrder.enumerated().map { ($1, $0) })
         return rooms.sorted { lhs, rhs in
             let left = order[lhs.id] ?? Int.max
             let right = order[rhs.id] ?? Int.max
@@ -403,8 +410,10 @@ final class IOSHomeAssistantViewModel: ObservableObject {
             externalURL: externalURL,
             internalURL: internalURL,
             internalSSIDs: internalSSIDs,
-            lastKnownLocationName: HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: externalURL)
-                == previousFingerprint ? self.settings.lastKnownLocationName : "",
+            lastKnownLocationName: HomeAssistantSnapshotCacheStore.instanceFingerprint(
+                externalURL: externalURL,
+                internalURL: internalURL
+            ) == previousFingerprint ? self.settings.lastKnownLocationName : "",
             aiAnalysisEnabled: aiAnalysisEnabled,
             showsDiagnosticEntities: showsDiagnosticEntities
         )
@@ -606,24 +615,17 @@ final class IOSHomeAssistantViewModel: ObservableObject {
     }
 
     func updateRoomOrder(_ roomIDs: [String]) {
-        guard let snapshot else { return }
+        guard snapshot != nil else { return }
         let currentRooms = rooms
         let validIDs = Set(currentRooms.map(\.id))
         let normalized = roomIDs.reduce(into: [String]()) { result, id in
             if validIDs.contains(id), !result.contains(id) { result.append(id) }
         }
         let missing = currentRooms.map(\.id).filter { !normalized.contains($0) }
-        let updated = HomeAssistantLayoutSuggestion(
-            roomOrder: normalized + missing,
-            featuredEntityIDs: layoutSuggestion.featuredEntityIDs,
-            aliases: layoutSuggestion.aliases,
-            suggestions: layoutSuggestion.suggestions
-        )
-        layoutSuggestion = updated
-        settingsStore.saveLayoutSuggestion(
-            updated,
-            topologyHash: HomeAssistantLayoutAnalyzer.topologyHash(for: snapshot)
-        )
+        // 房间顺序是用户显式意图，存进以 instanceFingerprint 为键的 dashboardLayout，
+        // 避免像旧实现那样绑定到会随实体增删失效的 topologyHash。
+        dashboardLayout.setRoomOrder(normalized + missing)
+        saveDashboardLayout()
     }
 
     func accessories(inRoom roomID: String) -> [HomeAssistantAccessory] {
@@ -963,10 +965,15 @@ final class IOSHomeAssistantViewModel: ObservableObject {
         let fetchedDevices = await devicesResult
         let cachedHasPhysicalDevices = snapshot?.cards.contains(where: { !$0.isVirtual }) == true
         let cachedHasAssignedRooms = snapshot?.cards.contains(where: { $0.areaID != nil }) == true
+        // 空注册表（不仅是 nil）同样视为退化响应：否则所有实体的 deviceID 会变 nil，
+        // 卡片 ID 从 <deviceID> 跳成 entity:<entityID>，让已保存的显隐/顺序全部失配。
+        let missingRegistry = fetchedRegistry?.isEmpty ?? true
+        let missingDevices = fetchedDevices?.isEmpty ?? true
+        let missingAreas = fetchedAreas?.isEmpty ?? true
         if hadExistingSnapshot,
-           (fetchedRegistry == nil && cachedHasPhysicalDevices)
-            || (fetchedDevices == nil && cachedHasPhysicalDevices)
-            || (fetchedAreas == nil && cachedHasAssignedRooms) {
+           (missingRegistry && cachedHasPhysicalDevices)
+            || (missingDevices && cachedHasPhysicalDevices)
+            || (missingAreas && cachedHasAssignedRooms) {
             diagnostics.record(
                 category: "home_assistant.connection",
                 name: "connection_attempt_failed",
@@ -974,9 +981,9 @@ final class IOSHomeAssistantViewModel: ObservableObject {
                 endpoint: connectedCandidate?.url,
                 error: HomeAssistantError.invalidResponse,
                 details: [
-                    "missingRegistry": String(fetchedRegistry == nil),
-                    "missingDevices": String(fetchedDevices == nil),
-                    "missingAreas": String(fetchedAreas == nil),
+                    "missingRegistry": String(missingRegistry),
+                    "missingDevices": String(missingDevices),
+                    "missingAreas": String(missingAreas),
                     "cachedHasPhysicalDevices": String(cachedHasPhysicalDevices),
                     "cachedHasAssignedRooms": String(cachedHasAssignedRooms),
                 ]
@@ -1098,7 +1105,10 @@ final class IOSHomeAssistantViewModel: ObservableObject {
     }
 
     private var instanceFingerprint: String? {
-        HomeAssistantSnapshotCacheStore.instanceFingerprint(externalURL: settings.externalURL)
+        HomeAssistantSnapshotCacheStore.instanceFingerprint(
+            externalURL: settings.externalURL,
+            internalURL: settings.internalURL
+        )
     }
 
     private func restoreCachedSnapshotIfNeeded() {

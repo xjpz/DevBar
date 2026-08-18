@@ -513,17 +513,56 @@ public struct HomeAssistantDashboardLayoutSettings: Codable, Equatable, Sendable
     public static let schemaVersion = 1
 
     public let schemaVersion: Int
+    /// 用户手动排定的房间顺序（存 areaID）。放在这里而非 layoutSuggestion，
+    /// 因为本设置以 instanceFingerprint 为键、对实体增删稳定，不会像 topologyHash 那样被拓扑漂移清空。
+    public var roomOrder: [String]
     public var cardOrderByRoom: [String: [String]]
     public var cardSizes: [String: HomeAssistantCardSize]
 
     public init(
+        roomOrder: [String] = [],
         cardOrderByRoom: [String: [String]] = [:],
         cardSizes: [String: HomeAssistantCardSize] = [:],
         schemaVersion: Int = HomeAssistantDashboardLayoutSettings.schemaVersion
     ) {
         self.schemaVersion = schemaVersion
+        self.roomOrder = Self.uniqueNonEmptyValues(roomOrder)
         self.cardOrderByRoom = cardOrderByRoom.mapValues(Self.uniqueNonEmptyValues)
         self.cardSizes = cardSizes
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case schemaVersion
+        case roomOrder
+        case cardOrderByRoom
+        case cardSizes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion)
+            ?? HomeAssistantDashboardLayoutSettings.schemaVersion
+        let roomOrder = try container.decodeIfPresent([String].self, forKey: .roomOrder) ?? []
+        let cardOrderByRoom = try container.decodeIfPresent([String: [String]].self, forKey: .cardOrderByRoom) ?? [:]
+        let cardSizes = try container.decodeIfPresent([String: HomeAssistantCardSize].self, forKey: .cardSizes) ?? [:]
+        self.init(
+            roomOrder: roomOrder,
+            cardOrderByRoom: cardOrderByRoom,
+            cardSizes: cardSizes,
+            schemaVersion: schemaVersion
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(schemaVersion, forKey: .schemaVersion)
+        try container.encode(roomOrder, forKey: .roomOrder)
+        try container.encode(cardOrderByRoom, forKey: .cardOrderByRoom)
+        try container.encode(cardSizes, forKey: .cardSizes)
+    }
+
+    public mutating func setRoomOrder(_ roomIDs: [String]) {
+        roomOrder = Self.uniqueNonEmptyValues(roomIDs)
     }
 
     public mutating func setOrder(_ cardIDs: [String], forRoom roomID: String) {

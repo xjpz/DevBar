@@ -22,6 +22,14 @@ public struct HomeAssistantSnapshotCacheStore: @unchecked Sendable {
         self.maximumBytes = maximumBytes
     }
 
+    /// 优先用 externalURL 推导指纹（对已有用户保持原键不变），推导不出时回落到 internalURL。
+    /// 只配了内网地址（或 externalURL 无法解析出 host）时也能得到稳定指纹，
+    /// 避免显隐/布局设置因指纹为 nil 而静默不落盘或被清空。
+    public static func instanceFingerprint(externalURL: String, internalURL: String) -> String? {
+        instanceFingerprint(externalURL: externalURL)
+            ?? instanceFingerprint(externalURL: internalURL)
+    }
+
     public static func instanceFingerprint(externalURL: String) -> String? {
         let value = externalURL.trimmingCharacters(in: .whitespacesAndNewlines)
         guard var components = URLComponents(string: value),
