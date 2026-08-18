@@ -8,6 +8,7 @@ struct IOSZCodeRemoteView: View {
     @Environment(\.themeTokens) private var theme
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.iosToolEntryContext) private var entryContext
 
     @StateObject private var connectionStore = IOSZCodeRemoteConnectionStore()
     // WebView 与主题/导航状态由会话控制器持有，返回其他页面后仍保留，重进免重新加载
@@ -38,6 +39,18 @@ struct IOSZCodeRemoteView: View {
         session.pageIsDark ? .white.opacity(0.75) : .black.opacity(0.7)
     }
 
+    /// 作为固定 tab 根视图时模拟系统"下滑收起底栏"（系统行为不识别 WKWebView 滚动）；
+    /// 从工具页推入时底栏本就隐藏，无需处理
+    private var shouldCollapseTabBar: Bool {
+        entryContext == .tabRoot && isPaired && session.isWebScrolledDown
+    }
+
+    /// 作为固定 tab 根视图时不提供顶部悬浮控制（返回/菜单）：tab 根无返回目标，
+    /// 且需求要求从底栏进入时不出现顶部按钮；仅从工具页推入时保留点按唤出
+    private var allowsChrome: Bool {
+        entryContext != .tabRoot
+    }
+
     var body: some View {
         ZStack {
             if let urlString = connectionStore.connectionURLString {
@@ -51,6 +64,7 @@ struct IOSZCodeRemoteView: View {
         .toolbar(isPaired ? .hidden : .visible, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(theme.isGeek ? .dark : nil, for: .navigationBar)
+        .toolbar(shouldCollapseTabBar ? .hidden : .visible, for: .tabBar)
         // 状态栏/Home 指示条颜色跟随远控页面主题，实现整体沉浸
         .preferredColorScheme(immersiveColorScheme)
         .sheet(isPresented: $isShowingScanner) {
@@ -153,6 +167,8 @@ struct IOSZCodeRemoteView: View {
     }
 
     private func toggleChrome() {
+        // 从底栏进入时不提供顶部悬浮控制
+        guard allowsChrome else { return }
         // 远控页内部二级页面（网页自带返回导航）不显示悬浮控制；失效态除外
         if session.isSubpage && session.navigationState != .failed {
             hideChrome()
@@ -169,6 +185,7 @@ struct IOSZCodeRemoteView: View {
 
     /// pinned = true 时不自动隐藏（如菜单打开、失效态）
     private func showChrome(pinned: Bool) {
+        guard allowsChrome else { return }
         if session.isSubpage && session.navigationState != .failed { return }
         withAnimation(.easeInOut(duration: 0.2)) {
             isChromeVisible = true

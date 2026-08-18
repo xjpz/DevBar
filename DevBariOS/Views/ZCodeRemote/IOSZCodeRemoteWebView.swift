@@ -24,13 +24,18 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
     @Published private(set) var pageBottomBackground: UIColor?
     /// 远控页内部路由进入二级页面（会话详情等）时为 true，此时不显示悬浮控制
     @Published private(set) var isSubpage = false
+    /// 网页内容向下滚动时为 true：作为固定 tab 根视图时隐藏底栏（系统 minimize 不识别 WKWebView 滚动）
+    @Published private(set) var isWebScrolledDown = false
 
     private(set) var webView: WKWebView?
     private var refreshControl: UIRefreshControl?
     private var loadedURLString: String?
     private var lastHandledReloadToken = 0
+    private var contentOffsetObservation: NSKeyValueObservation?
+    private var lastContentOffsetY: CGFloat = 0
 
     static let themeMessageName = "zcodeTheme"
+    static let scrollMessageName = "zcodeScroll"
 
     /// 主题探测与出血区对色：
     /// - 深/浅判定：html/body 背景 → 主题 class 令牌 → color-scheme 声明 → 跳过浮层的顶/底采样 → 系统偏好；
@@ -150,6 +155,43 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
       observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'color-scheme'] });
       if (document.body) observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
       setInterval(report, 2000);
+      // 滚动方向检测：捕获阶段监听 scroll 事件，覆盖 inner DOM 元素滚动
+      // （此类页面 WKWebView 主 scrollView 不动，原生侧无法感知）；
+      // 累积阈值判定，惯性滚动的碎片化位移也能累计触发；方向翻转时上报
+      var scrollDown = false;
+      var anchorY = null;
+      var anchorTarget = null;
+      function scrolledDown(value) {
+        if (value === scrollDown) return;
+        scrollDown = value;
+        try {
+          window.webkit.messageHandlers.zcodeScroll.postMessage({ down: value });
+        } catch (e) {}
+      }
+      function handleScrollEvent(ev) {
+        var t = ev.target;
+        var y = null;
+        if (t === document) {
+          y = (document.scrollingElement && document.scrollingElement.scrollTop) || window.pageYOffset || 0;
+        } else if (t && t.scrollTop !== undefined && t instanceof Element) {
+          y = t.scrollTop;
+        }
+        if (y === null) return;
+        if (t !== anchorTarget) {
+          anchorTarget = t;
+          anchorY = y;
+          return;
+        }
+        var delta = y - anchorY;
+        if (delta > 24) {
+          scrolledDown(true);
+          anchorY = y;
+        } else if (delta < -8) {
+          scrolledDown(false);
+          anchorY = y;
+        }
+      }
+      window.addEventListener('scroll', handleScrollEvent, true);
     })();
     """
 
@@ -179,20 +221,25 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
 
     /// 断开并清除时彻底销毁会话（WebView、脚本、探测状态全部重置）
     func teardown() {
+        contentOffsetObservation?.invalidate()
+        contentOffsetObservation = nil
         webView?.configuration.userContentController.removeAllUserScripts()
         webView?.configuration.userContentController.removeScriptMessageHandler(forName: Self.themeMessageName)
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: Self.scrollMessageName)
         webView?.stopLoading()
         webView?.navigationDelegate = nil
         webView = nil
         refreshControl = nil
         loadedURLString = nil
         lastHandledReloadToken = 0
+        lastContentOffsetY = 0
         navigationState = .idle
         pageIsDark = true
         pageUsesSystemTheme = true
         pageTopBackground = nil
         pageBottomBackground = nil
         isSubpage = false
+        isWebScrolledDown = false
     }
 
     // MARK: - 装配
@@ -201,6 +248,7 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
         let configuration = WKWebViewConfiguration()
         let contentController = WKUserContentController()
         contentController.add(self, name: Self.themeMessageName)
+        contentController.add(self, name: Self.scrollMessageName)
         contentController.addUserScript(WKUserScript(
             source: Self.themeProbeScript,
             injectionTime: .atDocumentEnd,
@@ -220,8 +268,32 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
         view.scrollView.refreshControl = refresh
         refreshControl = refresh
 
+        // 系统 tabBarMinimizeBehavior 不识别 WKWebView 的内部滚动，
+        // 用 KVO 观察 contentOffset 模拟"下滑收起底栏、上滑恢复"
+        contentOffsetObservation = view.scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scrollView, _ in
+            DispatchQueue.main.async {
+                self?.handleWebScroll(scrollView)
+            }
+        }
+
         webView = view
         return view
+    }
+
+    private func handleWebScroll(_ scrollView: UIScrollView) {
+        let y = scrollView.contentOffset.y
+        // 只响应真实拖动/减速；程序性偏移（键盘、布局）与下拉回弹（负值）仅同步基线
+        guard scrollView.isTracking || scrollView.isDecelerating, y >= 0 else {
+            lastContentOffsetY = max(y, 0)
+            return
+        }
+        let delta = y - lastContentOffsetY
+        lastContentOffsetY = y
+        if delta > 24 {
+            if !isWebScrolledDown { isWebScrolledDown = true }
+        } else if delta < -8 {
+            if isWebScrolledDown { isWebScrolledDown = false }
+        }
     }
 
     private func load(_ urlString: String, in view: WKWebView) {
@@ -232,6 +304,8 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
         navigationState = .connecting
         loadedURLString = urlString
         isSubpage = false
+        isWebScrolledDown = false
+        lastContentOffsetY = 0
         // 远控页面按无缓存加载，避免失效地址命中旧缓存造成假连接
         let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         view.load(request)
@@ -258,6 +332,13 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
 
 extension IOSZCodeRemoteSessionController: WKNavigationDelegate, WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == Self.scrollMessageName {
+            if let body = message.body as? [String: Any],
+               let down = body["down"] as? Bool {
+                isWebScrolledDown = down
+            }
+            return
+        }
         guard message.name == Self.themeMessageName,
               let body = message.body as? [String: Any],
               let dark = body["dark"] as? Bool,
@@ -290,6 +371,33 @@ extension IOSZCodeRemoteSessionController: WKNavigationDelegate, WKScriptMessage
 
     func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
         navigationState = .connecting
+    }
+
+    /// HTTP 错误状态（4xx/5xx）下 didFinish 仍会触发，空错误页会呈现为白屏。
+    /// 主框架非 2xx 直接转失效态走重扫/重试引导，避免"假连接白屏"。
+    func webView(
+        _ webView: WKWebView,
+        decidePolicyFor navigationResponse: WKNavigationResponse,
+        decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+    ) {
+        if navigationResponse.isForMainFrame,
+           let http = navigationResponse.response as? HTTPURLResponse,
+           !(200...399).contains(http.statusCode) {
+            navigationState = .failed
+            decisionHandler(.cancel)
+            return
+        }
+        decisionHandler(.allow)
+    }
+
+    /// 网页内容进程被系统回收（长时间后台、内存压力）时 WebView 会变纯白且不自恢复。
+    /// 重载当前地址复活页面；无地址可载则转失效态走重扫引导。
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        if let urlString = loadedURLString {
+            load(urlString, in: webView)
+        } else {
+            navigationState = .failed
+        }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
