@@ -42,8 +42,6 @@ struct IOSHomeAssistantDeviceCard: View {
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: "编辑设备", edit)
         .accessibilityValue(accessibilityStateText)
-        .animation(.easeInOut(duration: 0.24), value: presentationState)
-        .animation(.easeInOut(duration: 0.2), value: isPending)
         .contextMenu {
             deviceContextMenu
                 .transaction { transaction in
@@ -76,9 +74,10 @@ struct IOSHomeAssistantDeviceCard: View {
                 Spacer(minLength: isEditing ? 52 : 0)
                 if !isEditing, let currentIndoorTemperatureText {
                     Text(currentIndoorTemperatureText)
-                        .font(theme.appFont.font(.title2, weight: .bold).monospacedDigit())
+                        .font(theme.appFont.font(.largeTitle, weight: .bold).monospacedDigit())
                         .foregroundStyle(titleColor)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.82)
                 }
                 if accessory.needsReview, !isEditing {
                     Image(systemName: "exclamationmark.circle.fill")
@@ -106,21 +105,16 @@ struct IOSHomeAssistantDeviceCard: View {
                 Circle()
                     .fill(iconPlateColor)
                     .frame(width: diameter, height: diameter)
-                if isPending {
-                    ProgressView().tint(iconForegroundColor)
-                } else {
-                    Image(systemName: accessory.systemImage)
-                        .font(.system(size: symbolSize, weight: .semibold))
-                        .symbolRenderingMode(.hierarchical)
-                        .foregroundStyle(iconForegroundColor)
-                }
+                Image(systemName: accessory.systemImage)
+                    .font(.system(size: symbolSize, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(iconForegroundColor)
             }
-            .scaleEffect(isPending ? 0.94 : 1)
         }
         .buttonStyle(.plain)
-        .disabled(isEditing || isPending)
+        .disabled(isEditing)
         .accessibilityLabel(hasQuickAction ? "控制 \(accessory.name)" : "查看 \(accessory.name)")
-        .accessibilityValue(state.primaryText)
+        .accessibilityValue(isPending ? "\(state.primaryText)，正在执行" : state.primaryText)
     }
 
     private var editControls: some View {
@@ -253,6 +247,7 @@ struct IOSHomeAssistantDeviceCard: View {
     }
 
     private func iconAction() {
+        guard !isPending else { return }
         if hasQuickAction && controlsEnabled { quickAction() } else { open() }
     }
 

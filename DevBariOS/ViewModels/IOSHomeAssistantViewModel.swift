@@ -1059,7 +1059,6 @@ final class IOSHomeAssistantViewModel: ObservableObject {
                 rawStatesByID[state.entityID] = state
                 pendingStateUpdates[state.entityID] = state
                 scheduleStateProjection()
-                pendingEntityIDs.remove(state.entityID)
             }
             guard !Task.isCancelled, isConfigured else { return }
             connectionState = .reconnecting
