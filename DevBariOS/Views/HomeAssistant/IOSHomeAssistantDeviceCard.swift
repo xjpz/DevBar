@@ -71,13 +71,15 @@ struct IOSHomeAssistantDeviceCard: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(alignment: .top) {
                 iconButton(diameter: 42, symbolSize: 19)
-                Spacer(minLength: isEditing ? 52 : 0)
+                Spacer(minLength: isEditing ? 52 : 10)
                 if !isEditing, let currentIndoorTemperatureText {
                     Text(currentIndoorTemperatureText)
-                        .font(theme.appFont.font(.largeTitle, weight: .bold).monospacedDigit())
+                        .font(.system(size: 40, weight: .bold, design: .rounded).monospacedDigit())
                         .foregroundStyle(titleColor)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.82)
+                        .minimumScaleFactor(0.78)
+                        .allowsTightening(true)
+                        .layoutPriority(1)
                 }
                 if accessory.needsReview, !isEditing {
                     Image(systemName: "exclamationmark.circle.fill")
