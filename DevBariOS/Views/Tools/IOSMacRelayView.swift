@@ -83,16 +83,6 @@ struct IOSMacRelayView: View {
             }
 
             ToolbarItemGroup(placement: .topBarTrailing) {
-                Button {
-                    Task {
-                        await refreshRelayState()
-                    }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .iosToolToolbarIcon(theme)
-                }
-                .accessibilityLabel("刷新")
-
                 Menu {
                     Button {
                         Task {
