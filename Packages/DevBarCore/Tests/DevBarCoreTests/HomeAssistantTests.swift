@@ -4,6 +4,48 @@ import Testing
 
 @Suite("Home Assistant")
 struct HomeAssistantTests {
+    @Test("WebSocket ping completion ignores duplicate success")
+    func webSocketPingCompletionIgnoresDuplicateSuccess() {
+        let recorder = OneShotCompletionRecorder()
+        let completion = HomeAssistantOneShotCompletion { error in
+            recorder.record(error)
+        }
+
+        completion.complete(error: nil)
+        completion.complete(error: HomeAssistantTestError.duplicate)
+
+        #expect(recorder.errors.count == 1)
+        #expect((recorder.errors.first ?? nil) == nil)
+    }
+
+    @Test("WebSocket ping completion keeps the first failure")
+    func webSocketPingCompletionKeepsFirstFailure() {
+        let recorder = OneShotCompletionRecorder()
+        let completion = HomeAssistantOneShotCompletion { error in
+            recorder.record(error)
+        }
+
+        completion.complete(error: HomeAssistantTestError.first)
+        completion.complete(error: HomeAssistantTestError.duplicate)
+
+        #expect(recorder.errors.count == 1)
+        #expect((recorder.errors.first as? HomeAssistantTestError) == .first)
+    }
+
+    @Test("WebSocket ping completion is safe under concurrent callbacks")
+    func webSocketPingCompletionIsSafeUnderConcurrentCallbacks() {
+        let recorder = OneShotCompletionRecorder()
+        let completion = HomeAssistantOneShotCompletion { error in
+            recorder.record(error)
+        }
+
+        DispatchQueue.concurrentPerform(iterations: 32) { index in
+            completion.complete(error: index == 0 ? nil : HomeAssistantTestError.duplicate)
+        }
+
+        #expect(recorder.errors.count == 1)
+    }
+
     @Test("Dashboard hides sensor cards by default but keeps controllable devices")
     func dashboardDefaultPresentationHidesSensors() {
         #expect(!HomeAssistantDashboardPresentationPolicy.isShownByDefault(.sensorGroup))
@@ -1495,5 +1537,27 @@ struct HomeAssistantTests {
             devices: [device],
             services: []
         )
+    }
+}
+
+private enum HomeAssistantTestError: Error, Equatable {
+    case first
+    case duplicate
+}
+
+private final class OneShotCompletionRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recordedErrors: [Error?] = []
+
+    var errors: [Error?] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordedErrors
+    }
+
+    func record(_ error: Error?) {
+        lock.lock()
+        recordedErrors.append(error)
+        lock.unlock()
     }
 }

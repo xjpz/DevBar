@@ -1,5 +1,26 @@
 import Foundation
 
+final class HomeAssistantOneShotCompletion: @unchecked Sendable {
+    private let lock = NSLock()
+    private var completed = false
+    private let handler: @Sendable (Error?) -> Void
+
+    init(handler: @escaping @Sendable (Error?) -> Void) {
+        self.handler = handler
+    }
+
+    func complete(error: Error?) {
+        lock.lock()
+        guard !completed else {
+            lock.unlock()
+            return
+        }
+        completed = true
+        lock.unlock()
+        handler(error)
+    }
+}
+
 public actor HomeAssistantWebSocketClient {
     public typealias EventStream = AsyncStream<HomeAssistantState>
 
@@ -483,9 +504,12 @@ public actor HomeAssistantWebSocketClient {
 
     private func sendProtocolPing(using socket: URLSessionWebSocketTask) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            socket.sendPing { error in
+            let completion = HomeAssistantOneShotCompletion { error in
                 if let error { continuation.resume(throwing: error) }
                 else { continuation.resume() }
+            }
+            socket.sendPing { error in
+                completion.complete(error: error)
             }
         }
     }
