@@ -116,7 +116,7 @@ struct IOSHomeAssistantAccessoryControlView: View {
     }
 
     private var usesScrollableControlSurface: Bool {
-        controlEntity?.domain == "climate"
+        controlEntity?.domain == "climate" || controlEntity?.domain == "fan"
     }
 
     private var dismissalScale: CGFloat {
@@ -213,6 +213,7 @@ struct IOSHomeAssistantAccessoryControlView: View {
             percentage: capabilities.percentage,
             percentageStep: capabilities.percentageStep,
             supportsPercentage: capabilities.supportsPercentage,
+            isPending: model.pendingEntityIDs.contains(entity.entityID),
             presetModes: capabilities.presetModes,
             selectedPresetMode: capabilities.presetMode,
             supportsOscillation: capabilities.supportsOscillation,
@@ -1062,6 +1063,7 @@ private struct IOSHomeAssistantFanControlPanel: View {
     let percentage: Double?
     let percentageStep: Double
     let supportsPercentage: Bool
+    let isPending: Bool
     let presetModes: [String]
     let selectedPresetMode: String?
     let supportsOscillation: Bool
@@ -1077,14 +1079,12 @@ private struct IOSHomeAssistantFanControlPanel: View {
     let setOscillating: (Bool) -> Void
     let setDirection: (String) -> Void
 
-    @State private var draftPercentage: Double
-    @State private var isAdjustingPercentage = false
-
     init(
         isOn: Bool,
         percentage: Double?,
         percentageStep: Double,
         supportsPercentage: Bool,
+        isPending: Bool,
         presetModes: [String],
         selectedPresetMode: String?,
         supportsOscillation: Bool,
@@ -1104,6 +1104,7 @@ private struct IOSHomeAssistantFanControlPanel: View {
         self.percentage = percentage
         self.percentageStep = percentageStep
         self.supportsPercentage = supportsPercentage
+        self.isPending = isPending
         self.presetModes = presetModes
         self.selectedPresetMode = selectedPresetMode
         self.supportsOscillation = supportsOscillation
@@ -1118,21 +1119,15 @@ private struct IOSHomeAssistantFanControlPanel: View {
         self.setPresetMode = setPresetMode
         self.setOscillating = setOscillating
         self.setDirection = setDirection
-        _draftPercentage = State(
-            initialValue: Self.normalizedPercentage(
-                percentage ?? 100,
-                step: percentageStep
-            )
-        )
     }
 
     var body: some View {
         VStack(spacing: 18) {
-            HStack(spacing: 22) {
-                powerButton
-                if supportsPercentage {
-                    speedControl
-                } else {
+            if supportsPercentage {
+                speedControl
+            } else {
+                HStack(spacing: 22) {
+                    powerButton
                     powerSummary
                 }
             }
@@ -1172,10 +1167,6 @@ private struct IOSHomeAssistantFanControlPanel: View {
         .background(Color.cyan.opacity(theme.isGeek ? 0.08 : 0.06), in: panelShape)
         .overlay(panelShape.stroke(.white.opacity(0.14), lineWidth: 0.75))
         .shadow(color: .black.opacity(0.10), radius: 12, y: 5)
-        .onChange(of: percentage) { _, newValue in
-            guard !isAdjustingPercentage, let newValue else { return }
-            draftPercentage = Self.normalizedPercentage(newValue, step: percentageStep)
-        }
     }
 
     private var panelShape: RoundedRectangle {
@@ -1201,33 +1192,32 @@ private struct IOSHomeAssistantFanControlPanel: View {
     }
 
     private var speedControl: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("风速")
-                .font(theme.captionWeightFont)
-                .foregroundStyle(.white.opacity(0.62))
-            Text("\(Int(draftPercentage.rounded()))%")
-                .font(.system(size: 42, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+        let currentPercentage = percentage ?? (isOn ? 100 : 0)
+        return VStack(spacing: 8) {
+            Text("风速 \(Int(currentPercentage.rounded()))%")
+                .font(theme.subheadlineWeightFont)
+                .foregroundStyle(.white.opacity(0.72))
                 .contentTransition(.numericText())
-            Slider(
-                value: $draftPercentage,
-                in: percentageStep...100,
-                step: percentageStep
-            ) { editing in
-                isAdjustingPercentage = editing
-                if !editing {
-                    setPercentage(draftPercentage)
+
+            IOSHomeAssistantVerticalLevelControl(
+                value: currentPercentage,
+                isOn: isOn,
+                symbol: symbol,
+                accent: .cyan,
+                supportsLevel: true,
+                isPending: isPending,
+                controlWidth: 154,
+                controlHeight: 300,
+                toggle: togglePower,
+                commit: { value in
+                    setPercentage(Self.normalizedPercentage(value, step: percentageStep))
                 }
-            }
-            .tint(.cyan)
-            Text(speedStepText)
-                .font(theme.captionFont)
-                .foregroundStyle(.white.opacity(0.52))
+            )
+            .frame(width: 154, height: 300)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("风速")
-        .accessibilityValue("\(Int(draftPercentage.rounded()))%")
+        .accessibilityValue("\(Int(currentPercentage.rounded()))%")
     }
 
     private var powerSummary: some View {
@@ -1330,10 +1320,6 @@ private struct IOSHomeAssistantFanControlPanel: View {
         }
     }
 
-    private var speedStepText: String {
-        percentageStep > 1 ? "每档 \(Int(percentageStep.rounded()))%" : "连续调速"
-    }
-
     private static func normalizedPercentage(_ value: Double, step: Double) -> Double {
         let normalizedStep = min(100, max(1, step))
         return min(100, max(normalizedStep, (value / normalizedStep).rounded() * normalizedStep))
@@ -1422,22 +1408,11 @@ private struct IOSHomeAssistantVerticalLevelControl: View {
                     .fill(.black.opacity(0.34))
 
                 if supportsLevel {
-                    ZStack(alignment: .bottom) {
-                        Rectangle()
-                            .fill(accent)
-                            .frame(height: fillHeight)
-                            .mask(shape)
-
-                        Image(systemName: symbol)
-                            .font(.system(size: 36, weight: .semibold))
-                            .foregroundStyle(
-                                iconUsesDarkForeground
-                                    ? .black.opacity(0.72)
-                                    : .white.opacity(0.96)
-                            )
-                            .frame(width: 84, height: iconTapHeight)
-                            .contentShape(Rectangle())
-                    }
+                    levelFill(
+                        shape: shape,
+                        fillHeight: fillHeight,
+                        iconUsesDarkForeground: iconUsesDarkForeground
+                    )
                 } else {
                     RoundedRectangle(cornerRadius: 42, style: .continuous)
                         .fill(.black.opacity(0.50))
@@ -1556,6 +1531,31 @@ private struct IOSHomeAssistantVerticalLevelControl: View {
             draftValue = nextValue
             commit(nextValue)
         }
+    }
+
+    private func levelFill(
+        shape: RoundedRectangle,
+        fillHeight: CGFloat,
+        iconUsesDarkForeground: Bool
+    ) -> some View {
+        ZStack(alignment: .bottom) {
+            Rectangle()
+                .fill(accent)
+                .frame(height: fillHeight)
+                .frame(maxWidth: .infinity)
+                .mask(shape)
+
+            Image(systemName: symbol)
+                .font(.system(size: 36, weight: .semibold))
+                .foregroundStyle(
+                    iconUsesDarkForeground
+                        ? .black.opacity(0.72)
+                        : .white.opacity(0.96)
+                )
+                .frame(width: 84, height: iconTapHeight)
+                .contentShape(Rectangle())
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
     }
 
     private func level(at locationY: CGFloat, height: CGFloat) -> Double {
