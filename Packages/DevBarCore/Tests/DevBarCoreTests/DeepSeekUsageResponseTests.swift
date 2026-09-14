@@ -57,6 +57,79 @@ func deepSeekUsageDecodesLatestNumericUsageResponse() throws {
     #expect(usage.totalAvailableTokens == 1_560_032)
     #expect(abs(usage.totalBalanceCNY - 4.68009896) < 0.00000001)
     #expect(usage.monthlyCostCNY == 0)
+    #expect(abs(usage.totalCostCNY - 5.33195584) < 0.00000001)
+    #expect(usage.displayedCostCNY == 0)
+}
+
+@Test
+func deepSeekUsageDisplaysCondensedOverdrawnResponse() throws {
+    let json = """
+    {
+      "code": 0,
+      "msg": "",
+      "data": {
+        "biz_code": 0,
+        "biz_msg": "",
+        "biz_data": {
+          "normal_wallets": [
+            {
+              "currency": "CNY",
+              "balance": "-0.0591191600000000",
+              "token_estimation": "0"
+            }
+          ],
+          "bonus_wallets": [
+            {
+              "currency": "CNY",
+              "balance": "0",
+              "token_estimation": "0"
+            }
+          ],
+          "total_costs": [
+            {
+              "currency": "CNY",
+              "amount": "20.0711739600000000"
+            }
+          ]
+        }
+      }
+    }
+    """.data(using: .utf8)!
+
+    let response = try JSONDecoder().decode(DeepSeekUsageResponse.self, from: json)
+    let usage = try #require(response.data?.bizData)
+
+    #expect(abs(usage.totalBalanceCNY + 0.05911916) < 0.00000001)
+    #expect(abs(usage.totalCostCNY - 20.07117396) < 0.00000001)
+    #expect(abs(usage.displayedCostCNY - 20.07117396) < 0.00000001)
+    #expect(usage.totalAvailableTokens == 0)
+    #expect(usage.quotaRows.count == 1)
+    #expect(usage.quotaRows[0].percentage == 100)
+    #expect(usage.quotaRows[0].unitDescription == "¥20.0712 / ¥20.01")
+}
+
+@Test
+func deepSeekUsageSumsWalletTokenEstimatesWhenAggregateIsMissing() throws {
+    let json = """
+    {
+      "code": 0,
+      "data": {
+        "biz_data": {
+          "normal_wallets": [
+            { "currency": "CNY", "balance": "1", "token_estimation": "1200" }
+          ],
+          "bonus_wallets": [
+            { "currency": "CNY", "balance": "0", "token_estimation": "300" }
+          ]
+        }
+      }
+    }
+    """.data(using: .utf8)!
+
+    let response = try JSONDecoder().decode(DeepSeekUsageResponse.self, from: json)
+    let usage = try #require(response.data?.bizData)
+
+    #expect(usage.totalAvailableTokens == 1_500)
 }
 
 @Test

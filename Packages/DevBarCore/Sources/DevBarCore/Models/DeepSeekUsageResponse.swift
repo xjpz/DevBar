@@ -40,6 +40,7 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
     public let bonusWallets: [DeepSeekWallet]?
     public let totalAvailableTokenEstimation: String?
     public let monthlyCosts: [DeepSeekMonthlyCost]?
+    public let totalCosts: [DeepSeekMonthlyCost]?
     public let monthlyTokenUsage: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -50,6 +51,7 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
         case bonusWallets = "bonus_wallets"
         case totalAvailableTokenEstimation = "total_available_token_estimation"
         case monthlyCosts = "monthly_costs"
+        case totalCosts = "total_costs"
         case monthlyTokenUsage = "monthly_token_usage"
     }
 
@@ -61,6 +63,7 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
         bonusWallets: [DeepSeekWallet]?,
         totalAvailableTokenEstimation: String?,
         monthlyCosts: [DeepSeekMonthlyCost]?,
+        totalCosts: [DeepSeekMonthlyCost]? = nil,
         monthlyTokenUsage: Int?
     ) {
         self.currentToken = currentToken
@@ -70,6 +73,7 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
         self.bonusWallets = bonusWallets
         self.totalAvailableTokenEstimation = totalAvailableTokenEstimation
         self.monthlyCosts = monthlyCosts
+        self.totalCosts = totalCosts
         self.monthlyTokenUsage = monthlyTokenUsage
     }
 
@@ -85,6 +89,7 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
             forKey: .totalAvailableTokenEstimation
         )
         monthlyCosts = try container.decodeIfPresent([DeepSeekMonthlyCost].self, forKey: .monthlyCosts)
+        totalCosts = try container.decodeIfPresent([DeepSeekMonthlyCost].self, forKey: .totalCosts)
         monthlyTokenUsage = try container.decodeIntegerOrStringIfPresent(forKey: .monthlyTokenUsage)
     }
 
@@ -99,7 +104,14 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
 
     /// Total available token estimation from all wallets.
     public var totalAvailableTokens: Int {
-        Int(totalAvailableTokenEstimation ?? "0") ?? 0
+        if let totalAvailableTokenEstimation,
+           let total = Int(totalAvailableTokenEstimation) {
+            return total
+        }
+
+        let normal = normalWallets?.reduce(0) { $0 + ($1.tokenEstimation.flatMap(Int.init) ?? 0) } ?? 0
+        let bonus = bonusWallets?.reduce(0) { $0 + ($1.tokenEstimation.flatMap(Int.init) ?? 0) } ?? 0
+        return normal + bonus
     }
 
     /// Monthly cost in CNY.
@@ -107,14 +119,24 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
         monthlyCosts?.reduce(0.0) { $0 + ($1.amount.flatMap(Double.init) ?? 0) } ?? 0
     }
 
+    /// Cumulative cost in CNY, used when the platform omits the monthly breakdown.
+    public var totalCostCNY: Double {
+        totalCosts?.reduce(0.0) { $0 + ($1.amount.flatMap(Double.init) ?? 0) } ?? 0
+    }
+
+    /// Prefer the explicit monthly cost and fall back to cumulative cost only when absent.
+    public var displayedCostCNY: Double {
+        monthlyCosts == nil ? totalCostCNY : monthlyCostCNY
+    }
+
     /// Monthly token usage.
     public var monthlyTokenUsageValue: Int {
         monthlyTokenUsage ?? 0
     }
 
-    /// Cost usage percentage: monthlyCost / (totalBalance + monthlyCost) * 100
+    /// Cost usage percentage: displayedCost / (totalBalance + displayedCost) * 100
     public var costPercentage: Int {
-        let spent = monthlyCostCNY
+        let spent = displayedCostCNY
         let total = totalBalanceCNY + spent
         guard total > 0 else { return 0 }
         return min(Int((spent / total * 100).rounded()), 100)
@@ -133,7 +155,7 @@ public struct DeepSeekUsageData: Codable, Sendable, Equatable {
         var rows: [QuotaRowItem] = []
 
         // Cost row
-        let spentCNY = monthlyCostCNY
+        let spentCNY = displayedCostCNY
         let totalCNY = totalBalanceCNY + spentCNY
         if totalCNY > 0 {
             rows.append(QuotaRowItem(
