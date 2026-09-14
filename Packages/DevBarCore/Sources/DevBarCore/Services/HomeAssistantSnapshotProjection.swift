@@ -178,9 +178,10 @@ public enum HomeAssistantSnapshotProjection {
     }
 
     private static let cachedAttributeKeys = Set([
-        "brightness", "color_mode", "color_temp", "current_position", "current_temperature",
+        "brightness", "color_mode", "color_temp", "color_temp_kelvin", "current_position", "current_temperature",
         "device_class", "fan_mode", "fan_modes", "hvac_action", "hvac_modes", "max_temp",
-        "current_direction", "min_temp", "oscillating", "percentage", "percentage_step",
+        "current_direction", "max_color_temp_kelvin", "max_mireds", "min_color_temp_kelvin",
+        "min_mireds", "min_temp", "oscillating", "percentage", "percentage_step",
         "options", "preset_mode", "preset_modes", "rgb_color", "swing_horizontal_mode",
         "swing_horizontal_modes", "swing_mode", "swing_modes",
         "supported_color_modes", "supported_features", "target_temp_high", "target_temp_low",

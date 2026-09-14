@@ -228,14 +228,30 @@ struct IOSHomeAssistantDeviceDetailView: View {
     @ViewBuilder
     private func controls(for entity: HomeAssistantEntity) -> some View {
         switch entity.domain {
-        case "light", "switch", "input_boolean":
+        case "light":
+            let capabilities = HomeAssistantLightCapabilities(entity: entity)
             Button(entity.isOn ? "关闭" : "开启") {
                 perform(entity, action: entity.isOn ? .turnOff : .turnOn)
             }
             .buttonStyle(.borderedProminent)
-            if entity.domain == "light", entity.state.attributes["brightness"] != nil {
+            if capabilities.supportsBrightness {
                 percentageSlider(entity: entity, label: "亮度", attribute: "brightness", scale: 255) { .setBrightness($0) }
             }
+            if capabilities.supportsColorTemperature {
+                IOSHomeAssistantColorTemperatureControl(
+                    initialValue: capabilities.colorTemperatureKelvin,
+                    range: capabilities.colorTemperatureRange,
+                    theme: theme,
+                    usesDarkSurface: false
+                ) { value in
+                    perform(entity, action: .setColorTemperatureKelvin(value))
+                }
+            }
+        case "switch", "input_boolean":
+            Button(entity.isOn ? "关闭" : "开启") {
+                perform(entity, action: entity.isOn ? .turnOff : .turnOn)
+            }
+            .buttonStyle(.borderedProminent)
         case "fan":
             fanControls(entity)
         case "cover":

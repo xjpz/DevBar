@@ -21,7 +21,7 @@ struct IOSHomeAssistantAccessoryControlView: View {
                 }
                 .simultaneousGesture(dismissDragGesture)
 
-            VStack(spacing: controlProjection.usesChildControlGrid ? 12 : 18) {
+            VStack(spacing: pageSpacing) {
                 topBar
                     .contentShape(Rectangle())
                     .simultaneousGesture(dismissDragGesture)
@@ -45,7 +45,7 @@ struct IOSHomeAssistantAccessoryControlView: View {
                             auxiliaryControls
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, scrollContentVerticalPadding)
                     }
                     .scrollBounceBehavior(.basedOnSize)
                 } else {
@@ -115,8 +115,26 @@ struct IOSHomeAssistantAccessoryControlView: View {
         controlEntity.map { model.pendingEntityIDs.contains($0.entityID) } ?? false
     }
 
+    private var usesCompactLightControlLayout: Bool {
+        guard let controlEntity, controlEntity.domain == "light" else { return false }
+        return HomeAssistantLightCapabilities(entity: controlEntity).supportsColorTemperature
+    }
+
+    private var pageSpacing: CGFloat {
+        if controlProjection.usesChildControlGrid { return 12 }
+        return usesCompactLightControlLayout ? 12 : 18
+    }
+
+    private var scrollContentVerticalPadding: CGFloat {
+        usesCompactLightControlLayout ? 4 : 8
+    }
+
     private var usesScrollableControlSurface: Bool {
-        controlEntity?.domain == "climate" || controlEntity?.domain == "fan"
+        guard let controlEntity else { return false }
+        if controlEntity.domain == "climate" || controlEntity.domain == "fan" { return true }
+        return controlEntity.domain == "light"
+            && !controlProjection.usesChildControlGrid
+            && HomeAssistantLightCapabilities(entity: controlEntity).supportsColorTemperature
     }
 
     private var dismissalScale: CGFloat {
@@ -159,7 +177,7 @@ struct IOSHomeAssistantAccessoryControlView: View {
                 .background(.ultraThinMaterial, in: Capsule())
             }
         }
-        .frame(minHeight: 48)
+        .frame(minHeight: usesCompactLightControlLayout ? 36 : 48)
     }
 
     @ViewBuilder
@@ -169,15 +187,7 @@ struct IOSHomeAssistantAccessoryControlView: View {
         } else if let entity = controlEntity {
             switch entity.domain {
             case "light":
-                levelControl(
-                    entity: entity,
-                    value: lightLevel(entity),
-                    symbol: liveAccessory.systemImage,
-                    accent: .yellow,
-                    supportsLevel: entity.state.attributes["brightness"] != nil,
-                    compact: controlProjection.usesChildControlGrid,
-                    levelAction: { .setBrightness($0) }
-                )
+                lightControl(entity)
             case "fan":
                 fanControl(entity)
             case "switch", "input_boolean":
@@ -204,6 +214,33 @@ struct IOSHomeAssistantAccessoryControlView: View {
         } else {
             metricSummary
         }
+    }
+
+    private func lightControl(_ entity: HomeAssistantEntity) -> some View {
+        let capabilities = HomeAssistantLightCapabilities(entity: entity)
+        return VStack(spacing: 10) {
+            levelControl(
+                entity: entity,
+                value: lightLevel(entity),
+                symbol: liveAccessory.systemImage,
+                accent: .yellow,
+                supportsLevel: capabilities.supportsBrightness,
+                compact: controlProjection.usesChildControlGrid,
+                levelAction: { .setBrightness($0) }
+            )
+
+            if capabilities.supportsColorTemperature {
+                IOSHomeAssistantColorTemperatureControl(
+                    initialValue: capabilities.colorTemperatureKelvin,
+                    range: capabilities.colorTemperatureRange,
+                    theme: theme,
+                    usesDarkSurface: true
+                ) { value in
+                    perform(entity, action: .setColorTemperatureKelvin(value))
+                }
+            }
+        }
+        .frame(maxWidth: 390)
     }
 
     private func fanControl(_ entity: HomeAssistantEntity) -> some View {

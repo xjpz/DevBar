@@ -1080,7 +1080,7 @@ struct HomeAssistantTests {
         let states = try decode([HomeAssistantState].self, """
         [
           {"entity_id":"\(unavailableID)","state":"unavailable","attributes":{"friendly_name":"灯光"}},
-          {"entity_id":"\(availableID)","state":"off","attributes":{"friendly_name":"灯光"}}
+          {"entity_id":"\(availableID)","state":"off","attributes":{"friendly_name":"灯光","brightness":128,"color_mode":"color_temp","color_temp_kelvin":4000,"min_color_temp_kelvin":2700,"max_color_temp_kelvin":6500,"supported_color_modes":["color_temp"]}}
         ]
         """)
         let device = try decode(
@@ -1112,6 +1112,13 @@ struct HomeAssistantTests {
         #expect(accessory.primaryControlEntity?.entityID == availableID)
         #expect(accessory.needsReview == false)
         #expect(HomeAssistantAccessoryStateResolver.resolve(accessory).availability == .partiallyAvailable)
+
+        let primaryEntity = try #require(accessory.primaryControlEntity)
+        let capabilities = HomeAssistantLightCapabilities(entity: primaryEntity)
+        #expect(capabilities.supportsBrightness)
+        #expect(capabilities.supportsColorTemperature)
+        #expect(capabilities.colorTemperatureKelvin == 4000)
+        #expect(capabilities.colorTemperatureRange == 2700...6500)
     }
 
     @Test("Automatic primary control follows equivalent light availability changes")
@@ -1182,6 +1189,180 @@ struct HomeAssistantTests {
 
         #expect(call.service == "unlock")
         #expect(call.requiresConfirmation)
+    }
+
+    @Test("Light color temperature capabilities and actions follow supported color modes")
+    func lightColorTemperatureCapabilitiesAndActions() throws {
+        let state = try decode(HomeAssistantState.self, """
+        {
+          "entity_id":"light.bedroom_main",
+          "state":"on",
+          "attributes":{
+            "brightness":128,
+            "color_mode":"color_temp",
+            "color_temp_kelvin":4000,
+            "min_color_temp_kelvin":2700,
+            "max_color_temp_kelvin":6500,
+            "supported_color_modes":["color_temp"]
+          }
+        }
+        """)
+        let entity = HomeAssistantEntity(
+            entityID: state.entityID,
+            deviceID: "lemesh.light.wy0c14",
+            areaID: "bedroom",
+            name: "主灯",
+            domain: "light",
+            deviceClass: nil,
+            icon: nil,
+            state: state,
+            availableServices: ["turn_on", "turn_off"]
+        )
+
+        let capabilities = HomeAssistantLightCapabilities(entity: entity)
+        #expect(capabilities.brightnessPercentage == 128.0 / 255.0 * 100.0)
+        #expect(capabilities.supportedColorModes == ["color_temp"])
+        #expect(capabilities.supportsBrightness)
+        #expect(capabilities.supportsColorTemperature)
+        #expect(capabilities.colorTemperatureKelvin == 4000)
+        #expect(capabilities.colorTemperatureRange == 2700...6500)
+
+        let call = try HomeAssistantControlPolicy.serviceCall(
+            entity: entity,
+            action: .setColorTemperatureKelvin(4200)
+        )
+        let clampedCall = try HomeAssistantControlPolicy.serviceCall(
+            entity: entity,
+            action: .setColorTemperatureKelvin(7000)
+        )
+
+        #expect(call.service == "turn_on")
+        #expect(call.data == ["color_temp_kelvin": .number(4200)])
+        #expect(clampedCall.data == ["color_temp_kelvin": .number(6500)])
+    }
+
+    @Test("Light color temperature support does not depend on a current Kelvin value")
+    func lightColorTemperatureSupportDoesNotRequireCurrentValue() throws {
+        let state = try decode(HomeAssistantState.self, """
+        {
+          "entity_id":"light.color_capable",
+          "state":"on",
+          "attributes":{
+            "color_mode":"rgb",
+            "supported_color_modes":["rgb","color_temp"]
+          }
+        }
+        """)
+        let entity = HomeAssistantEntity(
+            entityID: state.entityID,
+            deviceID: nil,
+            areaID: nil,
+            name: "彩灯",
+            domain: "light",
+            deviceClass: nil,
+            icon: nil,
+            state: state,
+            availableServices: ["turn_on"]
+        )
+
+        let capabilities = HomeAssistantLightCapabilities(entity: entity)
+        #expect(capabilities.supportsColorTemperature)
+        #expect(capabilities.colorTemperatureKelvin == nil)
+        #expect(capabilities.colorTemperatureRange == 2000...6500)
+    }
+
+    @Test("Legacy light temperature attributes remain readable and unsupported lights reject writes")
+    func legacyLightTemperatureCompatibilityAndUnsupportedWrite() throws {
+        let legacyState = try decode(HomeAssistantState.self, """
+        {
+          "entity_id":"light.legacy_cct",
+          "state":"on",
+          "attributes":{
+            "color_temp":250,
+            "min_mireds":154,
+            "max_mireds":370,
+            "supported_color_modes":["color_temp"]
+          }
+        }
+        """)
+        let legacyEntity = HomeAssistantEntity(
+            entityID: legacyState.entityID,
+            deviceID: nil,
+            areaID: nil,
+            name: "旧版色温灯",
+            domain: "light",
+            deviceClass: nil,
+            icon: nil,
+            state: legacyState,
+            availableServices: ["turn_on"]
+        )
+        let capabilities = HomeAssistantLightCapabilities(entity: legacyEntity)
+
+        #expect(capabilities.colorTemperatureKelvin == 4000)
+        #expect(capabilities.colorTemperatureRange == 2703...6494)
+
+        let rgbState = try decode(HomeAssistantState.self, """
+        {
+          "entity_id":"light.rgb_only",
+          "state":"on",
+          "attributes":{"supported_color_modes":["rgb"]}
+        }
+        """)
+        let rgbEntity = HomeAssistantEntity(
+            entityID: rgbState.entityID,
+            deviceID: nil,
+            areaID: nil,
+            name: "彩灯",
+            domain: "light",
+            deviceClass: nil,
+            icon: nil,
+            state: rgbState,
+            availableServices: ["turn_on"]
+        )
+
+        #expect(throws: HomeAssistantError.unsupportedControl) {
+            try HomeAssistantControlPolicy.serviceCall(
+                entity: rgbEntity,
+                action: .setColorTemperatureKelvin(4000)
+            )
+        }
+    }
+
+    @Test("Light Kelvin attributes survive snapshot caching")
+    func lightKelvinAttributesSurviveSnapshotCaching() throws {
+        let config = try decode(HomeAssistantConfig.self, #"{"location_name":"Home"}"#)
+        let state = try decode(HomeAssistantState.self, """
+        {
+          "entity_id":"light.bedroom_main",
+          "state":"on",
+          "attributes":{
+            "color_temp_kelvin":4000,
+            "min_color_temp_kelvin":2700,
+            "max_color_temp_kelvin":6500,
+            "min_mireds":154,
+            "max_mireds":370,
+            "supported_color_modes":["color_temp"],
+            "latitude":36.0
+          }
+        }
+        """)
+        let snapshot = HomeAssistantTopologyBuilder.build(
+            config: config,
+            states: [state],
+            registryEntries: [],
+            areas: [],
+            devices: [],
+            services: []
+        )
+
+        let cached = HomeAssistantSnapshotProjection.cacheSnapshot(from: snapshot)
+        let attributes = try #require(cached.entities.first?.state.attributes)
+        #expect(attributes["color_temp_kelvin"] == .number(4000))
+        #expect(attributes["min_color_temp_kelvin"] == .number(2700))
+        #expect(attributes["max_color_temp_kelvin"] == .number(6500))
+        #expect(attributes["min_mireds"] == .number(154))
+        #expect(attributes["max_mireds"] == .number(370))
+        #expect(attributes["latitude"] == nil)
     }
 
     @Test("Fan capabilities and actions follow the entity feature attributes")

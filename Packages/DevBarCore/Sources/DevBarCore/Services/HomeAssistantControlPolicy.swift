@@ -5,6 +5,7 @@ public enum HomeAssistantControlAction: Equatable, Sendable {
     case turnOff
     case toggle
     case setBrightness(Double)
+    case setColorTemperatureKelvin(Double)
     case setPercentage(Double)
     case setPresetMode(String)
     case setOscillating(Bool)
@@ -42,6 +43,15 @@ public enum HomeAssistantControlPolicy {
         case ("light", .setBrightness(let value)):
             service = "turn_on"
             data["brightness_pct"] = .number(clamp(value))
+        case ("light", .setColorTemperatureKelvin(let value)):
+            let capabilities = HomeAssistantLightCapabilities(entity: entity)
+            guard capabilities.supportsColorTemperature, value.isFinite else {
+                throw HomeAssistantError.unsupportedControl
+            }
+            service = "turn_on"
+            data["color_temp_kelvin"] = .number(
+                capabilities.clampedColorTemperatureKelvin(value).rounded()
+            )
         case ("fan", .setPercentage(let value)):
             service = "set_percentage"
             data["percentage"] = .number(clamp(value))
@@ -163,6 +173,80 @@ public enum HomeAssistantControlPolicy {
 
     private static func clamp(_ value: Double) -> Double {
         min(100, max(0, value))
+    }
+}
+
+public struct HomeAssistantLightCapabilities: Equatable, Sendable {
+    private static let defaultMinimumColorTemperatureKelvin = 2_000.0
+    private static let defaultMaximumColorTemperatureKelvin = 6_500.0
+    private static let brightnessColorModes: Set<String> = [
+        "brightness", "color_temp", "hs", "xy", "rgb", "rgbw", "rgbww", "white",
+    ]
+
+    public let brightnessPercentage: Double?
+    public let supportedColorModes: [String]
+    public let colorTemperatureKelvin: Double?
+    public let minimumColorTemperatureKelvin: Double
+    public let maximumColorTemperatureKelvin: Double
+    public let supportsBrightness: Bool
+    public let supportsColorTemperature: Bool
+
+    public var colorTemperatureRange: ClosedRange<Double> {
+        minimumColorTemperatureKelvin...maximumColorTemperatureKelvin
+    }
+
+    public init(entity: HomeAssistantEntity) {
+        let attributes = entity.state.attributes
+        let modes = Self.uniqueColorModes(attributes["supported_color_modes"])
+        let minimum = Self.positiveFiniteValue(attributes["min_color_temp_kelvin"])
+            ?? Self.kelvin(fromMireds: attributes["max_mireds"])
+            ?? Self.defaultMinimumColorTemperatureKelvin
+        let maximum = Self.positiveFiniteValue(attributes["max_color_temp_kelvin"])
+            ?? Self.kelvin(fromMireds: attributes["min_mireds"])
+            ?? Self.defaultMaximumColorTemperatureKelvin
+        let resolvedMinimum = min(minimum, maximum)
+        let resolvedMaximum = max(minimum, maximum)
+        let currentColorTemperature = Self.positiveFiniteValue(attributes["color_temp_kelvin"])
+            ?? Self.kelvin(fromMireds: attributes["color_temp"])
+
+        if let brightness = Self.positiveFiniteValue(attributes["brightness"]) {
+            brightnessPercentage = min(100, max(0, brightness / 255 * 100))
+        } else if attributes["brightness"]?.doubleValue == 0 {
+            brightnessPercentage = 0
+        } else {
+            brightnessPercentage = nil
+        }
+        supportedColorModes = modes
+        minimumColorTemperatureKelvin = resolvedMinimum
+        maximumColorTemperatureKelvin = resolvedMaximum
+        colorTemperatureKelvin = currentColorTemperature.map {
+            min(resolvedMaximum, max(resolvedMinimum, $0))
+        }
+        supportsBrightness = attributes["brightness"] != nil
+            || modes.contains { Self.brightnessColorModes.contains($0) }
+        supportsColorTemperature = modes.contains("color_temp")
+    }
+
+    public func clampedColorTemperatureKelvin(_ value: Double) -> Double {
+        min(maximumColorTemperatureKelvin, max(minimumColorTemperatureKelvin, value))
+    }
+
+    private static func uniqueColorModes(_ value: HomeAssistantJSONValue?) -> [String] {
+        (value?.arrayValue?.compactMap(\.stringValue) ?? []).reduce(into: []) { result, item in
+            let normalized = item.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !normalized.isEmpty, !result.contains(normalized) else { return }
+            result.append(normalized)
+        }
+    }
+
+    private static func positiveFiniteValue(_ value: HomeAssistantJSONValue?) -> Double? {
+        guard let number = value?.doubleValue, number.isFinite, number > 0 else { return nil }
+        return number
+    }
+
+    private static func kelvin(fromMireds value: HomeAssistantJSONValue?) -> Double? {
+        guard let mireds = positiveFiniteValue(value) else { return nil }
+        return (1_000_000 / mireds).rounded()
     }
 }
 
