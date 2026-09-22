@@ -243,6 +243,9 @@
         }
       }
     },
+    "%lld K" : {
+
+    },
     "%lld RUNNING" : {
       "localizations" : {
         "en" : {
@@ -326,6 +329,9 @@
           }
         }
       }
+    },
+    "%lld 开尔文" : {
+
     },
     "%lld/%lld" : {
       "localizations" : {
@@ -9868,26 +9874,6 @@
         }
       }
     },
-    "JSON" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "JSON"
-          }
-        }
-      }
-    },
-    "Key" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Key"
-          }
-        }
-      }
-    },
     "ios_zcode_remote_confirm_button" : {
       "localizations" : {
         "en" : {
@@ -10268,6 +10254,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "ZCode"
+          }
+        }
+      }
+    },
+    "JSON" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JSON"
+          }
+        }
+      }
+    },
+    "Key" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key"
           }
         }
       }
@@ -16446,6 +16452,9 @@
     "自动读取区域、设备和实体，生成适合 iPhone 的家庭控制台。" : {
 
     },
+    "色温" : {
+
+    },
     "蓝色" : {
 
     },
@@ -17193,6 +17202,9 @@
       }
     },
     "风速" : {
+
+    },
+    "风速 %lld%%" : {
 
     },
     "首页没有可控制设备" : {
