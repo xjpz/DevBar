@@ -39,16 +39,25 @@ struct IOSZCodeRemoteView: View {
         session.pageIsDark ? .white.opacity(0.75) : .black.opacity(0.7)
     }
 
-    /// 作为固定 tab 根视图时模拟系统"下滑收起底栏"（系统行为不识别 WKWebView 滚动）；
-    /// 从工具页推入时底栏本就隐藏，无需处理
-    private var shouldCollapseTabBar: Bool {
-        entryContext == .tabRoot && isPaired && session.isWebScrolledDown
+    /// 底栏隐藏判定：
+    /// - 从工具页推入：常驻隐藏（外层已按 pushed 隐藏，此处不得以 .visible 覆盖）；
+    /// - 固定 tab 根：首页（落地层）底栏稳定常显——这是返回/切换其他页面的唯一入口，
+    ///   不参与滚动收起（网页加载/自动跳转伴随的滚动事件会误报，导致底栏闪隐、
+    ///   需按住下拉才可见）；仅进入网页二级页面（会话页，网页自带返回导航）时隐藏；
+    ///   失效态保留底栏——失效引导下唯一的退出通道。
+    private var hidesTabBar: Bool {
+        guard isPaired else {
+            return entryContext == .pushed
+        }
+        if entryContext == .pushed { return true }
+        if session.navigationState == .failed { return false }
+        return session.isSubpage
     }
 
-    /// 作为固定 tab 根视图时不提供顶部悬浮控制（返回/菜单）：tab 根无返回目标，
-    /// 且需求要求从底栏进入时不出现顶部按钮；仅从工具页推入时保留点按唤出
+    /// 已配对即允许点按唤出悬浮控制（tab 根底栏常隐，菜单是网页内的控制入口）；
+    /// 返回按钮仅从工具页推入时出现（tab 根无返回目标），网页二级页面自带返回、不唤出（见 toggleChrome）
     private var allowsChrome: Bool {
-        entryContext != .tabRoot
+        isPaired
     }
 
     var body: some View {
@@ -64,7 +73,7 @@ struct IOSZCodeRemoteView: View {
         .toolbar(isPaired ? .hidden : .visible, for: .navigationBar)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(theme.isGeek ? .dark : nil, for: .navigationBar)
-        .toolbar(shouldCollapseTabBar ? .hidden : .visible, for: .tabBar)
+        .toolbar(hidesTabBar ? .hidden : .visible, for: .tabBar)
         // 状态栏/Home 指示条颜色跟随远控页面主题，实现整体沉浸
         .preferredColorScheme(immersiveColorScheme)
         .sheet(isPresented: $isShowingScanner) {
@@ -125,7 +134,10 @@ struct IOSZCodeRemoteView: View {
                     VStack(spacing: 0) {
                         if isChromeVisible {
                             HStack(alignment: .top) {
-                                floatingBackButton
+                                // 返回键仅推入路径需要；tab 根只有菜单（无返回目标）
+                                if entryContext == .pushed {
+                                    floatingBackButton
+                                }
 
                                 Spacer(minLength: 12)
 

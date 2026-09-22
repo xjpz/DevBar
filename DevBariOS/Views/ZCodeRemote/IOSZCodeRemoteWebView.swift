@@ -37,15 +37,33 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
     static let themeMessageName = "zcodeTheme"
     static let scrollMessageName = "zcodeScroll"
 
-    /// 主题探测与出血区对色：
-    /// - 深/浅判定：html/body 背景 → 主题 class 令牌 → color-scheme 声明 → 跳过浮层的顶/底采样 → 系统偏好；
-    /// - 出血区对色：深色顶/底实测值直接钉死（#202020 / #161616），浅色采样紧邻安全区元素底色；
+    /// 主题探测与出血区对色（依据 ZCode 开源源码，确定性信号优先、启发式降级）：
+    /// - 深/浅判定：html[data-zcode-browser-theme-surface]（浏览器环境首帧设置、useTheme 切换维护）
+    ///   → theme-zai-* 品牌类存在时读 dark class → html/body 背景亮度 → color-scheme → 采样 → 系统偏好；
+    /// - 系统跟随：localStorage["zcode-theme"] === "system" → color-scheme 同时含 light/dark；
+    /// - 出血区对色：getComputedStyle 读 --color-header / --color-background（theme-zai-dark 下即
+    ///   #202020 / #161616）→ 采样紧邻安全区元素底色 → 实测常量兜底（深 #202020 / 浅白）。
     ///   顶色刷 WebView 底色，底色由 SwiftUI 叠加贴屏底色带（见 IOSZCodeRemoteView）。
-    /// 主题切换表现为 html/body 的 class、style 或 color-scheme 变化，用 MutationObserver 捕获；
-    /// 另监听 prefers-color-scheme 变化覆盖「系统默认」模式，低频轮询兜底，结果去重后回传。
+    /// 主题切换必然翻转 html 的 class / 主题属性，MutationObserver 捕获；另监听 prefers-color-scheme
+    /// 覆盖「系统默认」模式；2s 轮询仅作兜底——确定性信号命中时不执行采样（elementFromPoint 链空转）。
     private static let themeProbeScript = """
     (function() {
       function parseRGB(color) {
+        if (!color) return null;
+        color = color.trim();
+        // 主题 token 是十六进制（--color-header: #202020），采样背景是 rgb()/rgba()
+        var hex = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+        if (hex) {
+          var h = hex[1];
+          if (h.length === 3) {
+            h = h.charAt(0) + h.charAt(0) + h.charAt(1) + h.charAt(1) + h.charAt(2) + h.charAt(2);
+          }
+          return [
+            parseInt(h.substring(0, 2), 16),
+            parseInt(h.substring(2, 4), 16),
+            parseInt(h.substring(4, 6), 16)
+          ];
+        }
         var m = color && color.match(/rgba?\\((\\d+)[, ]+(\\d+)[, ]+(\\d+)(?:[, /]+([\\d.]+))?\\)/);
         if (!m) return null;
         if (m[4] !== undefined && parseFloat(m[4]) === 0) return null;
@@ -105,11 +123,47 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
         var scheme = (getComputedStyle(document.documentElement).colorScheme || '').toLowerCase();
         return scheme.indexOf('light') >= 0 && scheme.indexOf('dark') >= 0;
       }
+      // ---- 确定性信号（packages/web/index.html、packages/ui/src/useTheme.ts、styles.css）----
+      // 浏览器环境（含 WKWebView）下页面在 <html> 上维护 data-zcode-browser-theme-surface，
+      // 首帧由 index.html 内联脚本设置、useTheme 每次切换主题时同步；
+      // 品牌主题类 theme-zai-dark/theme-zai-light 与 dark class 同批翻转，可互为佐证
+      function deterministicDark() {
+        var el = document.documentElement;
+        var surface = el.getAttribute('data-zcode-browser-theme-surface');
+        if (surface === 'dark') return true;
+        if (surface === 'light') return false;
+        if (el.classList.contains('theme-zai-dark') || el.classList.contains('theme-zai-light')) {
+          return el.classList.contains('dark');
+        }
+        return null;
+      }
+      // 主题种子 localStorage["zcode-theme"] ∈ {light,dark,zai-light,zai-dark,system}，system 为跟随系统
+      function deterministicSystem() {
+        try {
+          var seed = localStorage.getItem('zcode-theme');
+          if (seed === 'system') return true;
+          if (seed === 'light' || seed === 'dark' || seed === 'zai-light' || seed === 'zai-dark') {
+            return false;
+          }
+        } catch (e) {}
+        return null;
+      }
+      // 出血色 token 挂在 <html> 主题类上：--color-header（顶）/ --color-background（底）
+      function cssToken(name) {
+        return parseRGB(getComputedStyle(document.documentElement).getPropertyValue(name));
+      }
       var last = null;
-      // 二级页面检测：SPA 前端路由（pushState/popstate）+ 路径对比初始路径
+      // 二级页面检测：线上移动端 web 以 history.state.zcodeMobilePage 标记会话页
+      // （pushState 只写 state、不改 URL），直接读状态为权威信号；
+      // push/pop 计数与路径对比兜底其他版本行为
       var initialPath = location.pathname;
       var navDepth = 0;
       function isSubpage() {
+        try {
+          if (window.history.state && window.history.state.zcodeMobilePage === 'chat') {
+            return true;
+          }
+        } catch (e) {}
         return navDepth > 0 || location.pathname !== initialPath;
       }
       var origPush = history.pushState;
@@ -127,14 +181,18 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
       });
       function report() {
         try {
-          var dark = decideDark();
-          var system = systemMode();
-          // 出血带实测底色（用户确认）：深色顶部 #202020、最底部 #161616；
-          // 输入栏 #160d38 在安全区上方、由页面自绘，不属于出血带。浅色沿用采样值
-          var top = dark ? [32, 32, 32] : parseRGB(adjacentPaint());
-          var bottom = dark ? [22, 22, 22] : parseRGB(adjacentPaint());
+          var det = deterministicDark();
+          var dark = det !== null ? det : decideDark();
+          // 确定性命中时直接读 token，不进入采样（elementFromPoint 链不再周期执行）
+          var top = cssToken('--color-header');
+          var bottom = cssToken('--color-background');
+          // 降级链：token → 紧邻安全区采样 → 实测常量（深 #202020 / 浅白）
+          if (!top) top = parseRGB(adjacentPaint());
+          if (!bottom) bottom = parseRGB(adjacentPaint());
           if (!top) top = dark ? [32, 32, 32] : [255, 255, 255];
           if (!bottom) bottom = top;
+          var system = deterministicSystem();
+          if (system === null) system = systemMode();
           var sub = isSubpage();
           var key = dark + '|' + system + '|' + sub + '|' + top.join(',') + '|' + bottom.join(',');
           if (key === last) return;
@@ -152,8 +210,19 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
       var mql = window.matchMedia('(prefers-color-scheme: dark)');
       if (mql.addEventListener) mql.addEventListener('change', report);
       var observer = new MutationObserver(report);
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style', 'color-scheme'] });
-      if (document.body) observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
+      // 主题切换翻转 html 的 class、style（colorScheme）与主题属性，全部在此捕获
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: [
+          'class',
+          'style',
+          'data-zcode-browser-theme-surface',
+          'data-zcode-bootstrap-theme'
+        ]
+      });
+      if (document.body) {
+        observer.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] });
+      }
       setInterval(report, 2000);
       // 滚动方向检测：捕获阶段监听 scroll 事件，覆盖 inner DOM 元素滚动
       // （此类页面 WKWebView 主 scrollView 不动，原生侧无法感知）；
@@ -203,7 +272,7 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
         view.removeFromSuperview()
         lastHandledReloadToken = reloadToken
         if loadedURLString != urlString {
-            load(urlString, in: view)
+            scheduleLoad(urlString, in: view)
         } else {
             applyChrome()
         }
@@ -215,7 +284,17 @@ final class IOSZCodeRemoteSessionController: NSObject, ObservableObject {
         guard reloadToken != lastHandledReloadToken else { return }
         lastHandledReloadToken = reloadToken
         if let view = webView {
-            load(urlString, in: view)
+            scheduleLoad(urlString, in: view)
+        }
+    }
+
+    /// makeUIView / updateUIView 处于视图更新期内，直接调用 load 发布 navigationState 会触发
+    /// "Publishing changes from within view updates"；推迟到下一个 RunLoop 执行，
+    /// 并挡掉重复调度与 teardown 后的迟到加载
+    private func scheduleLoad(_ urlString: String, in view: WKWebView) {
+        DispatchQueue.main.async {
+            guard self.webView === view, self.loadedURLString != urlString else { return }
+            self.load(urlString, in: view)
         }
     }
 

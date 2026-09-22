@@ -605,7 +605,7 @@ struct IOSToolDestinationView: View {
             }
         }
         .environment(\.iosToolEntryContext, entryContext)
-        .toolbar(entryContext.tabBarVisibility, for: .tabBar)
+        .iosToolDestinationTabBarVisibility(entryContext)
         .toolbarTitleDisplayMode(entryContext.toolbarTitleDisplayMode)
         .toolbarBackground(toolNavigationBackground, for: .navigationBar)
         .toolbarBackground(toolNavigationBackgroundVisibility, for: .navigationBar)
@@ -635,6 +635,20 @@ enum IOSToolEntryContext {
 
     var toolbarTitleDisplayMode: ToolbarTitleDisplayMode {
         self == .tabRoot ? .inlineLarge : .inline
+    }
+}
+
+private extension View {
+    /// 容器层底栏可见性：tab 根不设置（显式 .visible 会压过工具内部的自定义隐藏，
+    /// 如 ZCode 远控沉浸态自隐底栏——外层修饰符优先级更高）；推入路径统一隐藏。
+    /// 各工具叶子层各自的 .toolbar(tabBarVisibility) 不受影响。
+    @ViewBuilder
+    func iosToolDestinationTabBarVisibility(_ context: IOSToolEntryContext) -> some View {
+        if context == .pushed {
+            toolbar(.hidden, for: .tabBar)
+        } else {
+            self
+        }
     }
 }
 
