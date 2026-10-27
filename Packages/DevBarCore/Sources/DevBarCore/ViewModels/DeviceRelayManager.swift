@@ -8,6 +8,7 @@ public final class DeviceRelayManager: ObservableObject {
     @Published public private(set) var localDeviceID: String?
     @Published public private(set) var deviceToken: String?
     @Published public private(set) var peers: [DeviceRelayDevice] = []
+    @Published public private(set) var hasLoadedPeers = false
     @Published public private(set) var pairQRCodePayload: DeviceRelayPairQRCodePayload?
     @Published public private(set) var connectionState: DeviceRelayConnectionState = .disconnected
     @Published public private(set) var activeTransport: DeviceRelayActiveTransport = .none
@@ -24,6 +25,7 @@ public final class DeviceRelayManager: ObservableObject {
     private let service: DeviceRelayService
     private let store: DeviceRelayStore
     private let localTransport = DeviceRelayLocalTransport()
+    private let clipboardCapabilityProbe = ClipboardCapabilityProbe()
     private var socketTask: URLSessionWebSocketTask?
     private var receiveTask: Task<Void, Never>?
     private var heartbeatTask: Task<Void, Never>?
@@ -38,6 +40,16 @@ public final class DeviceRelayManager: ObservableObject {
     private var deviceType: DeviceRelayDeviceType?
     private var deviceName: String?
     public var messageHandler: ((DeviceRelayMessage) -> Void)?
+    /// Consumed separately: clipboard packets never enter receivedMessages or diagnostic payloads.
+    public var clipboardMessageHandler: ((DeviceRelayMessage) -> Void)?
+    public var clipboardStatusFields: [String: String] = [:]
+    @Published public private(set) var clipboardPeerVersions: [String: Int] = [:]
+    @Published public private(set) var clipboardPeerStates: [String: String] = [:]
+
+    public func clipboardPairSecret(for peer: String) -> String? {
+        guard peers.contains(where: { $0.deviceId == peer }) else { return nil }
+        return store.loadLocalPairSecret(peerDeviceID: peer)
+    }
 
     public init(
         service: DeviceRelayService = .shared,
@@ -47,6 +59,10 @@ public final class DeviceRelayManager: ObservableObject {
         self.store = store
         self.currentSocketService = service
         self.deviceToken = nil
+#if DEBUG
+        clipboardCapabilityProbe.diagnosticURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+            .first?.appendingPathComponent("DevBarClipboard/capability-status.json")
+#endif
         bindLocalTransport()
     }
 
@@ -188,7 +204,7 @@ public final class DeviceRelayManager: ObservableObject {
             }
             appendLog(.info, "请求生成 iPhone 配对码")
             let pairCode = try await service.createPairCode(macDeviceId: macDeviceID, deviceToken: token)
-            let localSecret = Self.randomLocalSecret()
+            let localSecret = try Self.randomLocalSecret()
             guard store.savePendingLocalPairSecret(localSecret, pairCode: pairCode.pairCode) else {
                 throw DeviceRelayError.secureStorageUnavailable
             }
@@ -320,6 +336,10 @@ public final class DeviceRelayManager: ObservableObject {
         guard let token = deviceToken else { return }
         do {
             peers = try await service.fetchPeers(deviceToken: token)
+            hasLoadedPeers = true
+            let peerIDs = Set(peers.map(\.deviceId))
+            clipboardPeerVersions = clipboardPeerVersions.filter { peerIDs.contains($0.key) }
+            clipboardPeerStates = clipboardPeerStates.filter { peerIDs.contains($0.key) }
             localTransport.updateTargetPeerIDs(Set(peers.map(\.deviceId)))
             lastErrorMessage = nil
             appendLog(.info, "已刷新 peers：\(peers.count) 台")
@@ -410,6 +430,8 @@ public final class DeviceRelayManager: ObservableObject {
             store.clearLocalPairSecret(peerDeviceID: peerDeviceID)
             localTransport.disconnect(peerDeviceID: peerDeviceID)
             peers.removeAll { $0.deviceId == peerDeviceID }
+            clipboardPeerVersions[peerDeviceID] = nil
+            clipboardPeerStates[peerDeviceID] = nil
             peerRuntimeStates.removeValue(forKey: peerDeviceID)
             localConnectedPeerIDs.remove(peerDeviceID)
             localTransport.updateTargetPeerIDs(Set(peers.map(\.deviceId)))
@@ -490,10 +512,13 @@ public final class DeviceRelayManager: ObservableObject {
         await createPairQRCode(deviceName: deviceName)
     }
 
-    public func send(_ message: DeviceRelayMessage) async throws {
-        if await sendUsingLocalTransportIfPossible(message) {
+    public func send(_ message: DeviceRelayMessage, permit: DeviceRelaySendPermit? = nil) async throws {
+        guard permit?.isValid ?? true else { throw ClipboardFailure.cancelled }
+        if await sendUsingLocalTransportIfPossible(message, permit: permit) {
             return
         }
+
+        guard permit?.isValid ?? true else { throw ClipboardFailure.cancelled }
 
         if socketTask == nil {
             guard localDeviceID != nil else {
@@ -511,6 +536,7 @@ public final class DeviceRelayManager: ObservableObject {
             throw DeviceRelayError.webSocketNotConnected
         }
         let text = try DeviceRelayMessageCodec.encode(message)
+        guard permit?.isValid ?? true else { throw ClipboardFailure.cancelled }
         do {
             try await socketTask.send(.string(text))
             activeTransport = .relay
@@ -623,6 +649,18 @@ public final class DeviceRelayManager: ObservableObject {
         )
     }
 
+    public func fetchClipboardCapability(targetDeviceID: String) async throws -> ClipboardPeerCapability {
+        guard let localDeviceID, peers.contains(where: { $0.deviceId == targetDeviceID }) else {
+            throw ClipboardFailure.unavailable
+        }
+        return try await clipboardCapabilityProbe.request(peerID: targetDeviceID, localID: localDeviceID) { [weak self] id in
+            guard let self else { throw ClipboardFailure.cancelled }
+            let permit = DeviceRelaySendPermit { [weak self] in self?.clipboardCapabilityProbe.isPending(id) == true }
+            try await self.send(Self.makeSystemStatusRequestMessage(localDeviceID: localDeviceID,
+                targetDeviceId: targetDeviceID, deviceName: self.deviceName, requestID: id), permit: permit)
+        }
+    }
+
     public func sendSystemStatus(
         targetDeviceId: String,
         requestId: String?,
@@ -637,8 +675,7 @@ public final class DeviceRelayManager: ObservableObject {
         guard let localDeviceID else {
             throw DeviceRelayError.missingDeviceID
         }
-        try await send(
-            Self.makeSystemStatusMessage(
+        let message = Self.makeSystemStatusMessage(
                 localDeviceID: localDeviceID,
                 targetDeviceId: targetDeviceId,
                 requestId: requestId,
@@ -650,7 +687,9 @@ public final class DeviceRelayManager: ObservableObject {
                 networkDownBytesPerSecond: networkDownBytesPerSecond,
                 networkUpBytesPerSecond: networkUpBytesPerSecond
             )
-        )
+        try await send(DeviceRelayMessage(type: message.type, requestId: message.requestId,
+            fromDeviceId: message.fromDeviceId, targetDeviceId: message.targetDeviceId,
+            timestamp: message.timestamp, payload: message.payload.merging(clipboardStatusFields) { _, new in new }))
     }
 
     private func startReceiveLoop() {
@@ -729,9 +768,10 @@ public final class DeviceRelayManager: ObservableObject {
         )
     }
 
-    private func sendUsingLocalTransportIfPossible(_ message: DeviceRelayMessage) async -> Bool {
+    private func sendUsingLocalTransportIfPossible(_ message: DeviceRelayMessage, permit: DeviceRelaySendPermit?) async -> Bool {
         guard let targetDeviceID = message.targetDeviceId else { return false }
         if localTransport.connectedPeerIDs.contains(targetDeviceID) {
+            guard permit?.isValid ?? true else { return false }
             return sendLocal(message)
         }
         if deviceType == .iPhone {
@@ -740,6 +780,7 @@ public final class DeviceRelayManager: ObservableObject {
                 timeout: DevBarCoreConstants.DeviceRelay.localConnectTimeout
             )
             if connected {
+                guard permit?.isValid ?? true else { return false }
                 return sendLocal(message)
             }
         }
@@ -845,7 +886,8 @@ public final class DeviceRelayManager: ObservableObject {
     public static func makeSystemStatusRequestMessage(
         localDeviceID: String,
         targetDeviceId: String,
-        deviceName: String? = nil
+        deviceName: String? = nil,
+        requestID: String? = nil
     ) -> DeviceRelayMessage {
         var payload: [String: String] = [:]
         if let deviceName = normalizedDeviceName(deviceName) {
@@ -853,7 +895,7 @@ public final class DeviceRelayManager: ObservableObject {
         }
         return DeviceRelayMessage(
             type: .systemStatusRequest,
-            requestId: "status-\(UUID().uuidString.lowercased())",
+            requestId: requestID ?? "status-\(UUID().uuidString.lowercased())",
             fromDeviceId: localDeviceID,
             targetDeviceId: targetDeviceId,
             payload: payload
@@ -1057,6 +1099,10 @@ public final class DeviceRelayManager: ObservableObject {
     }
 
     private func handle(_ message: DeviceRelayMessage) {
+        if message.type == .clipboardSecure {
+            clipboardMessageHandler?(message)
+            return
+        }
         switch message.type {
         case .relayConnected:
             connectionState = .connected
@@ -1070,6 +1116,11 @@ public final class DeviceRelayManager: ObservableObject {
             activeTransport = localConnectedPeerIDs.isEmpty ? .relay : .local
             lastErrorMessage = nil
         case .systemStatus:
+            clipboardCapabilityProbe.receive(message)
+            if let peer = message.fromDeviceId {
+                clipboardPeerVersions[peer] = Int(message.payload["clipboardVersion"] ?? "")
+                clipboardPeerStates[peer] = message.payload["clipboardState"]
+            }
             receivedMessages.append(message)
             updatePeerRuntimeState(from: message)
         case .agentProgress:
@@ -1467,10 +1518,8 @@ public final class DeviceRelayManager: ObservableObject {
         }
     }
 
-    private static func randomLocalSecret() -> String {
-        var bytes = [UInt8](repeating: 0, count: 32)
-        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
-        return Data(bytes).base64URLEncodedString()
+    private static func randomLocalSecret() throws -> String {
+        try ClipboardRandom.bytes().base64URLEncodedString()
     }
 
     private func appendLog(_ level: DeviceRelayLogEntry.Level, _ message: String) {

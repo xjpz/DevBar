@@ -32,6 +32,7 @@ struct IOSMacRelayView: View {
                 VStack(spacing: 18) {
                     if let peer = selectedMacPeer {
                         macStatusCard(peer)
+                        clipboardEntry
                         controlCard(peer)
                     } else {
                         emptyRelayCard
@@ -146,6 +147,42 @@ struct IOSMacRelayView: View {
                 await refreshRelayState()
             }
         }
+    }
+
+    private var clipboardEntry: some View {
+        NavigationLink {
+            IOSClipboardHistoryView()
+                .environment(\.iosToolEntryContext, .pushed)
+        } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "doc.on.clipboard")
+                    .font(.title2)
+                    .foregroundStyle(theme.brandPrimary)
+                    .frame(width: 32)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("clipboard_title")
+                        .font(.headline)
+                        .foregroundStyle(theme.textPrimary)
+                    Text("clipboard_tool_subtitle")
+                        .font(.subheadline)
+                        .foregroundStyle(theme.textSecondary)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(theme.textTertiary)
+                    .accessibilityHidden(true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(16)
+            .background(cardBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(theme.textTertiary.opacity(0.2), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("ios.tools.macRelay.clipboard")
     }
 
     private func macStatusCard(_ peer: DeviceRelayDevice) -> some View {

@@ -299,7 +299,9 @@ public final class DeviceRelayLocalTransport {
         case .localReady:
             markAuthenticated(peerDeviceID: message.fromDeviceId, on: localConnection)
         default:
-            guard localConnection.peerDeviceID != nil else {
+            guard let authenticatedPeer = localConnection.peerDeviceID,
+                  message.fromDeviceId == authenticatedPeer,
+                  message.targetDeviceId == localDeviceID else {
                 logHandler?(.warning, "忽略未认证本地消息：\(message.type.rawValue)")
                 return
             }
@@ -524,6 +526,12 @@ private final class LocalConnection: @unchecked Sendable {
             if let data, !data.isEmpty {
                 self.buffer.append(data)
                 self.emitBufferedMessages()
+                // A receive chunk size is not a frame limit. Bound incomplete/unframed input too.
+                if self.buffer.count > 1024 * 1024 {
+                    self.connection.cancel()
+                    self.closeHandler?()
+                    return
+                }
             }
             if isComplete || error != nil {
                 self.closeHandler?()
@@ -536,6 +544,12 @@ private final class LocalConnection: @unchecked Sendable {
     private func emitBufferedMessages() {
         while let newlineIndex = buffer.firstIndex(of: 10) {
             let line = buffer[..<newlineIndex]
+            guard line.count <= 1024 * 1024 else {
+                buffer.removeAll()
+                connection.cancel()
+                closeHandler?()
+                return
+            }
             buffer.removeSubrange(...newlineIndex)
             guard !line.isEmpty,
                   let message = try? DeviceRelayMessageCodec.decode(Data(line)) else {

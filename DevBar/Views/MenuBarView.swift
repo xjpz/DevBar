@@ -9,13 +9,16 @@ struct MenuBarView: View {
     @EnvironmentObject private var quotaViewModel: QuotaViewModel
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
             if appViewModel.authState == .loggedIn {
                 LoggedInContentView()
-            } else if appViewModel.authState == .loading {
-                loadingView
             } else {
-                loginView
+                utilityHeader
+                if appViewModel.authState == .loading {
+                    loadingView
+                } else {
+                    loginView
+                }
             }
         }
         .frame(width: Constants.UI.popoverWidth)
@@ -32,6 +35,19 @@ struct MenuBarView: View {
 
     // MARK: - Subviews
 
+    private var utilityHeader: some View {
+        HStack(spacing: 8) {
+            Text("DevBar")
+                .font(.headline)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            ClipboardToolbarButton()
+            SettingsToolbarButton()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
@@ -47,12 +63,64 @@ struct MenuBarView: View {
     }
 }
 
+private struct ClipboardToolbarButton: View {
+    @EnvironmentObject private var appViewModel: AppViewModel
+
+    var body: some View {
+        Button { appViewModel.showClipboard() } label: {
+            Image(systemName: "clipboard")
+                .modifier(MenuBarToolbarIcon())
+        }
+        .buttonStyle(.borderless)
+        .help("clipboard_title")
+        .accessibilityLabel("clipboard_title")
+        .accessibilityIdentifier("mac.clipboard.open")
+    }
+}
+
+private struct SettingsToolbarButton: View {
+    @EnvironmentObject private var appViewModel: AppViewModel
+    @EnvironmentObject private var updateViewModel: UpdateViewModel
+
+    var body: some View {
+        Button { appViewModel.showSettings() } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "gearshape")
+                if updateViewModel.hasUpdateAvailable {
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 8, height: 8)
+                        .offset(x: 4, y: -4)
+                }
+            }
+            .modifier(MenuBarToolbarIcon())
+        }
+        .buttonStyle(.borderless)
+        .help("settings")
+        .accessibilityLabel("settings")
+    }
+}
+
+private struct MenuBarToolbarIcon: ViewModifier {
+    @State private var isHovered = false
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: 14, weight: .regular))
+            .foregroundStyle(.secondary)
+            .frame(width: 24, height: 24)
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .background(isHovered ? Color.primary.opacity(0.08) : .clear,
+                        in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .onHover { isHovered = $0 }
+    }
+}
+
 private struct LoggedInContentView: View {
     @EnvironmentObject private var appViewModel: AppViewModel
     @EnvironmentObject private var quotaViewModel: QuotaViewModel
     @EnvironmentObject private var openAIQuotaViewModel: OpenAIQuotaViewModel
     @EnvironmentObject private var mimoQuotaViewModel: MimoQuotaViewModel
-    @EnvironmentObject private var updateViewModel: UpdateViewModel
     @State private var selectedAccountID: String?
 
     private var enabledAccounts: [ProviderAccount] {
@@ -143,7 +211,7 @@ private struct LoggedInContentView: View {
     // MARK: - Header
 
     private var headerView: some View {
-        HStack {
+        HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("DevBar")
                     .font(.headline)
@@ -154,36 +222,30 @@ private struct LoggedInContentView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Spacer()
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            if isSelectedProviderLoading {
-                ProgressView()
-                    .controlSize(.small)
+            ZStack {
+                if isSelectedProviderLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                }
             }
+            .frame(width: 16, height: 16)
+
+            ClipboardToolbarButton()
 
             Button(action: {
                 Task { await appViewModel.refreshQuota() }
             }) {
                 Image(systemName: "arrow.clockwise")
+                    .modifier(MenuBarToolbarIcon())
             }
             .buttonStyle(.borderless)
             .help("refresh")
+            .accessibilityLabel("refresh")
 
-            Button(action: {
-                appViewModel.showSettings()
-            }) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: "gearshape")
-                    if updateViewModel.hasUpdateAvailable {
-                        Circle()
-                            .fill(.red)
-                            .frame(width: 8, height: 8)
-                            .offset(x: 4, y: -4)
-                    }
-                }
-            }
-            .buttonStyle(.borderless)
-            .help("settings")
+            SettingsToolbarButton()
         }
     }
 

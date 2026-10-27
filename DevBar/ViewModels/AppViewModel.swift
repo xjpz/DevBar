@@ -64,6 +64,7 @@ final class AppViewModel: ObservableObject {
     let notificationService = NotificationService()
     let weChatViewModel = WeChatViewModel()
     let deviceRelayManager = DeviceRelayManager()
+    let clipboard = MacClipboardController()
     let antiSleepService = AntiSleepService()
     private let providerPingSettingsStore = UserDefaultsProviderPingSettingsStore()
     private let providerPingAPIClient = BigModelAPIClient()
@@ -430,6 +431,7 @@ final class AppViewModel: ObservableObject {
             quotaViewModel.isLoading = true
         }
         syncAuthState()
+        clipboard.start(relay: deviceRelayManager)
         deviceRelayManager.messageHandler = { [weak self] message in
             Task { @MainActor [weak self] in
                 await self?.handleRelayMessage(message)
@@ -1948,6 +1950,10 @@ final class AppViewModel: ObservableObject {
     }
 
     // MARK: - Settings Window
+
+    func showClipboard() {
+        clipboard.showWindow(locale: languageManager?.currentLocale ?? .current)
+    }
 
     func showSettings(select tab: SettingsTab? = nil) {
         if let tab {

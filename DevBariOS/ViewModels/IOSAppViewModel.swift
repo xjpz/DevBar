@@ -205,6 +205,7 @@ final class IOSAppViewModel: ObservableObject {
     let mimoQuotaViewModel = MimoQuotaViewModel()
     let deepSeekQuotaViewModel = DeepSeekQuotaViewModel()
     let deviceRelayManager = DeviceRelayManager()
+    let clipboard = IOSClipboardViewModel()
 
     private let authService = AuthService()
     private let settingsStore = UserDefaultsAccountSettingsStore()
@@ -301,6 +302,7 @@ final class IOSAppViewModel: ObservableObject {
             ?? DeviceRelayHomeScreenShortcutPolicy.defaultSelection(hasPairedMac: false)
         self.availableHomeScreenShortcutActions = DeviceRelayHomeScreenShortcutPolicy.availableActions(hasPairedMac: false)
         self.syncedQuotaSnapshots = Self.loadSyncedQuotaSnapshots(for: accounts)
+        clipboard.attach(relay: deviceRelayManager)
         bindChildViewModels()
         NotificationCenter.default.publisher(for: .iosAPNsTokenChanged)
             .sink { [weak self] _ in
@@ -864,6 +866,11 @@ final class IOSAppViewModel: ObservableObject {
     private func restartQuotaAutoRefreshTimerIfNeeded() {
         guard isQuotaAutoRefreshActive else { return }
         scheduleNextQuotaAutoRefresh()
+    }
+
+    func prepareClipboard() async {
+        await startRelayIfNeeded()
+        await deviceRelayManager.refreshPeers()
     }
 
     private func startRelayIfNeeded(resume: Bool = false) async {

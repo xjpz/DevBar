@@ -1,5 +1,13 @@
 import Foundation
 
+/// Rechecked after connection waits, immediately before handing a message to a transport.
+@MainActor
+public final class DeviceRelaySendPermit {
+    private let validate: () -> Bool
+    public init(validate: @escaping () -> Bool) { self.validate = validate }
+    public var isValid: Bool { validate() }
+}
+
 public enum DeviceRelayDeviceType: String, Codable, Sendable, Equatable {
     case iPhone = "iphone"
     case mac
@@ -192,6 +200,7 @@ public struct DeviceAccountBindConfirmation: Codable, Sendable, Equatable {
 }
 
 public enum DeviceRelayMessageType: String, Codable, Sendable, Equatable {
+    case clipboardSecure = "clipboard.secure"
     case relayConnected = "relay.connected"
     case relayMessage = "relay.message"
     case relayPaired = "relay.paired"
