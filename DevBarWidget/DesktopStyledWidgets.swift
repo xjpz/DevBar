@@ -52,6 +52,17 @@ struct DesktopStyledWidgetConfigurationIntent: WidgetConfigurationIntent {
     @Parameter(title: "强调色", default: .automatic)
     var compactTimeAccentColor: CompactTimeAccentColorSelection?
 
+    #if os(iOS)
+    @Parameter(title: "额度样式", default: .classic)
+    var quotaStyle: QuotaWidgetStyleSelection?
+
+    @Parameter(title: "额度周期", default: .automatic)
+    var quotaPeriod: QuotaWidgetPeriodSelection?
+
+    @Parameter(title: "额度文字颜色", default: .automatic)
+    var quotaTextColor: QuotaWidgetTextSelection?
+    #endif
+
     static var parameterSummary: some ParameterSummary {
         Switch(\.$content) {
             Case([.compactTimeA, .compactTimeB, .compactTimeC]) {
@@ -60,6 +71,15 @@ struct DesktopStyledWidgetConfigurationIntent: WidgetConfigurationIntent {
                     \.$compactTimeAccentColor
                 }
             }
+            #if os(iOS)
+            Case([.glmQuota, .openAIQuota, .mimoQuota, .deepSeekQuota]) {
+                Summary("显示 \(\.$content)") {
+                    \.$quotaStyle
+                    \.$quotaPeriod
+                    \.$quotaTextColor
+                }
+            }
+            #endif
             DefaultCase {
                 Summary("显示 \(\.$content)")
             }
@@ -70,6 +90,9 @@ struct DesktopStyledWidgetConfigurationIntent: WidgetConfigurationIntent {
 struct DesktopStyledWidgetEntry: TimelineEntry {
     let date: Date
     let content: Content
+    #if os(iOS)
+    var quotaAppearance: QuotaWidgetAppearance = .classic
+    #endif
 
     enum Content {
         case quota(QuotaEntry, dataByProvider: [WidgetProviderSelection: WidgetSharedData])
@@ -95,7 +118,7 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
         let content = configuration.content.enabledContent
         if context.isPreview {
             if let provider = content.quotaProvider {
-                return previewQuotaEntry(date: Date(), provider: provider)
+                return configured(previewQuotaEntry(date: Date(), provider: provider), for: configuration)
             }
             return entry(for: configuration, date: Date())
         }
@@ -168,14 +191,31 @@ struct DesktopStyledWidgetTimelineProvider: AppIntentTimelineProvider {
         for configuration: DesktopStyledWidgetConfigurationIntent,
         date: Date
     ) -> DesktopStyledWidgetEntry {
-        entry(
+        configured(entry(
             date: date,
             content: configuration.content.enabledContent,
             compactTimeAppearance: CompactTimeAppearance(
                 textColorSelection: configuration.compactTimeTextColor ?? .automatic,
                 accentColorSelection: configuration.compactTimeAccentColor ?? .automatic
             )
+        ), for: configuration)
+    }
+
+    private func configured(
+        _ entry: DesktopStyledWidgetEntry,
+        for configuration: DesktopStyledWidgetConfigurationIntent
+    ) -> DesktopStyledWidgetEntry {
+        #if os(iOS)
+        var result = entry
+        result.quotaAppearance = QuotaWidgetAppearance(
+            style: configuration.quotaStyle ?? .classic,
+            period: configuration.quotaPeriod ?? .automatic,
+            text: configuration.quotaTextColor ?? .automatic
         )
+        return result
+        #else
+        return entry
+        #endif
     }
 
     private func entry(
@@ -358,15 +398,16 @@ struct DesktopStyledWidgetEntryView: View {
     var body: some View {
         switch entry.content {
         case let .quota(quota, dataByProvider):
-            if family == .systemLarge {
-                DesktopStyledQuotaLargeView(
-                    dataByProvider: dataByProvider,
-                    visualStyle: visualStyle,
-                    referenceDate: entry.date
-                )
+            #if os(iOS)
+            if entry.quotaAppearance.style != .classic {
+                StyledQuotaWidgetView(entry: quota, visualStyle: visualStyle, appearance: entry.quotaAppearance)
             } else {
-                DevBarWidgetEntryView(entry: quota, visualStyle: visualStyle)
+                classicQuotaView(quota, dataByProvider: dataByProvider)
             }
+            #else
+            classicQuotaView(quota, dataByProvider: dataByProvider)
+            #endif
+
         case let .macTheme(macTheme):
             MacThemeWidgetEntryView(entry: macTheme, visualStyle: visualStyle)
         case let .flipClock(flipClock):
@@ -378,6 +419,22 @@ struct DesktopStyledWidgetEntryView: View {
                 visualStyle: visualStyle,
                 appearance: appearance
             )
+        }
+    }
+
+    @ViewBuilder
+    private func classicQuotaView(
+        _ quota: QuotaEntry,
+        dataByProvider: [WidgetProviderSelection: WidgetSharedData]
+    ) -> some View {
+        if family == .systemLarge {
+            DesktopStyledQuotaLargeView(
+                dataByProvider: dataByProvider,
+                visualStyle: visualStyle,
+                referenceDate: entry.date
+            )
+        } else {
+            DevBarWidgetEntryView(entry: quota, visualStyle: visualStyle)
         }
     }
 }
@@ -392,7 +449,20 @@ private struct DesktopStyledWidgetRootView: View {
     var body: some View {
         DesktopStyledWidgetEntryView(entry: entry, visualStyle: visualStyle)
             .padding(contentMargins)
-            .styledWidgetBackground(visualStyle)
+            .containerBackground(for: .widget) { widgetBackground }
+    }
+
+    @ViewBuilder
+    private var widgetBackground: some View {
+        #if os(iOS)
+        if visualStyle == .dark, entry.quotaAppearance.style.isInstrument {
+            entry.quotaAppearance.style.instrumentBackground
+        } else {
+            WidgetVisualStyleBackground(style: visualStyle)
+        }
+        #else
+        WidgetVisualStyleBackground(style: visualStyle)
+        #endif
     }
 
     private var contentMargins: EdgeInsets {

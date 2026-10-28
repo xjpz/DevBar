@@ -1,6 +1,32 @@
 import Foundation
 
+public enum WidgetQuotaPeriod: String, Sendable {
+    case automatic, fiveHour, weekly, monthly
+}
+
 public enum WidgetQuotaPresentation {
+    /// An explicit selection must never silently display a different quota period.
+    public static func selectedLimit(
+        in limits: [WidgetQuotaLimit],
+        provider: WidgetProvider?,
+        period: WidgetQuotaPeriod
+    ) -> WidgetQuotaLimit? {
+        let sorted = sortedLimits(limits, provider: provider)
+        switch period {
+        case .automatic: return sorted.first
+        case .fiveHour: return sorted.first(where: isFiveHourLimit)
+        case .weekly: return sorted.first(where: isWeeklyLimit)
+        case .monthly: return sorted.first(where: isMonthlyLimit)
+        }
+    }
+
+    /// Preserve distinct empty/full endpoints even for a low-resolution instrument.
+    public static func filledSegments(percentage: Int, count: Int) -> Int {
+        guard count > 0, percentage > 0 else { return 0 }
+        guard percentage < 100 else { return count }
+        return min(max(1, count - 1), max(1, Int((Double(percentage) * Double(count) / 100).rounded())))
+    }
+
     public static func sortedLimits(
         _ limits: [WidgetQuotaLimit],
         provider: WidgetProvider?

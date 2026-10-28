@@ -64,3 +64,35 @@ private func limit(type: String, name: String) -> WidgetQuotaLimit {
         formattedResetTime: nil
     )
 }
+
+@Test
+func instrumentPeriodSelectionDoesNotSubstituteMissingPeriods() {
+    let session = limit(type: "OPENAI_SESSION", name: "5h Usage Limit")
+    let weekly = limit(type: "OPENAI_WEEKLY", name: "Weekly Usage Limit")
+    let monthly = limit(type: "TOKENS_LIMIT", name: "月度 Token")
+    let limits = [monthly, weekly, session]
+
+    #expect(WidgetQuotaPresentation.selectedLimit(in: limits, provider: .openai, period: .automatic) == session)
+    #expect(WidgetQuotaPresentation.selectedLimit(in: limits, provider: .openai, period: .fiveHour) == session)
+    #expect(WidgetQuotaPresentation.selectedLimit(in: limits, provider: .openai, period: .weekly) == weekly)
+    #expect(WidgetQuotaPresentation.selectedLimit(in: limits, provider: .openai, period: .monthly) == monthly)
+    #expect(WidgetQuotaPresentation.selectedLimit(in: [session], provider: .openai, period: .weekly) == nil)
+    #expect(WidgetQuotaPresentation.selectedLimit(in: [], provider: .openai, period: .automatic) == nil)
+}
+
+@Test
+func instrumentProgressKeepsEmptyFullAndSmallUsageDistinct() {
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: -10, count: 28) == 0)
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: 0, count: 28) == 0)
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: 1, count: 28) == 1)
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: 13, count: 28) == 4)
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: 99, count: 28) == 27)
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: 100, count: 28) == 28)
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: 120, count: 14) == 14)
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: 50, count: 0) == 0)
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: 50, count: -1) == 0)
+    #expect(WidgetQuotaPresentation.filledSegments(percentage: 1, count: 1) == 1)
+    let values = (-1...101).map { WidgetQuotaPresentation.filledSegments(percentage: $0, count: 14) }
+    #expect(values == values.sorted())
+    #expect(values.allSatisfy { (0...14).contains($0) })
+}
