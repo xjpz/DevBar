@@ -63,6 +63,7 @@ struct DesktopStyledWidgetConfigurationIntent: WidgetConfigurationIntent {
     var quotaTextColor: QuotaWidgetTextSelection?
     #endif
 
+    #if os(iOS)
     static var parameterSummary: some ParameterSummary {
         Switch(\.$content) {
             Case([.compactTimeA, .compactTimeB, .compactTimeC]) {
@@ -71,7 +72,6 @@ struct DesktopStyledWidgetConfigurationIntent: WidgetConfigurationIntent {
                     \.$compactTimeAccentColor
                 }
             }
-            #if os(iOS)
             Case([.glmQuota, .openAIQuota, .mimoQuota, .deepSeekQuota]) {
                 Summary("显示 \(\.$content)") {
                     \.$quotaStyle
@@ -79,12 +79,26 @@ struct DesktopStyledWidgetConfigurationIntent: WidgetConfigurationIntent {
                     \.$quotaTextColor
                 }
             }
-            #endif
             DefaultCase {
                 Summary("显示 \(\.$content)")
             }
         }
     }
+    #else
+    static var parameterSummary: some ParameterSummary {
+        Switch(\.$content) {
+            Case([.compactTimeA, .compactTimeB, .compactTimeC]) {
+                Summary("显示 \(\.$content)") {
+                    \.$compactTimeTextColor
+                    \.$compactTimeAccentColor
+                }
+            }
+            DefaultCase {
+                Summary("显示 \(\.$content)")
+            }
+        }
+    }
+    #endif
 }
 
 struct DesktopStyledWidgetEntry: TimelineEntry {

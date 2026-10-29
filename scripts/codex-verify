@@ -50,6 +50,8 @@ case "$profile" in
     run_core_tests
     run_xcode_build DevBar "generic/platform=macOS" macos
     run_xcode_build DevBariOS "generic/platform=iOS Simulator" ios
+    python3 scripts/verify-widget-intent-metadata.py \
+      "$cache_root/derived/ios/Build/Products/Debug-iphonesimulator/DevBarWidgetExtension.appex/Metadata.appintents/extract.actionsdata"
     ;;
   release)
     run_hygiene
